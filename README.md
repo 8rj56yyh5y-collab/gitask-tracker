@@ -16,7 +16,7 @@
 - Приём операций: `POST /api/ingest` (Apple Pay и SMS через «Команды» iOS), `POST /api/monobank` (вебхук).
 - PWA: ставится на экран «Домой» iPhone.
 
-Техническое задание и план этапов — в документе ТЗ. Настройка iPhone — [docs/IPHONE_SETUP.md](docs/IPHONE_SETUP.md).
+Техническое задание и план этапов — в документе ТЗ. Запуск в интернете — [docs/DEPLOY.md](docs/DEPLOY.md). Настройка iPhone — [docs/IPHONE_SETUP.md](docs/IPHONE_SETUP.md).
 
 ## Запуск
 
