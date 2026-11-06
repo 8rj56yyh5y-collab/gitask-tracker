@@ -13,5 +13,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!login|api/ingest|api/monobank|_next/|manifest.webmanifest|icon.svg|sw.js|favicon.ico).*)"],
+  matcher: ["/((?!login|api/ingest|api/monobank|api/telegram|_next/|manifest.webmanifest|icon.svg|sw.js|favicon.ico).*)"],
 };

@@ -39,7 +39,7 @@ const at = (day: number, hour: number) => {
   return (d > now ? now : d).toISOString();
 };
 
-// [день, час, сумма ₴ (минус — расход), карта, подразделение | null, контрагент, для кого, источник]
+// [день, час, сумма ₴ (минус — расход), карта, категория | null, контрагент, для кого, источник]
 const txs: [number, number, number, string, string | null, string, string, string][] = [
   [1, 9, -12_400, "1234", "Пункт Житомир", "Петренко О. (лом)", "", "sms"],
   [1, 14, -850, "1234", "Отдел продаж", "WOG", "", "applepay"],
@@ -71,4 +71,38 @@ for (const [day, hour, uah, last4, centerName, counterparty, forWhom, source] of
     source,
   });
 }
-console.log(`Демо готово: ${cards.length} карт, ${txs.length} операций.`);
+// Прошлые 5 месяцев — для аналитики и сравнения (суммы условные).
+const history: [string, number][] = [
+  ["Пункт Житомир", 52_000], ["Пункт Бердичев", 41_000], ["Отдел продаж", 14_000],
+  ["Продукты", 9_500], ["Топливо", 18_000], ["Руководитель", 7_000], ["ФОП (налоги", 3_600],
+];
+let past = 0;
+for (let back = 1; back <= 5; back++) {
+  const factor = [1, 0.92, 1.08, 0.85, 0.97][back - 1];
+  for (const [i, [name, base]] of history.entries()) {
+    for (const part of [0.6, 0.4]) {
+      const d = new Date(now.getFullYear(), now.getMonth() - back, 3 + i * 3 + (part < 0.5 ? 1 : 0), 12);
+      repo.insertTx({
+        occurredAt: d.toISOString(),
+        amountKop: -Math.round((base * factor * part) / 10) * 1000,
+        cardId: card(["1234", "5678", "9012"][i % 3]),
+        costCenterId: center(name),
+        counterparty: name,
+        source: "import",
+      });
+      past++;
+    }
+  }
+  // Поступление от покупателя лома — сразу с категорией, чтобы не висело в «Нужно записать».
+  repo.insertTx({
+    occurredAt: new Date(now.getFullYear(), now.getMonth() - back, 20, 12).toISOString(),
+    amountKop: Math.round(180_000 * factor) * 100,
+    cardId: card("5678"),
+    costCenterId: center("Отдел продаж"),
+    kind: "income",
+    counterparty: "ТОВ Втормет",
+    source: "import",
+  });
+}
+
+console.log(`Демо готово: ${cards.length} карт, ${txs.length} операций в этом месяце и ${past} за прошлые 5 месяцев.`);

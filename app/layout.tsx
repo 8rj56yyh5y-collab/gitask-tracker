@@ -3,6 +3,7 @@ import Link from "next/link";
 import "./globals.css";
 import { unassignedSummary } from "@/lib/repo.ts";
 import { SwRegister } from "./sw-register.tsx";
+import { Nav } from "./components/Nav.tsx";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE, sessionValid } from "@/lib/session.ts";
 
@@ -42,21 +43,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="ru">
       <body>
         <header className="top">
-          <Link href="/" className="brand">D&amp;N</Link>
-          <Link href="/new" className="btn btn-primary btn-sm">+ Операция</Link>
+          <Link href="/" className="brand">
+            D&amp;N
+          </Link>
         </header>
         <main className="wrap">{children}</main>
-        <nav className="tabs">
-          <Link href="/" className="side-brand">D&amp;N</Link>
-          <Link href="/new" className="btn btn-primary side-new">+ Операция</Link>
-          <Link href="/">Главная</Link>
-          <Link href="/inbox">
-            Разнести{count > 0 && <span className="badge">{count}</span>}
-          </Link>
-          <Link href="/cards">Лимиты</Link>
-          <Link href="/centers">Подразделения</Link>
-          <Link href="/history">История</Link>
-        </nav>
+        <Nav pending={count} />
         <SwRegister />
       </body>
     </html>

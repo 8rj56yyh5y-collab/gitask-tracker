@@ -46,7 +46,7 @@ export function monthBounds(d = new Date()): { from: string; to: string } {
   return { from: from.toISOString(), to: to.toISOString() };
 }
 
-// ---------- Подразделения ----------
+// ---------- Категории ----------
 
 export function listCenters(): CostCenter[] {
   return rows<CostCenter>(
@@ -54,7 +54,7 @@ export function listCenters(): CostCenter[] {
   );
 }
 
-/** Подразделения в порядке дерева, с уровнем вложенности. */
+/** Категории в порядке дерева, с уровнем вложенности. */
 export function centerTree(): (CostCenter & { depth: number; path: string })[] {
   const all = listCenters();
   const out: (CostCenter & { depth: number; path: string })[] = [];
@@ -190,7 +190,7 @@ export function getTx(id: number): Tx | null {
   return (getDb().prepare(`${TX_SELECT} WHERE t.id = ?`).get(id) as unknown as Tx) ?? null;
 }
 
-/** Неразнесённые: нет подразделения и это не внутренний перевод. */
+/** Неразнесённые: нет категории и это не внутренний перевод. */
 export function listUnassigned(): Tx[] {
   return rows<Tx>(
     getDb()
@@ -216,7 +216,7 @@ export function listRecent(limit = 50): Tx[] {
 export function assignTx(id: number, centerId: number, forWhom?: string, description?: string) {
   const db = getDb();
   const center = db.prepare("SELECT is_internal FROM cost_centers WHERE id = ?").get(centerId) as Row | undefined;
-  if (!center) throw new Error("Подразделение не найдено");
+  if (!center) throw new Error("Категория не найдена");
   const tx = db.prepare("SELECT amount, kind FROM transactions WHERE id = ?").get(id) as Row | undefined;
   if (!tx) throw new Error("Операция не найдена");
   const kind = Number(center.is_internal) ? "internal" : Number(tx.amount) >= 0 ? "income" : "expense";
@@ -232,7 +232,7 @@ export function deleteTx(id: number) {
 }
 
 /**
- * Подсказка подразделений: сначала те, куда раньше разносили этого контрагента/описание,
+ * Подсказка категорий: сначала те, куда раньше разносили этого контрагента/описание,
  * затем самые частые за последние 90 дней.
  */
 export function suggestCenters(tx: Pick<Tx, "counterparty" | "description">, limit = 3): number[] {
@@ -272,7 +272,7 @@ export interface CenterStat {
   parent_id: number | null;
   is_internal: number;
   archived: number;
-  /** Расход за месяц, копейки, включая все вложенные подразделения. */
+  /** Расход за месяц, копейки, включая все вложенные категории. */
   spent: number;
   budget: number;
   forecast: number;
@@ -280,10 +280,10 @@ export interface CenterStat {
   status: BudgetStatus;
 }
 
-/** Расходы, прогноз и статус лимита по каждому подразделению за месяц (с учётом вложенных). */
+/** Расходы, прогноз и статус лимита по каждому категории за месяц (с учётом вложенных). */
 export function centerStats(today = new Date()): Map<number, CenterStat> {
   const { from, to } = monthBounds(today);
-  // Берём и скрытые подразделения: если по ним были расходы, деньги не должны «исчезнуть» из отчёта.
+  // Берём и скрытые категории: если по ним были расходы, деньги не должны «исчезнуть» из отчёта.
   const centers = rows<CostCenter & { archived: number }>(getDb().prepare("SELECT * FROM cost_centers").all());
   const direct = getDb()
     .prepare(
@@ -295,7 +295,7 @@ export function centerStats(today = new Date()): Map<number, CenterStat> {
   const byId = new Map(centers.map((c) => [c.id, c]));
   const totals = new Map<number, number>();
   for (const r of direct) {
-    // Расход идёт в само подразделение и во все его родительские.
+    // Расход идёт в саму категорию и во все её родительские.
     let c = byId.get(Number(r.id));
     const seen = new Set<number>();
     while (c && !seen.has(c.id)) {
@@ -327,28 +327,28 @@ export function centerStats(today = new Date()): Map<number, CenterStat> {
 
 const visible = (s: CenterStat) => !s.is_internal && (!s.archived || s.spent > 0);
 
-/** Корневые подразделения за месяц (вложенные уже суммированы в родителя). */
+/** Корневые категории за месяц (вложенные уже суммированы в родителя). */
 export function monthSpendByCenter(today = new Date()): CenterStat[] {
   return [...centerStats(today).values()]
     .filter((s) => s.parent_id === null && visible(s))
     .sort((a, b) => b.spent - a.spent);
 }
 
-/** Прямые подразделения внутри данного. */
+/** Прямые категории внутри данного. */
 export function childStats(parentId: number, today = new Date()): CenterStat[] {
   return [...centerStats(today).values()]
     .filter((s) => s.parent_id === parentId && visible(s))
     .sort((a, b) => b.spent - a.spent || a.name.localeCompare(b.name, "ru"));
 }
 
-/** Подразделения любого уровня, где лимит превышен или будет превышен при текущем темпе. */
+/** Категории любого уровня, где лимит превышен или будет превышен при текущем темпе. */
 export function budgetAlerts(today = new Date()): CenterStat[] {
   return [...centerStats(today).values()]
     .filter((s) => (s.status === "over" || s.status === "pace") && visible(s))
     .sort((a, b) => (a.status === b.status ? b.forecast - b.budget - (a.forecast - a.budget) : a.status === "over" ? -1 : 1));
 }
 
-/** id подразделения и всех вложенных. */
+/** id категории и всех вложенных. */
 function descendantIds(id: number): number[] {
   const all = rows<{ id: number; parent_id: number | null }>(getDb().prepare("SELECT id, parent_id FROM cost_centers").all());
   const out = [id];
@@ -356,7 +356,7 @@ function descendantIds(id: number): number[] {
   return out;
 }
 
-/** Операции подразделения (с вложенными) за текущий месяц. */
+/** Операции категории (с вложенными) за текущий месяц. */
 export function centerTransactions(id: number, today = new Date()): Tx[] {
   const { from, to } = monthBounds(today);
   const ids = descendantIds(id);
@@ -376,4 +376,90 @@ export function getCenter(id: number): (CostCenter & { archived: number }) | nul
 
 export function setCenterBudget(id: number, budgetKop: number) {
   getDb().prepare("UPDATE cost_centers SET monthly_budget = ? WHERE id = ?").run(Math.max(0, budgetKop), id);
+}
+
+// ---------- Аналитика по месяцам ----------
+
+/** "2026-11" → дата внутри этого месяца (для текущего — сегодня, для прошлых — последний день). */
+export function monthDate(key: string | null | undefined, now = new Date()): Date {
+  const m = key?.match(/^(\d{4})-(\d{2})$/);
+  if (!m) return now;
+  const y = Number(m[1]);
+  const mon = Number(m[2]) - 1;
+  if (y === now.getFullYear() && mon === now.getMonth()) return now;
+  if (new Date(y, mon, 1) > now) return now;
+  return new Date(y, mon + 1, 0, 12);
+}
+
+export function monthKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+export function shiftMonth(d: Date, delta: number): Date {
+  return new Date(d.getFullYear(), d.getMonth() + delta + 1, 0, 12);
+}
+
+export interface MonthTotal {
+  key: string;
+  expense: number;
+  income: number;
+}
+
+/** Расходы и поступления по месяцам: `count` месяцев, заканчивая месяцем `end`. */
+export function monthlyTotals(count = 12, end = new Date()): MonthTotal[] {
+  const out: MonthTotal[] = [];
+  for (let i = count - 1; i >= 0; i--) {
+    const d = shiftMonth(end, -i);
+    const { from, to } = monthBounds(d);
+    const r = getDb()
+      .prepare(
+        `SELECT COALESCE(SUM(CASE WHEN kind = 'expense' THEN -amount END), 0) AS e,
+                COALESCE(SUM(CASE WHEN kind = 'income' THEN amount END), 0) AS i
+         FROM transactions WHERE occurred_at >= ? AND occurred_at < ?`,
+      )
+      .get(from, to) as Row;
+    out.push({ key: monthKey(d), expense: Number(r.e), income: Number(r.i) });
+  }
+  return out;
+}
+
+export interface CategoryCompare {
+  id: number;
+  name: string;
+  color: string;
+  current: number;
+  previous: number;
+  /** Изменение в процентах; null, если в прошлом месяце расходов не было. */
+  changePct: number | null;
+}
+
+/** Сравнение расходов по категориям верхнего уровня: выбранный месяц против предыдущего. */
+export function compareWithPrevMonth(d: Date): CategoryCompare[] {
+  const cur = centerStats(d);
+  const prev = centerStats(shiftMonth(d, -1));
+  return [...cur.values()]
+    .filter((s) => s.parent_id === null && !s.is_internal)
+    .map((s) => {
+      const p = prev.get(s.id)?.spent ?? 0;
+      return {
+        id: s.id,
+        name: s.name,
+        color: s.color,
+        current: s.spent,
+        previous: p,
+        changePct: p > 0 ? Math.round(((s.spent - p) / p) * 100) : null,
+      };
+    })
+    .filter((c) => c.current > 0 || c.previous > 0)
+    .sort((a, b) => b.current - a.current);
+}
+
+export function getAiReport(month: string): { text: string; created_at: string } | null {
+  return (getDb().prepare("SELECT text, created_at FROM ai_reports WHERE month = ?").get(month) as { text: string; created_at: string }) ?? null;
+}
+
+export function saveAiReport(month: string, text: string) {
+  getDb()
+    .prepare("INSERT INTO ai_reports (month, text) VALUES (?, ?) ON CONFLICT(month) DO UPDATE SET text = excluded.text, created_at = datetime('now')")
+    .run(month, text);
 }

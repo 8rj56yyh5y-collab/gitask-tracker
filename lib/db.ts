@@ -44,6 +44,18 @@ CREATE TABLE IF NOT EXISTS transactions (
   assigned_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+-- Разборы месяца от ИИ (кешируются, чтобы не платить за повторный запрос).
+CREATE TABLE IF NOT EXISTS ai_reports (
+  month TEXT PRIMARY KEY, -- YYYY-MM
+  text TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_tx_unassigned ON transactions(cost_center_id, kind);
 CREATE INDEX IF NOT EXISTS idx_tx_card_date ON transactions(card_id, occurred_at);
 `;

@@ -7,7 +7,7 @@ export default function Centers() {
   const tree = centerTree();
   return (
     <div className="grid grid-2">
-      <h1>Подразделения</h1>
+      <h1>Категории</h1>
       <div className="card">
         {tree.map((c) => (
           <div key={c.id} className="row-between tree-row" style={{ paddingLeft: c.depth * 20 }}>
@@ -25,7 +25,7 @@ export default function Centers() {
         ))}
       </div>
       <form action={addCenter} className="card form">
-        <h2>Добавить подразделение</h2>
+        <h2>Добавить категорию</h2>
         <label>
           Название
           <input name="name" required placeholder="например, Пункт в Житомире" />

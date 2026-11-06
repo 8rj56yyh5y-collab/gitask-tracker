@@ -5,11 +5,12 @@ import { parseAmount, toKop } from "@/lib/money.ts";
 import { parseBankMessage } from "@/lib/sms.ts";
 import { findCard, insertTx } from "@/lib/repo.ts";
 import { revalidatePath } from "next/cache";
+import { notifyNewTx } from "@/lib/telegram.ts";
 
 // Приём операций из «Команд» iOS.
 //   Apple Pay:  { "source": "applepay", "amount": "₴250,00", "merchant": "АТБ", "card": "ПриватБанк •••• 1234" }
 //   SMS банка:  { "source": "sms", "text": "Oplata 250.00 UAH ATB *1234 ..." }
-// Ответ: { id, url } — «Команда» открывает url, где сразу выбирается подразделение.
+// Ответ: { id, url } — «Команда» открывает url, где сразу выбирается категория.
 
 export async function POST(req: Request) {
   if (!ingestTokenOk(bearer(req))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -65,8 +66,8 @@ export async function POST(req: Request) {
     occurredAt: now.toISOString(),
   });
 
-  revalidatePath("/");
-  revalidatePath("/inbox");
+  if (!duplicate) await notifyNewTx(id);
+  revalidatePath("/", "layout");
   const base = process.env.DN_PUBLIC_URL ?? new URL(req.url).origin;
   return NextResponse.json({ id, duplicate, url: `${base}/inbox/${id}` });
 }

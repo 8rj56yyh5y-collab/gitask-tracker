@@ -25,7 +25,7 @@ export default async function CenterPage({ params }: { params: Promise<{ id: str
     <div className="grid grid-2">
       <div className="span-all">
         <div className="muted small">
-          <Link href="/centers">Подразделения</Link>
+          <Link href="/centers">Категории</Link>
           {parent && (
             <>
               {" › "}

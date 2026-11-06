@@ -5,7 +5,7 @@ import { centerTree, listRecent, listUnassigned } from "@/lib/repo.ts";
 import { formatMoney } from "@/lib/money.ts";
 
 export default function History() {
-  // Неразнесённые висят сверху, пока им не выбрано подразделение, — с любой карты и из любого источника.
+  // Неразнесённые висят сверху, пока им не выбрана категория, — с любой карты и из любого источника.
   const pending = listUnassigned();
   const pendingIds = new Set(pending.map((t) => t.id));
   const done = listRecent(200).filter((t) => !pendingIds.has(t.id));

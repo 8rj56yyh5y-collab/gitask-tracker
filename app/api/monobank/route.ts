@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { bearer, ingestTokenOk } from "@/lib/auth.ts";
 import { findCard, insertTx } from "@/lib/repo.ts";
 import { revalidatePath } from "next/cache";
+import { notifyNewTx } from "@/lib/telegram.ts";
 
 // Вебхук Monobank (личный API, https://api.monobank.ua/docs/).
 // Регистрируется на адрес https://<домен>/api/monobank?key=<DN_INGEST_TOKEN>.
@@ -50,7 +51,7 @@ export async function POST(req: Request) {
     item.currencyCode && item.currencyCode !== 980 && typeof item.operationAmount === "number"
       ? `${(Math.abs(item.operationAmount) / 100).toFixed(2)} ${opCurrency}`
       : "";
-  insertTx({
+  const { id, duplicate } = insertTx({
     amountKop: item.amount,
     currency: "UAH",
     occurredAt: new Date((item.time ?? Date.now() / 1000) * 1000).toISOString(),
@@ -61,7 +62,7 @@ export async function POST(req: Request) {
     externalId: `mono:${item.id}`,
     raw: JSON.stringify(body),
   });
-  revalidatePath("/");
-  revalidatePath("/inbox");
+  if (!duplicate) await notifyNewTx(id);
+  revalidatePath("/", "layout");
   return new NextResponse("ok");
 }

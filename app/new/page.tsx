@@ -21,7 +21,7 @@ export default function NewTx() {
           <input name="amount" inputMode="decimal" required autoFocus placeholder="0" className="amount-input" />
         </label>
         <label>
-          Подразделение
+          Категория
           <select name="centerId" required defaultValue="">
             <option value="" disabled>
               — выберите —

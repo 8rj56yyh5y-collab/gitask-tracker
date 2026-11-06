@@ -5,7 +5,7 @@ import { suggestCenters, type Tx } from "@/lib/repo.ts";
 
 type Center = { id: number; name: string; path: string; color: string };
 
-/** Неразнесённая операция с кнопками быстрого выбора подразделения. */
+/** Неразнесённая операция с кнопками быстрого выбора категории. */
 export function UnassignedItem({ tx, centers, next }: { tx: Tx; centers: Map<number, Center>; next?: string }) {
   const sugg = suggestCenters(tx)
     .map((id) => centers.get(id))
@@ -26,7 +26,7 @@ export function UnassignedItem({ tx, centers, next }: { tx: Tx; centers: Map<num
           </form>
         ))}
         <Link href={`/inbox/${tx.id}`} className="btn btn-sm btn-ghost">
-          {sugg.length ? "Другое…" : "Выбрать подразделение…"}
+          {sugg.length ? "Другое…" : "Выбрать категорию…"}
         </Link>
       </div>
     </div>

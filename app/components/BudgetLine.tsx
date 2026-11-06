@@ -4,7 +4,7 @@ import type { CenterStat } from "@/lib/repo.ts";
 
 const STATUS_COLOR = { ok: "var(--green)", pace: "var(--orange)", over: "var(--red)" } as const;
 
-/** Строка подразделения: расход, полоска, прогноз до конца месяца и сигнал по лимиту. */
+/** Строка категории: расход, полоска, прогноз до конца месяца и сигнал по лимиту. */
 export function BudgetLine({ s, total, href }: { s: CenterStat; total: number; href?: string }) {
   const hasBudget = s.budget > 0;
   // С лимитом — полоска показывает долю лимита и красится по статусу; без лимита — долю от всех расходов.
