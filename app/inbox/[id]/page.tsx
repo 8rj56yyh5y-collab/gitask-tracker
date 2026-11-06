@@ -12,7 +12,7 @@ export default async function AssignOne({ params }: { params: Promise<{ id: stri
   const sugg = new Set(suggestCenters(tx));
 
   return (
-    <>
+    <div className="narrow-wide">
       <h1>Куда ушли деньги?</h1>
       <div className="card">
         <TxRow tx={tx} />
@@ -43,6 +43,6 @@ export default async function AssignOne({ params }: { params: Promise<{ id: stri
         <input type="hidden" name="id" value={tx.id} />
         <button className="btn btn-ghost btn-sm danger">Удалить операцию (дубль / ошибка)</button>
       </form>
-    </>
+    </div>
   );
 }

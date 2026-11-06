@@ -20,7 +20,7 @@ export default function Cards() {
     .sort((a, b) => b.left - a.left)[0];
 
   return (
-    <>
+    <div className="grid grid-auto">
       <h1>Лимиты карт</h1>
       {limited.length > 0 && (
         <div className="card">
@@ -104,6 +104,6 @@ export default function Cards() {
         </label>
         <button className="btn btn-primary">Добавить</button>
       </form>
-    </>
+    </div>
   );
 }

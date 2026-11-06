@@ -311,7 +311,8 @@ export function monthSpendByCenter(today = new Date()): CenterSpend[] {
         color: c.color,
         spent: s,
         budget: c.monthly_budget,
-        forecast: day >= FORECAST_FROM_DAY ? Math.round((s / day) * daysInMonth) : null,
+        // Округляем до целых гривен: копейки в прогнозе — ложная точность.
+        forecast: day >= FORECAST_FROM_DAY ? Math.round((s / day) * daysInMonth / 100) * 100 : null,
       };
     })
     .sort((a, b) => b.spent - a.spent);

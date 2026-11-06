@@ -11,7 +11,7 @@ export default function Inbox() {
   const total = items.reduce((a, t) => a + Math.abs(t.amount), 0);
 
   return (
-    <>
+    <div className="grid grid-auto">
       <h1>Не разнесено</h1>
       {items.length === 0 ? (
         <div className="card alert alert-ok big">Всё разнесено ✓</div>
@@ -28,8 +28,8 @@ export default function Inbox() {
             <form action={assignTransaction} className="quick">
               <input type="hidden" name="id" value={t.id} />
               {sugg.map((c) => (
-                <button key={c!.id} name="centerId" value={c!.id} className="btn btn-sm" style={{ borderColor: c!.color }}>
-                  {c!.path}
+                <button key={c!.id} name="centerId" value={c!.id} className="btn btn-sm" style={{ borderColor: c!.color }} title={c!.path}>
+                  {c!.name}
                 </button>
               ))}
               <Link href={`/inbox/${t.id}`} className="btn btn-sm btn-ghost">
@@ -39,6 +39,6 @@ export default function Inbox() {
           </div>
         );
       })}
-    </>
+    </div>
   );
 }

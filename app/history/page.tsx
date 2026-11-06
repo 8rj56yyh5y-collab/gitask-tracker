@@ -5,7 +5,7 @@ import { listRecent } from "@/lib/repo.ts";
 export default function History() {
   const items = listRecent(200);
   return (
-    <>
+    <div className="narrow-wide">
       <h1>История</h1>
       {items.length === 0 && <p className="muted">Операций пока нет.</p>}
       <div className="card">
@@ -15,6 +15,6 @@ export default function History() {
           </Link>
         ))}
       </div>
-    </>
+    </div>
   );
 }

@@ -47,6 +47,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </header>
         <main className="wrap">{children}</main>
         <nav className="tabs">
+          <Link href="/" className="side-brand">D&amp;N</Link>
+          <Link href="/new" className="btn btn-primary side-new">+ Операция</Link>
           <Link href="/">Главная</Link>
           <Link href="/inbox">
             Разнести{count > 0 && <span className="badge">{count}</span>}

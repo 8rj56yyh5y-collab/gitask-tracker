@@ -5,7 +5,7 @@ export default function NewTx() {
   const tree = centerTree();
   const cards = listCards();
   return (
-    <>
+    <div className="narrow">
       <h1>Новая операция</h1>
       <form action={addTransaction} className="card form">
         <div className="seg">
@@ -63,6 +63,6 @@ export default function NewTx() {
         </label>
         <button className="btn btn-primary">Записать</button>
       </form>
-    </>
+    </div>
   );
 }

@@ -5,7 +5,7 @@ import { formatMoney } from "@/lib/money.ts";
 export default function Centers() {
   const tree = centerTree();
   return (
-    <>
+    <div className="grid grid-2">
       <h1>Подразделения</h1>
       <div className="card">
         {tree.map((c) => (
@@ -53,9 +53,9 @@ export default function Centers() {
         </label>
         <button className="btn btn-primary">Добавить</button>
       </form>
-      <form action="/logout" method="post">
+      <form action="/logout" method="post" className="span-all">
         <button className="btn btn-ghost btn-sm">Выйти</button>
       </form>
-    </>
+    </div>
   );
 }

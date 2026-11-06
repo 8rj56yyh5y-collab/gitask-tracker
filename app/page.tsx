@@ -18,8 +18,8 @@ export default function Home() {
   const month = new Date().toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
 
   return (
-    <>
-      <Link href="/inbox" className={`card alert ${un.count ? "alert-on" : "alert-ok"}`}>
+    <div className="grid grid-home">
+      <Link href="/inbox" className={`card alert span-all ${un.count ? "alert-on" : "alert-ok"}`}>
         {un.count ? (
           <>
             <div className="big">{un.count} не разнесено</div>
@@ -76,6 +76,6 @@ export default function Home() {
           </>
         )}
       </Link>
-    </>
+    </div>
   );
 }
