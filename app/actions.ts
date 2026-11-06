@@ -16,8 +16,8 @@ import {
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const num = (f: FormData, k: string) => {
-  const v = str(f, k);
-  return v ? Number(v) : null;
+  const v = Number(str(f, k));
+  return str(f, k) && Number.isFinite(v) ? v : null;
 };
 
 function refresh() {

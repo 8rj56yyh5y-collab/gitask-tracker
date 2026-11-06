@@ -27,6 +27,7 @@ export async function POST(req: Request) {
         description?: string;
         comment?: string;
         amount?: number;
+        operationAmount?: number;
         currencyCode?: number;
         counterName?: string;
       };
@@ -42,13 +43,20 @@ export async function POST(req: Request) {
   if (body.type !== "StatementItem" || !item?.id || typeof item.amount !== "number") return new NextResponse("ignored");
 
   const card = findCard({ monoAccount: body.data?.account ?? null });
+  // amount — в валюте счёта (её и списали с карты, она идёт в лимиты),
+  // currencyCode/operationAmount — валюта и сумма самой покупки. Для покупок в валюте пишем оригинал в комментарий.
+  const opCurrency = CURRENCY[item.currencyCode ?? 980] ?? String(item.currencyCode);
+  const foreign =
+    item.currencyCode && item.currencyCode !== 980 && typeof item.operationAmount === "number"
+      ? `${(Math.abs(item.operationAmount) / 100).toFixed(2)} ${opCurrency}`
+      : "";
   insertTx({
     amountKop: item.amount,
-    currency: CURRENCY[item.currencyCode ?? 980] ?? String(item.currencyCode),
+    currency: "UAH",
     occurredAt: new Date((item.time ?? Date.now() / 1000) * 1000).toISOString(),
     cardId: card?.id ?? null,
     counterparty: item.counterName || item.description || "",
-    description: item.comment ?? "",
+    description: [item.comment, foreign].filter(Boolean).join(" · "),
     source: "monobank",
     externalId: `mono:${item.id}`,
     raw: JSON.stringify(body),

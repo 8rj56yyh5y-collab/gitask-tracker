@@ -46,11 +46,12 @@ export async function POST(req: Request) {
 
   const card = findCard({ last4, hint: cardHint });
   const now = new Date();
-  const minute = now.toISOString().slice(0, 16);
-  const externalId = createHash("sha256")
-    .update([source, amount, direction, counterparty, card?.id ?? cardHint, minute, s("text")].join("|"))
-    .digest("hex")
-    .slice(0, 32);
+  // Защита от дублей — только если «Команда» прислала свой id. Без него два одинаковых
+  // платежа подряд (например, два перевода по 5 000 ₴) — это две разные операции, их нельзя терять.
+  const clientId = s("id");
+  const externalId = clientId
+    ? `${source}:` + createHash("sha256").update(clientId).digest("hex").slice(0, 32)
+    : null;
 
   const { id, duplicate } = insertTx({
     amountKop: (direction === "in" ? 1 : -1) * toKop(amount),

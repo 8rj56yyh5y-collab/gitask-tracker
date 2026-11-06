@@ -3,6 +3,8 @@ import Link from "next/link";
 import "./globals.css";
 import { unassignedSummary } from "@/lib/repo.ts";
 import { SwRegister } from "./sw-register.tsx";
+import { cookies } from "next/headers";
+import { SESSION_COOKIE, sessionValid } from "@/lib/session.ts";
 
 export const metadata: Metadata = {
   title: "D&N",
@@ -20,7 +22,21 @@ export const viewport: Viewport = {
 
 export const dynamic = "force-dynamic";
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const authed = await sessionValid((await cookies()).get(SESSION_COOKIE)?.value);
+  if (!authed) {
+    // Страница входа: без меню и без данных.
+    return (
+      <html lang="ru">
+        <body>
+          <header className="top">
+            <span className="brand">D&amp;N</span>
+          </header>
+          <main className="wrap">{children}</main>
+        </body>
+      </html>
+    );
+  }
   const { count } = unassignedSummary();
   return (
     <html lang="ru">

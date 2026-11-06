@@ -53,6 +53,9 @@ export default function Centers() {
         </label>
         <button className="btn btn-primary">Добавить</button>
       </form>
+      <form action="/logout" method="post">
+        <button className="btn btn-ghost btn-sm">Выйти</button>
+      </form>
     </>
   );
 }

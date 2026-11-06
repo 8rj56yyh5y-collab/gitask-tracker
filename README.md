@@ -24,7 +24,7 @@
 
 ```bash
 npm install
-cp .env.example .env.local   # и вписать DN_INGEST_TOKEN
+cp .env.example .env.local   # вписать DN_APP_PASSWORD и DN_INGEST_TOKEN
 npm run dev                  # http://localhost:3000
 ```
 
@@ -33,4 +33,9 @@ npm test         # тесты логики (лимиты, разбор сумм 
 npm run build    # сборка
 ```
 
-Данные хранятся в `data/dn.db` (SQLite). Переход на PostgreSQL и многопользовательский режим — этап 2.
+Данные хранятся в `data/dn.db` (SQLite). Поэтому для работы в интернете нужен сервер с постоянным диском
+(VPS или Railway с volume). Vercel и другие «бессерверные» хостинги не подходят, пока не сделан переход
+на PostgreSQL (этап 2, вместе с отдельными пользователями и ролями).
+
+Интерфейс закрыт паролем `DN_APP_PASSWORD`. API приёма операций (`/api/ingest`, `/api/monobank`)
+работает только с ключом `DN_INGEST_TOKEN`.

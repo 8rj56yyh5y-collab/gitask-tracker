@@ -155,7 +155,12 @@ export function insertTx(t: NewTx): { id: number; duplicate: boolean } {
     const ex = db.prepare("SELECT id FROM transactions WHERE external_id = ?").get(t.externalId) as Row | undefined;
     if (ex) return { id: Number(ex.id), duplicate: true };
   }
-  const kind = t.kind ?? (t.amountKop >= 0 ? "income" : "expense");
+  let kind = t.kind ?? (t.amountKop >= 0 ? "income" : "expense");
+  if (t.costCenterId) {
+    // Операция сразу в «Внутренние переводы» — не расход и не доход.
+    const c = db.prepare("SELECT is_internal FROM cost_centers WHERE id = ?").get(t.costCenterId) as Row | undefined;
+    if (c && Number(c.is_internal)) kind = "internal";
+  }
   const res = db
     .prepare(
       `INSERT INTO transactions
@@ -265,13 +270,17 @@ export interface CenterSpend {
   color: string;
   spent: number;
   budget: number;
-  forecast: number;
+  /** Прогноз на месяц; null в первые дни месяца, когда данных слишком мало. */
+  forecast: number | null;
 }
+
+const FORECAST_FROM_DAY = 5;
 
 /** Расходы за текущий месяц по корневым подразделениям (дочерние суммируются в родителя). */
 export function monthSpendByCenter(today = new Date()): CenterSpend[] {
   const { from, to } = monthBounds(today);
-  const centers = listCenters();
+  // Берём и скрытые подразделения: если по ним были расходы, деньги не должны «исчезнуть» из отчёта.
+  const centers = rows<CostCenter & { archived: number }>(getDb().prepare("SELECT * FROM cost_centers").all());
   const spent = getDb()
     .prepare(
       `SELECT cost_center_id AS id, SUM(-amount) AS s FROM transactions
@@ -293,16 +302,16 @@ export function monthSpendByCenter(today = new Date()): CenterSpend[] {
   const day = today.getDate();
   const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
   return centers
-    .filter((c) => c.parent_id === null && !c.is_internal)
+    .filter((c) => rootOf(c.id) === c.id && !c.is_internal && (!c.archived || (totals.get(c.id) ?? 0) > 0))
     .map((c) => {
       const s = totals.get(c.id) ?? 0;
       return {
         id: c.id,
-        name: c.name,
+        name: c.archived ? `${c.name} (скрыто)` : c.name,
         color: c.color,
         spent: s,
         budget: c.monthly_budget,
-        forecast: Math.round((s / day) * daysInMonth),
+        forecast: day >= FORECAST_FROM_DAY ? Math.round((s / day) * daysInMonth) : null,
       };
     })
     .sort((a, b) => b.spent - a.spent);

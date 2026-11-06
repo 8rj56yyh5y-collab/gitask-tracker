@@ -47,10 +47,11 @@ export default function Home() {
               <div className="bar-track">
                 <div className="bar-fill" style={{ width: `${total ? (s.spent / total) * 100 : 0}%`, background: s.color }} />
               </div>
-              {s.spent > 0 && (
+              {s.spent > 0 && (s.forecast !== null || s.budget > 0) && (
                 <div className="muted small">
-                  прогноз на месяц ≈ {formatMoney(s.forecast)}
-                  {s.budget > 0 && <> · бюджет {formatMoney(s.budget)}</>}
+                  {s.forecast !== null && <>прогноз на месяц ≈ {formatMoney(s.forecast)}</>}
+                  {s.forecast !== null && s.budget > 0 && " · "}
+                  {s.budget > 0 && <>бюджет {formatMoney(s.budget)}</>}
                 </div>
               )}
             </li>
