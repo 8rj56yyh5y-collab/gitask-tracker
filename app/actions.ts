@@ -11,6 +11,7 @@ import {
   createCenter,
   deleteTx,
   insertTx,
+  setCenterBudget,
   updateCardLimit,
 } from "@/lib/repo.ts";
 
@@ -21,7 +22,14 @@ const num = (f: FormData, k: string) => {
 };
 
 function refresh() {
-  for (const p of ["/", "/inbox", "/cards", "/centers", "/history"]) revalidatePath(p);
+  // Все страницы, включая страницы подразделений и операций.
+  revalidatePath("/", "layout");
+}
+
+/** Возврат только на внутренний адрес. */
+function back(f: FormData) {
+  const next = str(f, "next");
+  if (next.startsWith("/") && !next.startsWith("//")) redirect(next);
 }
 
 export async function addTransaction(f: FormData) {
@@ -49,8 +57,7 @@ export async function assignTransaction(f: FormData) {
   if (!id || !centerId) throw new Error("Выберите подразделение");
   assignTx(id, centerId, str(f, "forWhom"), str(f, "description"));
   refresh();
-  const next = str(f, "next");
-  if (next) redirect(next);
+  back(f);
 }
 
 export async function removeTransaction(f: FormData) {
@@ -89,6 +96,13 @@ export async function addCenter(f: FormData) {
   const name = str(f, "name");
   if (!name) throw new Error("Укажите название");
   createCenter(name, num(f, "parentId"), str(f, "color") || "#6b7280", toKop(parseAmount(str(f, "budget")) ?? 0), f.get("internal") === "on");
+  refresh();
+  back(f);
+}
+
+export async function updateCenterBudget(f: FormData) {
+  const id = num(f, "id");
+  if (id) setCenterBudget(id, toKop(parseAmount(str(f, "budget")) ?? 0));
   refresh();
 }
 

@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { formatMoney } from "@/lib/money.ts";
 import { limitState } from "@/lib/limits.ts";
-import { cardUsage, listCards, monthSpendByCenter, unassignedSummary } from "@/lib/repo.ts";
+import { budgetAlerts, cardUsage, listCards, monthSpendByCenter, unassignedSummary } from "@/lib/repo.ts";
+import { BudgetLine } from "./components/BudgetLine.tsx";
 
 export default function Home() {
   const un = unassignedSummary();
   const spend = monthSpendByCenter();
+  const alerts = budgetAlerts();
   const total = spend.reduce((a, s) => a + s.spent, 0);
   const cards = listCards();
   const usage = cardUsage();
@@ -30,30 +32,28 @@ export default function Home() {
         )}
       </Link>
 
+      {alerts.length > 0 && (
+        <section className="card span-all alert-budget">
+          <h2>Сигналы по лимитам</h2>
+          {alerts.map((a) => (
+            <Link key={a.id} href={`/centers/${a.id}`} className={`pill pill-${a.status === "over" ? "red" : "orange"} plain`}>
+              {a.name}:{" "}
+              {a.status === "over"
+                ? `перелимит ${formatMoney(a.spent - a.budget)} (лимит ${formatMoney(a.budget)})`
+                : `при таком темпе ≈ ${formatMoney(a.forecast)} при лимите ${formatMoney(a.budget)}`}
+            </Link>
+          ))}
+        </section>
+      )}
+
       <section className="card">
         <h2>Расходы · {month}</h2>
         <div className="big">{formatMoney(total)}</div>
         {spend.length === 0 && <p className="muted">Пока нет расходов.</p>}
         <ul className="bars">
-          {spend.map((s) => (
-            <li key={s.id}>
-              <div className="bar-head">
-                <span>
-                  <i className="dot" style={{ background: s.color }} />
-                  {s.name}
-                </span>
-                <strong>{formatMoney(s.spent)}</strong>
-              </div>
-              <div className="bar-track">
-                <div className="bar-fill" style={{ width: `${total ? (s.spent / total) * 100 : 0}%`, background: s.color }} />
-              </div>
-              {s.spent > 0 && (s.forecast !== null || s.budget > 0) && (
-                <div className="muted small">
-                  {s.forecast !== null && <>прогноз на месяц ≈ {formatMoney(s.forecast)}</>}
-                  {s.forecast !== null && s.budget > 0 && " · "}
-                  {s.budget > 0 && <>бюджет {formatMoney(s.budget)}</>}
-                </div>
-              )}
+          {spend.map((st) => (
+            <li key={st.id}>
+              <BudgetLine s={st} total={total} href={`/centers/${st.id}`} />
             </li>
           ))}
         </ul>

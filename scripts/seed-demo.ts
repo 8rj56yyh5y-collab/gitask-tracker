@@ -17,6 +17,9 @@ for (const [name, color] of [["Пункт Житомир", "#d97706"], ["Пун�
   repo.createCenter(name, points, color, 0, false);
 }
 db.prepare("UPDATE cost_centers SET monthly_budget = ? WHERE id = ?").run(25_000_00, center("Отдел продаж"));
+const personal = center("Личные");
+repo.createCenter("Продукты", personal, "#a855f7", 12_000_00, false);
+repo.createCenter("Топливо", personal, "#7c3aed", 25_000_00, false);
 
 const cards: [string, string, string, string, number][] = [
   ["ПриватБанк", "1234", "я", "personal", 30_000_00],
@@ -41,7 +44,9 @@ const txs: [number, number, number, string, string | null, string, string, strin
   [1, 9, -12_400, "1234", "Пункт Житомир", "Петренко О. (лом)", "", "sms"],
   [1, 14, -850, "1234", "Отдел продаж", "WOG", "", "applepay"],
   [2, 10, -19_500, "5678", "Пункт Бердичев", "Металбаза", "", "sms"],
-  [2, 18, -1_240, "9012", "Личные", "Сільпо", "", "monobank"],
+  [2, 18, -1_240, "9012", "Продукты", "Сільпо", "", "monobank"],
+  [2, 8, -4_800, "1234", "Топливо", "WOG", "", "applepay"],
+  [3, 19, -5_200, "9012", "Топливо", "OKKO", "", "monobank"],
   [3, 11, -5_000, "3456", "Руководитель", "Ресторан Канапа", "руководитель", "applepay"],
   [3, 16, 45_000, "5678", null, "ТОВ Втормет", "", "sms"],
   [4, 9, -8_000, "1234", "Внутренние переводы", "Перевод на ПУМБ *5678", "", "manual"],
@@ -49,7 +54,7 @@ const txs: [number, number, number, string, string | null, string, string, strin
   [4, 15, -2_300, "9012", "Отдел продаж", "OKKO", "", "monobank"],
   [5, 10, -3_600, "5678", "ФОП (налоги", "Єдиний податок", "", "manual"],
   [5, 13, -31_200, "9012", "Пункт Бердичев", "Постачальник Сидоренко", "", "monobank"],
-  [5, 19, -640, "1234", "Личные", "АТБ", "", "applepay"],
+  [5, 19, -640, "1234", "Продукты", "АТБ", "", "applepay"],
   [6, 9, -4_500, "7890", null, "Нова пошта", "", "sms"],
   [6, 11, -9_800, "3456", null, "Шевченко М.", "", "applepay"],
   [6, 12, -415, "9012", null, "Steam", "", "monobank"],

@@ -61,3 +61,29 @@ test("suggestions prefer the center used for the same counterparty", () => {
   assert.equal(repo.suggestCenters({ counterparty: "WOG", description: "" })[0], center("Личные").id);
   assert.ok(repo.suggestCenters({ counterparty: "", description: "" }).includes(sales));
 });
+
+test("sub-category spend and forecast roll up; fuel pace triggers an alert", () => {
+  const today = new Date(2026, 10, 3, 12);
+  repo.createCenter("Семья", null, "#000000", 0, false);
+  const personal = center("Семья").id;
+  repo.createCenter("Топливо", personal, "#000000", 25_000_00, false);
+  repo.createCenter("Продукты", personal, "#000000", 0, false);
+  const fuel = center("Топливо").id;
+  const food = center("Продукты").id;
+  repo.insertTx({ amountKop: -10_000_00, source: "applepay", costCenterId: fuel, occurredAt: new Date(2026, 10, 2, 10).toISOString() });
+  repo.insertTx({ amountKop: -1_500_00, source: "applepay", costCenterId: food, occurredAt: new Date(2026, 10, 3, 9).toISOString() });
+
+  const stats = repo.centerStats(today);
+  assert.equal(stats.get(fuel)!.status, "pace");
+  assert.equal(stats.get(fuel)!.forecast, 100_000_00);
+  assert.equal(stats.get(food)!.status, "none");
+  assert.equal(stats.get(personal)!.spent, 11_500_00);
+
+  const kids = repo.childStats(personal, today).map((c) => c.name);
+  assert.deepEqual(kids.slice(0, 2), ["Топливо", "Продукты"]);
+  assert.ok(repo.budgetAlerts(today).some((a) => a.id === fuel));
+  assert.equal(repo.centerTransactions(personal, today).length, 2);
+
+  repo.setCenterBudget(fuel, 120_000_00);
+  assert.equal(repo.centerStats(today).get(fuel)!.status, "ok");
+});

@@ -161,3 +161,23 @@ input[type="color"] { padding: 2px; height: 40px; }
   .tx { padding: 10px 0; }
   .plain:hover .tx-title { text-decoration: underline; }
 }
+
+/* ---------- Лимиты подразделений и неразнесённые ---------- */
+.bar-track { position: relative; }
+.bar-fill { position: relative; z-index: 1; }
+.bar-forecast {
+  position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px;
+  border: 1.5px dashed; border-left: 0; box-sizing: border-box; opacity: 0.8;
+}
+.budget-note { margin-top: 2px; }
+.warn-text { color: var(--orange); }
+.dot-lg { width: 14px; height: 14px; }
+.input-short { max-width: 130px; }
+.add-child { margin-top: 16px; flex-wrap: wrap; }
+.add-child input[name="name"] { min-width: 160px; }
+.alert-budget { border-left: 5px solid var(--orange); }
+.alert-budget .pill { display: block; }
+.pending-block { margin-bottom: 20px; }
+.card-unassigned { border-left: 5px solid var(--red); }
+.chip-pending { border-color: var(--red); color: var(--red); }
+h1 .dot { margin-right: 10px; }

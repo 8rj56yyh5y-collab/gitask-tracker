@@ -27,6 +27,7 @@ export function TxRow({ tx, children }: { tx: Tx; children?: React.ReactNode }) 
           </span>
         )}
         {tx.kind === "internal" && <span className="chip">внутренний перевод</span>}
+        {tx.cost_center_id === null && tx.kind !== "internal" && <span className="chip chip-pending">не разнесено</span>}
       </div>
       <div className={`tx-amount ${tx.amount < 0 ? "neg" : "pos"}`}>{formatMoney(tx.amount, tx.currency)}</div>
       {children}

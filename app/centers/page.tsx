@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { addCenter, removeCenter } from "../actions.ts";
 import { centerTree } from "@/lib/repo.ts";
 import { formatMoney } from "@/lib/money.ts";
@@ -10,12 +11,12 @@ export default function Centers() {
       <div className="card">
         {tree.map((c) => (
           <div key={c.id} className="row-between tree-row" style={{ paddingLeft: c.depth * 20 }}>
-            <span>
+            <Link href={`/centers/${c.id}`} className="plain">
               <i className="dot" style={{ background: c.color }} />
               {c.name}
               {c.is_internal ? <span className="muted small"> · не расход</span> : null}
-              {c.monthly_budget > 0 && <span className="muted small"> · бюджет {formatMoney(c.monthly_budget)}</span>}
-            </span>
+              {c.monthly_budget > 0 && <span className="muted small"> · лимит {formatMoney(c.monthly_budget)}</span>}
+            </Link>
             <form action={removeCenter}>
               <input type="hidden" name="id" value={c.id} />
               <button className="btn btn-ghost btn-sm" title="Скрыть">✕</button>
@@ -45,7 +46,7 @@ export default function Centers() {
           <input name="color" type="color" defaultValue="#2563eb" />
         </label>
         <label>
-          Бюджет в месяц, ₴ (необязательно)
+          Лимит в месяц, ₴ (необязательно)
           <input name="budget" inputMode="decimal" />
         </label>
         <label className="check">

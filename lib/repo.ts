@@ -1,4 +1,5 @@
 import { getDb } from "./db.ts";
+import { budgetStatus, forecastMonth, type BudgetStatus } from "./budget.ts";
 
 export interface CostCenter {
   id: number;
@@ -264,24 +265,27 @@ export function suggestCenters(tx: Pick<Tx, "counterparty" | "description">, lim
 
 // ---------- Отчёты ----------
 
-export interface CenterSpend {
+export interface CenterStat {
   id: number;
   name: string;
   color: string;
+  parent_id: number | null;
+  is_internal: number;
+  archived: number;
+  /** Расход за месяц, копейки, включая все вложенные подразделения. */
   spent: number;
   budget: number;
-  /** Прогноз на месяц; null в первые дни месяца, когда данных слишком мало. */
-  forecast: number | null;
+  forecast: number;
+  early: boolean;
+  status: BudgetStatus;
 }
 
-const FORECAST_FROM_DAY = 5;
-
-/** Расходы за текущий месяц по корневым подразделениям (дочерние суммируются в родителя). */
-export function monthSpendByCenter(today = new Date()): CenterSpend[] {
+/** Расходы, прогноз и статус лимита по каждому подразделению за месяц (с учётом вложенных). */
+export function centerStats(today = new Date()): Map<number, CenterStat> {
   const { from, to } = monthBounds(today);
   // Берём и скрытые подразделения: если по ним были расходы, деньги не должны «исчезнуть» из отчёта.
   const centers = rows<CostCenter & { archived: number }>(getDb().prepare("SELECT * FROM cost_centers").all());
-  const spent = getDb()
+  const direct = getDb()
     .prepare(
       `SELECT cost_center_id AS id, SUM(-amount) AS s FROM transactions
        WHERE kind = 'expense' AND cost_center_id IS NOT NULL AND occurred_at >= ? AND occurred_at < ?
@@ -289,31 +293,87 @@ export function monthSpendByCenter(today = new Date()): CenterSpend[] {
     )
     .all(from, to) as Row[];
   const byId = new Map(centers.map((c) => [c.id, c]));
-  const rootOf = (id: number): number => {
-    let c = byId.get(id);
-    while (c?.parent_id && byId.has(c.parent_id)) c = byId.get(c.parent_id);
-    return c?.id ?? id;
-  };
   const totals = new Map<number, number>();
-  for (const r of spent) {
-    const root = rootOf(Number(r.id));
-    totals.set(root, (totals.get(root) ?? 0) + Number(r.s));
+  for (const r of direct) {
+    // Расход идёт в само подразделение и во все его родительские.
+    let c = byId.get(Number(r.id));
+    const seen = new Set<number>();
+    while (c && !seen.has(c.id)) {
+      seen.add(c.id);
+      totals.set(c.id, (totals.get(c.id) ?? 0) + Number(r.s));
+      c = c.parent_id ? byId.get(c.parent_id) : undefined;
+    }
   }
-  const day = today.getDate();
-  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-  return centers
-    .filter((c) => rootOf(c.id) === c.id && !c.is_internal && (!c.archived || (totals.get(c.id) ?? 0) > 0))
-    .map((c) => {
-      const s = totals.get(c.id) ?? 0;
-      return {
-        id: c.id,
-        name: c.archived ? `${c.name} (скрыто)` : c.name,
-        color: c.color,
-        spent: s,
-        budget: c.monthly_budget,
-        // Округляем до целых гривен: копейки в прогнозе — ложная точность.
-        forecast: day >= FORECAST_FROM_DAY ? Math.round((s / day) * daysInMonth / 100) * 100 : null,
-      };
-    })
+  const out = new Map<number, CenterStat>();
+  for (const c of centers) {
+    const spent = totals.get(c.id) ?? 0;
+    const { forecast, early } = forecastMonth(spent, today);
+    out.set(c.id, {
+      id: c.id,
+      name: c.archived ? `${c.name} (скрыто)` : c.name,
+      color: c.color,
+      parent_id: c.parent_id && byId.has(c.parent_id) ? c.parent_id : null,
+      is_internal: c.is_internal,
+      archived: c.archived,
+      spent,
+      budget: c.monthly_budget,
+      forecast,
+      early,
+      status: budgetStatus(spent, c.monthly_budget, forecast),
+    });
+  }
+  return out;
+}
+
+const visible = (s: CenterStat) => !s.is_internal && (!s.archived || s.spent > 0);
+
+/** Корневые подразделения за месяц (вложенные уже суммированы в родителя). */
+export function monthSpendByCenter(today = new Date()): CenterStat[] {
+  return [...centerStats(today).values()]
+    .filter((s) => s.parent_id === null && visible(s))
     .sort((a, b) => b.spent - a.spent);
+}
+
+/** Прямые подразделения внутри данного. */
+export function childStats(parentId: number, today = new Date()): CenterStat[] {
+  return [...centerStats(today).values()]
+    .filter((s) => s.parent_id === parentId && visible(s))
+    .sort((a, b) => b.spent - a.spent || a.name.localeCompare(b.name, "ru"));
+}
+
+/** Подразделения любого уровня, где лимит превышен или будет превышен при текущем темпе. */
+export function budgetAlerts(today = new Date()): CenterStat[] {
+  return [...centerStats(today).values()]
+    .filter((s) => (s.status === "over" || s.status === "pace") && visible(s))
+    .sort((a, b) => (a.status === b.status ? b.forecast - b.budget - (a.forecast - a.budget) : a.status === "over" ? -1 : 1));
+}
+
+/** id подразделения и всех вложенных. */
+function descendantIds(id: number): number[] {
+  const all = rows<{ id: number; parent_id: number | null }>(getDb().prepare("SELECT id, parent_id FROM cost_centers").all());
+  const out = [id];
+  for (let i = 0; i < out.length; i++) for (const c of all) if (c.parent_id === out[i] && !out.includes(c.id)) out.push(c.id);
+  return out;
+}
+
+/** Операции подразделения (с вложенными) за текущий месяц. */
+export function centerTransactions(id: number, today = new Date()): Tx[] {
+  const { from, to } = monthBounds(today);
+  const ids = descendantIds(id);
+  return rows<Tx>(
+    getDb()
+      .prepare(
+        `${TX_SELECT} WHERE t.cost_center_id IN (${ids.map(() => "?").join(",")})
+         AND t.occurred_at >= ? AND t.occurred_at < ? ORDER BY t.occurred_at DESC`,
+      )
+      .all(...ids, from, to),
+  );
+}
+
+export function getCenter(id: number): (CostCenter & { archived: number }) | null {
+  return (getDb().prepare("SELECT * FROM cost_centers WHERE id = ?").get(id) as unknown as CostCenter & { archived: number }) ?? null;
+}
+
+export function setCenterBudget(id: number, budgetKop: number) {
+  getDb().prepare("UPDATE cost_centers SET monthly_budget = ? WHERE id = ?").run(Math.max(0, budgetKop), id);
 }
