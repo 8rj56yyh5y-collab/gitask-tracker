@@ -1,0 +1,11 @@
+{
+  "name": "D&N",
+  "short_name": "D&N",
+  "description": "Учёт денег: ни один платёж без записи",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f172a",
+  "lang": "ru",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
