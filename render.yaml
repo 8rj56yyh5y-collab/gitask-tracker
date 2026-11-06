@@ -1,0 +1,25 @@
+# Настройка для Render (кнопка «Deploy to Render» в README).
+# Render сам создаст сервис, диск для базы и секретный ключ; спросит только пароль для входа.
+# Формат написан по документации Render, но ещё не проверен на реальном развёртывании.
+services:
+  - type: web
+    name: dn
+    runtime: node
+    plan: starter # постоянный диск есть только на платных планах (~$7/мес)
+    region: frankfurt
+    branch: claude/hopeful-davinci-yrcko2
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    disk:
+      name: dn-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: DN_DB_PATH
+        value: /data/dn.db
+      - key: DN_APP_PASSWORD
+        sync: false # Render попросит ввести пароль при создании
+      - key: DN_INGEST_TOKEN
+        generateValue: true # длинный случайный ключ для «Команд» и Monobank
+      - key: ANTHROPIC_API_KEY
+        sync: false # по желанию — для «Разбора от ИИ»; можно оставить пустым

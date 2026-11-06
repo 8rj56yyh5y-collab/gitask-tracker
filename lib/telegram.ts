@@ -79,7 +79,7 @@ function txText(tx: Tx): string {
 }
 
 function publicUrl(): string | null {
-  const u = process.env.DN_PUBLIC_URL;
+  const u = process.env.DN_PUBLIC_URL || process.env.RENDER_EXTERNAL_URL;
   return u && u.startsWith("https://") ? u.replace(/\/$/, "") : null;
 }
 

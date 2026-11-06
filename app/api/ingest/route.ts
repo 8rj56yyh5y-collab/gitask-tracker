@@ -68,6 +68,6 @@ export async function POST(req: Request) {
 
   if (!duplicate) await notifyNewTx(id);
   revalidatePath("/", "layout");
-  const base = process.env.DN_PUBLIC_URL ?? new URL(req.url).origin;
+  const base = process.env.DN_PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || new URL(req.url).origin;
   return NextResponse.json({ id, duplicate, url: `${base}/inbox/${id}` });
 }

@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { publicBase } from "@/lib/url.ts";
 import { SESSION_COOKIE, SESSION_MAX_AGE, appPassword, safeEqual, sessionToken } from "@/lib/session.ts";
 
 async function login(f: FormData) {
@@ -14,7 +15,8 @@ async function login(f: FormData) {
   }
   (await cookies()).set(SESSION_COOKIE, await sessionToken(password), {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    // Только по https: при запуске с ноутбука по Wi-Fi (http) iPhone иначе не сохранит вход.
+    secure: (await publicBase()).startsWith("https://"),
     sameSite: "lax",
     maxAge: SESSION_MAX_AGE,
     path: "/",

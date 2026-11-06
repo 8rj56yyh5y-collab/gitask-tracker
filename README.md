@@ -21,6 +21,13 @@
 
 Техническое задание и план этапов — в документе ТЗ. Запуск в интернете — [docs/DEPLOY.md](docs/DEPLOY.md). Настройка iPhone — [docs/IPHONE_SETUP.md](docs/IPHONE_SETUP.md).
 
+## Как открыть на iPhone
+
+- **Для теста — с MacBook по Wi-Fi:** двойной клик по `start-mac.command`, на iPhone открыть адрес, который он покажет.
+- **Постоянно — Render:** [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/8rj56yyh5y-collab/gitask-tracker)
+
+Подробно — [docs/PHONE.md](docs/PHONE.md).
+
 ## Запуск
 
 Нужен Node.js 22.13+ (используется встроенный `node:sqlite`).
