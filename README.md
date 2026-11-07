@@ -26,7 +26,7 @@
 - **Для теста — с MacBook по Wi-Fi:** двойной клик по `start-mac.command`, на iPhone открыть адрес, который он покажет.
 - **Постоянно — Render:** [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/8rj56yyh5y-collab/gitask-tracker)
 
-Подробно — [docs/PHONE.md](docs/PHONE.md).
+Подробно — [docs/PHONE.md](docs/PHONE.md). Наглядная инструкция со схемами экранов (карты, Telegram, Monobank, «Команды» для Apple Pay) — [docs/setup-guide.html](docs/setup-guide.html), она же онлайн: https://claude.ai/artifact/KqAuv2jkK1Pjkwzqtq4Swj
 
 ## Запуск
 

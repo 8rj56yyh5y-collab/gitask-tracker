@@ -1,0 +1,415 @@
+<title>D&amp;N — подключение iPhone</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap">
+<style>
+/* Layout: одна колонка инструкции; каждый шаг — схема экрана iPhone слева и текст справа (на телефоне — друг под другом). */
+:root {
+  --bg: #f6f6f4; --paper: #ffffff; --ink: #111111; --muted: #5f5f5f; --line: #e3e3df;
+  --red: #d90429; --red-soft: #fde8eb; --ok: #1f8a4c;
+  --screen: #1c1c1e; --screen-2: #2c2c2e; --screen-ink: #f2f2f7; --screen-muted: #8e8e93; --ios-blue: #0a84ff; --ios-green: #30d158;
+  --font: "Onest", -apple-system, "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0b0b0b; --paper: #161616; --ink: #f2f2f2; --muted: #a3a3a3; --line: #2a2a2a; --red: #ff3b4a; --red-soft: #3a1418; --ok: #4cc27e; color-scheme: dark;
+} }
+:root[data-theme="dark"] { --bg: #0b0b0b; --paper: #161616; --ink: #f2f2f2; --muted: #a3a3a3; --line: #2a2a2a; --red: #ff3b4a; --red-soft: #3a1418; --ok: #4cc27e; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--font); margin: 0; }
+.page { max-width: 980px; margin: 0 auto; padding-block: 24px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header.hero { padding: 8px 0 24px; border-bottom: 3px solid var(--ink); margin-bottom: 28px; }
+.brand { font-weight: 800; font-size: 15px; letter-spacing: 0.08em; color: var(--red); }
+h1 { font-size: clamp(28px, 6vw, 44px); line-height: 1.1; margin: 6px 0 10px; text-wrap: balance; }
+.lead { font-size: 18px; color: var(--muted); max-width: 62ch; margin: 0; }
+.flow { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; padding: 0; list-style: none; font-size: 14px; }
+.flow li { padding: 6px 12px; border: 1.5px solid var(--ink); border-radius: 999px; font-weight: 600; }
+.flow li.arrow { border: 0; padding: 6px 0; color: var(--red); }
+h2 { font-size: 26px; margin: 48px 0 6px; display: flex; align-items: baseline; gap: 12px; }
+h2 .part { font-size: 13px; letter-spacing: 0.08em; color: var(--paper); background: var(--ink); padding: 3px 9px; border-radius: 6px; }
+.sub { color: var(--muted); margin: 0 0 18px; max-width: 62ch; }
+.step { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 28px; align-items: start; padding: 22px 0; border-top: 1px solid var(--line); }
+.step .n { font-weight: 800; color: var(--red); font-size: 14px; letter-spacing: 0.06em; }
+.step h3 { font-size: 20px; margin: 2px 0 8px; }
+.step p, .step li { max-width: 60ch; }
+.step ol, .step ul { padding-left: 20px; margin: 8px 0; }
+.step li { margin: 4px 0; }
+kbd, code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.9em; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; }
+.callout { border-left: 4px solid var(--red); background: var(--red-soft); padding: 10px 14px; border-radius: 0 10px 10px 0; margin: 12px 0; max-width: 62ch; }
+.callout.ok { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.pitfalls { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 12px; }
+.pitfall { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.pitfall b { color: var(--red); display: block; margin-bottom: 4px; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; }
+.tbl { overflow-x: auto; }
+th, td { text-align: left; padding: 10px 8px; border-top: 1px solid var(--line); vertical-align: top; }
+th { font-size: 13px; color: var(--muted); border-top: 0; }
+.yes { color: var(--ok); font-weight: 700; } .no { color: var(--red); font-weight: 700; }
+
+/* ---------- Схема экрана iPhone ---------- */
+.phone { width: 270px; max-width: 100%; background: var(--screen); color: var(--screen-ink); border: 9px solid #0a0a0a; border-radius: 38px; padding: 34px 12px 18px; position: relative; font-size: 13px; line-height: 1.35; box-shadow: 0 10px 30px rgb(0 0 0 / 0.18); }
+.phone::before { content: ""; position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: 84px; height: 22px; background: #0a0a0a; border-radius: 12px; }
+.phone.light { background: #f2f2f7; color: #111; }
+.phone.light .row, .phone.light .blk { background: #fff; }
+.phone.tg { background: #17212b; }
+.ttl { font-weight: 700; font-size: 17px; margin: 4px 4px 10px; }
+.row { background: var(--screen-2); border-radius: 12px; padding: 10px 12px; margin: 6px 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.row .v { color: var(--ios-blue); }
+.row .m { color: var(--screen-muted); }
+.blk { background: var(--screen-2); border-radius: 14px; padding: 10px 12px; margin: 8px 0; }
+.blk .lnk { color: var(--ios-blue); word-break: break-all; }
+.tabs3 { display: flex; justify-content: space-around; border-top: 1px solid #3a3a3c; margin-top: 14px; padding-top: 8px; font-size: 11px; color: var(--screen-muted); }
+.tabs3 span.on { color: var(--ios-blue); }
+.search { background: #3a3a3c; border-radius: 10px; padding: 8px 10px; color: var(--screen-muted); margin: 6px 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.chips span { background: var(--screen-2); border-radius: 8px; padding: 5px 8px; font-size: 12px; }
+.icon { display: inline-flex; width: 22px; height: 22px; border-radius: 6px; align-items: center; justify-content: center; font-size: 12px; flex: none; }
+.var { background: var(--ios-blue); color: #fff; border-radius: 6px; padding: 1px 6px; font-size: 12px; white-space: nowrap; }
+.toggle { width: 36px; height: 22px; border-radius: 11px; background: #3a3a3c; position: relative; flex: none; }
+.toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; }
+.toggle.on { background: var(--ios-green); } .toggle.on::after { left: 16px; }
+.msg { background: #182533; border-radius: 12px; padding: 10px 12px; margin: 6px 0; }
+.kb { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+.kb span { background: #2b5278; color: #fff; text-align: center; border-radius: 8px; padding: 7px 4px; font-size: 12px; }
+.kb span.w { grid-column: 1 / -1; }
+.dn { background: #0a0a0a; color: #f5f5f5; }
+.dn .blk, .dn .row { background: #161616; border: 1px solid #262626; }
+.dn .btn { background: #e11d2e; color: #fff; text-align: center; border-radius: 10px; padding: 8px; font-weight: 700; margin-top: 6px; }
+/* Что нажимать: красная рамка и номер */
+.tap { position: relative; outline: 3px solid var(--red); outline-offset: 2px; border-radius: 10px; }
+.tap[data-n]::after { content: attr(data-n); position: absolute; top: -12px; right: -12px; width: 24px; height: 24px; border-radius: 50%; background: var(--red); color: #fff; font: 800 13px/24px var(--font); text-align: center; box-shadow: 0 0 0 3px var(--screen); }
+.note-on-screen { color: #ff6b78; font-size: 11px; font-weight: 700; margin: 2px 4px; }
+
+@media (max-width: 720px) {
+  .step { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .phone { margin: 0 auto; }
+}
+@media print { .phone { box-shadow: none; } }
+</style>
+
+<div class="page">
+<header class="hero">
+  <div class="brand">D&amp;N · ИНСТРУКЦИЯ</div>
+  <h1>Как сделать, чтобы каждая оплата сама приходила в D&amp;N и Telegram</h1>
+  <p class="lead">Настраивается один раз, примерно за 20 минут. Потом: оплатили телефоном → в Telegram сообщение «−250 ₴ · АТБ · NovaPay» → нажали категорию → записано.</p>
+  <ol class="flow" aria-label="Порядок">
+    <li>1. Карты в D&amp;N</li><li class="arrow">→</li>
+    <li>2. Telegram</li><li class="arrow">→</li>
+    <li>3. Monobank</li><li class="arrow">→</li>
+    <li>4. iPhone: «Команды»</li><li class="arrow">→</li>
+    <li>5. Проверка</li>
+  </ol>
+</header>
+
+<h2><span class="part">ЧАСТЬ 1</span> Добавить карты в D&amp;N</h2>
+<p class="sub">D&amp;N должен знать, какие у вас карты: по названию банка он поймёт, с какой карты прошла оплата.</p>
+
+<section class="step">
+  <div class="phone dn" aria-label="Схема экрана D&N, раздел Карты">
+    <div class="ttl">Карты</div>
+    <div class="blk"><b>Лимит по умолчанию</b><div class="row tap" data-n="1" style="margin-top:6px"><span>30000</span><span class="m">Сохранить</span></div></div>
+    <div class="blk"><b>Добавить карту</b>
+      <div class="row tap" data-n="2"><span>Банк</span><span class="v">NovaPay ▾</span></div>
+      <div class="row"><span>Последние 4 цифры</span><span>5050</span></div>
+      <div class="btn tap" data-n="3">Добавить</div>
+    </div>
+    <div class="tabs3"><span>Главная</span><span class="on">Карты</span><span>＋</span><span>История</span><span>Ещё</span></div>
+  </div>
+  <div>
+    <div class="n">ШАГ 1</div>
+    <h3>Внизу «Карты»</h3>
+    <ol>
+      <li><b>Лимит по умолчанию</b>: впишите, например, <code>30000</code> → «Сохранить». Он поставится каждой карте.</li>
+      <li><b>Добавить карту</b>: выберите <b>банк</b> и впишите <b>последние 4 цифры</b>.</li>
+      <li>«Добавить». Повторите для каждой карты: Радабанк, Альянс, ПУМБ, Приват, А-Банк, NovaPay.</li>
+    </ol>
+    <div class="callout">Monobank вручную не добавляйте: он появится сам в части 3.</div>
+  </div>
+</section>
+
+<section class="step">
+  <div class="phone dn" aria-label="Схема: объединение карт Monobank">
+    <div class="ttl">Карты</div>
+    <div class="blk"><b>3 карты Monobank — объединить в одну?</b>
+      <div class="row tap" data-n="1" style="margin-top:6px"><span>Основная</span><span class="v">•••• 0055 ▾</span></div>
+      <div class="btn tap" data-n="2">Объединить</div>
+    </div>
+    <div class="blk" style="background:linear-gradient(135deg,#141414,#000)"><b>Monobank</b><div style="letter-spacing:.12em">•••• 0055</div><div style="font-size:11px;opacity:.8">+ ещё 2 карты банка · один лимит на все</div></div>
+  </div>
+  <div>
+    <div class="n">ШАГ 2 · ЕСЛИ У БАНКА НЕСКОЛЬКО КАРТ</div>
+    <h3>Объединить в одну основную</h3>
+    <p>У Monobank несколько карт, а лимит один. На странице «Карты» появится блок «объединить в одну?»:</p>
+    <ol>
+      <li>Выберите <b>основную карту</b>.</li>
+      <li>«Объединить». Останется одна плитка, внутри видно траты каждой карты.</li>
+    </ol>
+  </div>
+</section>
+
+<h2><span class="part">ЧАСТЬ 2</span> Telegram — сюда будут приходить оплаты</h2>
+<p class="sub">Без Telegram оплаты тоже записываются, но никто не напомнит выбрать категорию.</p>
+
+<section class="step">
+  <div class="phone tg" aria-label="Схема: BotFather в Telegram">
+    <div class="ttl">@BotFather</div>
+    <div class="msg tap" data-n="1">/newbot</div>
+    <div class="msg">Как назвать бота? → <b>D&amp;N</b><br>Адрес бота? → <b>dn_dan_bot</b></div>
+    <div class="msg tap" data-n="2">Готово! Токен:<br><span style="color:#6ab3f3">1234567890:AAH…</span></div>
+  </div>
+  <div>
+    <div class="n">ШАГ 3</div>
+    <h3>Создать своего бота</h3>
+    <ol>
+      <li>В Telegram найдите <b>@BotFather</b> → Start → отправьте <code>/newbot</code>.</li>
+      <li>Придумайте имя и адрес (должен заканчиваться на <code>bot</code>). BotFather пришлёт <b>токен</b>, скопируйте его.</li>
+    </ol>
+  </div>
+</section>
+
+<section class="step">
+  <div class="phone dn" aria-label="Схема: подключение Telegram в настройках D&N">
+    <div class="ttl">Настройки</div>
+    <div class="blk"><b>Уведомления в Telegram</b>
+      <div class="row tap" data-n="1" style="margin-top:6px"><span class="m">1234567890:AA…</span><span style="color:#e11d2e;font-weight:700">Подключить</span></div>
+      <div class="btn tap" data-n="2">Открыть бота и нажать «Старт»</div>
+    </div>
+  </div>
+  <div>
+    <div class="n">ШАГ 4</div>
+    <h3>Подключить в D&amp;N</h3>
+    <ol>
+      <li>D&amp;N → <b>Ещё → Настройки → Уведомления в Telegram</b> → вставьте токен → «Подключить».</li>
+      <li>«Открыть бота и нажать Старт» → в Telegram <b>Start</b>. Бот ответит «Готово ✓».</li>
+    </ol>
+  </div>
+</section>
+
+<h2><span class="part">ЧАСТЬ 3</span> Monobank — всё само</h2>
+<section class="step">
+  <div class="phone dn" aria-label="Схема: подключение Monobank">
+    <div class="ttl">Настройки</div>
+    <div class="blk"><b>Monobank — автоматически</b>
+      <div class="row tap" data-n="1" style="margin-top:6px"><span class="m">Токен Monobank</span></div>
+      <div class="row tap" data-n="2"><span>Вести операции с</span><span class="v">сегодня</span></div>
+      <div class="btn tap" data-n="3">Подключить</div>
+    </div>
+  </div>
+  <div>
+    <div class="n">ШАГ 5</div>
+    <h3>Токен с api.monobank.ua</h3>
+    <ol>
+      <li>Откройте <b>api.monobank.ua</b>, войдите через приложение Monobank, скопируйте токен и вставьте в D&amp;N.</li>
+      <li>«Вести операции с»: оставьте <b>сегодня</b>, тогда старые операции не подтянутся.</li>
+      <li>«Подключить». Карты Monobank добавятся сами, и каждая операция будет приходить в Telegram.</li>
+    </ol>
+  </div>
+</section>
+
+<h2><span class="part">ЧАСТЬ 4</span> iPhone: «Команды» — для всех остальных банков</h2>
+<p class="sub">Apple не даёт программам видеть оплаты. Это делает встроенное приложение <b>«Команды»</b> (Shortcuts): после каждой оплаты Apple Pay оно отправляет сумму, магазин и карту в D&amp;N. Работает с любой картой из Wallet.</p>
+
+<div class="pitfalls" role="list" aria-label="Частые ошибки">
+  <div class="pitfall" role="listitem"><b>Не ищите D&amp;N в «Командах»</b>Его там нет и не будет. Связь — через ссылку из настроек D&amp;N.</div>
+  <div class="pitfall" role="listitem"><b>Не вставляйте ссылку в поиск</b>Поиск ищет действия по названию. Ссылка вставляется в голубое слово «URL».</div>
+  <div class="pitfall" role="listitem"><b>Не заходите в «Подробнее → Вопросы импорта»</b>Это для пересылки команды другим. Все настройки — прямо в действии.</div>
+</div>
+
+<section class="step">
+  <div class="phone dn" aria-label="Схема: копирование ссылки в D&N">
+    <div class="ttl">Настройки</div>
+    <div class="blk"><b>Оплаты Apple Pay — с любой карты</b>
+      <div class="m" style="font-size:11px;margin-top:4px">Ваша ссылка для «Команд»</div>
+      <div class="row" style="margin-top:4px"><span class="m" style="font-size:11px">https://dn-….onrender.com/api/ingest?key=…</span><span class="tap" data-n="1" style="padding:2px 6px">⧉</span></div>
+    </div>
+  </div>
+  <div>
+    <div class="n">ШАГ 6</div>
+    <h3>Скопировать свою ссылку</h3>
+    <p>D&amp;N → <b>Ещё → Настройки → «Оплаты Apple Pay»</b> → кнопка <b>⧉</b> рядом со ссылкой. В ссылке уже есть ваш секретный ключ.</p>
+    <div class="callout">Никому эту ссылку не пересылайте: по ней можно добавлять операции в ваш D&amp;N.</div>
+  </div>
+</section>
+
+<section class="step">
+  <div class="phone" aria-label="Схема: вкладка Автоматизация в Командах">
+    <div class="ttl" style="display:flex;justify-content:space-between">Автоматизация <span class="tap" data-n="2" style="color:var(--ios-blue);padding:0 6px">＋</span></div>
+    <div class="row"><span class="m">Личное</span></div>
+    <div class="tabs3"><span>Команды</span><span class="on tap" data-n="1" style="padding:0 6px">Автоматизация</span><span>Галерея</span></div>
+  </div>
+  <div>
+    <div class="n">ШАГ 7</div>
+    <h3>Открыть «Команды» → «Автоматизация» → «＋»</h3>
+    <p>Приложение «Команды» — тёмная иконка с розово-синими фигурами. Не нашли — свайп вниз по экрану и напишите «Команды». Нужен iOS 17 или новее.</p>
+  </div>
+</section>
+
+<section class="step">
+  <div class="phone" aria-label="Схема: выбор триггера Транзакция">
+    <div class="ttl">Новая автоматизация</div>
+    <div class="row"><span>Время дня</span></div>
+    <div class="row"><span>Будильник</span></div>
+    <div class="row tap" data-n="1"><span><span class="icon" style="background:#000;border:1px solid #444">💳</span> Транзакция</span><span class="m">›</span></div>
+    <div class="row"><span>Электронная почта</span></div>
+  </div>
+  <div>
+    <div class="n">ШАГ 8</div>
+    <h3>Выбрать «Транзакция»</h3>
+    <p>Пролистайте список вниз. «Транзакция» — с иконкой Wallet.</p>
+  </div>
+</section>
+
+<section class="step">
+  <div class="phone" aria-label="Схема: настройки триггера">
+    <div class="ttl" style="display:flex;justify-content:space-between">Транзакция <span class="tap" data-n="4" style="color:var(--ios-blue);padding:0 6px">Далее</span></div>
+    <div class="row tap" data-n="1"><span>Карта</span><span class="v">Любая (12)</span></div>
+    <div class="row"><span>Категория</span><span class="v">Любая</span></div>
+    <div class="row"><span>Фильтровать продавцов</span><span class="m">не трогать</span></div>
+    <div class="row tap" data-n="2"><span>Немедленный запуск</span><span style="color:var(--ios-blue)">✓</span></div>
+    <div class="row"><span>Запуск после подтверждения</span></div>
+    <div class="row tap" data-n="3"><span>Уведомлять о запуске</span><span class="toggle"></span></div>
+  </div>
+  <div>
+    <div class="n">ШАГ 9</div>
+    <h3>Все карты, немедленный запуск</h3>
+    <ol>
+      <li><b>Карта</b>: все. <b>Категория</b>: все. «Фильтровать продавцов» не трогайте.</li>
+      <li>Выберите <b>«Немедленный запуск»</b>, иначе iPhone будет переспрашивать после каждой оплаты.</li>
+      <li><b>«Уведомлять о запуске»</b>: выключите.</li>
+      <li>«Далее».</li>
+    </ol>
+  </div>
+</section>
+
+<section class="step">
+  <div class="phone" aria-label="Схема: экран выбора действия">
+    <div class="m" style="font-size:11px;margin:0 4px 6px">Когда я подношу к считывателю любую…</div>
+    <div class="row"><span>💡 Приступить</span></div>
+    <div class="row tap" data-n="1"><span>Создать новую быструю команду</span></div>
+    <div class="row"><span>Показать папку</span></div>
+    <div class="row"><span>Создать заметку</span></div>
+    <div class="note-on-screen">Приложения ниже — не нужны</div>
+  </div>
+  <div>
+    <div class="n">ШАГ 10</div>
+    <h3>«Создать новую быструю команду»</h3>
+    <p>На некоторых iPhone кнопка называется «Новая пустая автоматизация». Приложения в списке ниже не трогайте.</p>
+  </div>
+</section>
+
+<section class="step">
+  <div class="phone" aria-label="Схема: поиск действия">
+    <div class="blk"><span class="m">Получать «транзакция» в качестве входных данных</span></div>
+    <div class="search tap" data-n="1">🔍 содержимое</div>
+    <div class="row tap" data-n="2"><span><span class="icon" style="background:var(--ios-green)">⬇</span> Получить содержимое URL</span></div>
+    <div class="chips"><span>Интернет</span><span>Документы</span><span>Скрипты</span></div>
+  </div>
+  <div>
+    <div class="n">ШАГ 11</div>
+    <h3>Найти «Получить содержимое URL»</h3>
+    <ol>
+      <li>В <b>«Поиск действий»</b> напишите слово <code>содержимое</code>. Не ссылку!</li>
+      <li>Выберите <b>«Получить содержимое URL»</b>. Если поиск пуст: раздел <b>«Интернет»</b> → это действие.</li>
+    </ol>
+  </div>
+</section>
+
+<section class="step">
+  <div class="phone" aria-label="Схема: действие Получить содержимое URL раскрыто">
+    <div class="blk">
+      <div><span class="icon" style="background:var(--ios-green)">⬇</span> <b>Получить содержимое</b></div>
+      <div class="lnk tap" data-n="1" style="margin-top:6px">https://dn-….onrender.com/api/ingest?key=…</div>
+    </div>
+    <div class="row tap" data-n="2"><span>Метод</span><span class="v">POST</span></div>
+    <div class="row"><span>Заголовки</span><span class="m">не трогать</span></div>
+    <div class="row tap" data-n="3"><span>Тело запроса</span><span class="v">JSON</span></div>
+    <div class="row"><span style="color:var(--ios-green)">⊕ Добавить новое поле</span></div>
+  </div>
+  <div>
+    <div class="n">ШАГ 12</div>
+    <h3>Вставить ссылку, POST и JSON</h3>
+    <ol>
+      <li>Нажмите голубое слово <b>«URL»</b> → «Вставить». Встанет ссылка из шага 6.</li>
+      <li>Под ссылкой появятся строки. <b>Метод</b> → выберите <b>POST</b>.</li>
+      <li><b>Тело запроса</b> → выберите <b>JSON</b>.</li>
+    </ol>
+    <div class="callout">Строки «Метод» и «Тело запроса» — прямо в этом сером блоке. Если их не видно, нажмите на стрелку ⌄ рядом со ссылкой.</div>
+  </div>
+</section>
+
+<section class="step">
+  <div class="phone" aria-label="Схема: три поля JSON">
+    <div class="row"><span>Тело запроса</span><span class="v">JSON</span></div>
+    <div class="row tap" data-n="1"><span>amount</span><span class="var">Транзакция · Сумма</span></div>
+    <div class="row tap" data-n="2"><span>merchant</span><span class="var">Транзакция · Продавец</span></div>
+    <div class="row tap" data-n="3"><span>card</span><span class="var">Транзакция · Карта</span></div>
+    <div class="row"><span style="color:var(--ios-green)">⊕ Добавить новое поле</span></div>
+  </div>
+  <div>
+    <div class="n">ШАГ 13 · САМЫЙ ВАЖНЫЙ</div>
+    <h3>Три поля: сумма, магазин, карта</h3>
+    <p>Для каждого: <b>«⊕ Добавить новое поле» → «Текст»</b>.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Слева (ключ)</th><th>Справа (значение)</th></tr></thead>
+      <tbody>
+        <tr><td><code>amount</code></td><td>Нажать в поле → над клавиатурой <b>«Входящие данные команды»</b> → нажать на голубой блок → <b>Сумма</b></td></tr>
+        <tr><td><code>merchant</code></td><td>«Входящие данные команды» → голубой блок → <b>Продавец</b></td></tr>
+        <tr><td><code>card</code></td><td>«Входящие данные команды» → голубой блок → <b>Карта или пропуск</b></td></tr>
+      </tbody>
+    </table></div>
+    <p>Затем синяя галочка <b>✓</b> вверху справа.</p>
+  </div>
+</section>
+
+<h2><span class="part">ЧАСТЬ 5</span> Проверка и как пользоваться</h2>
+
+<section class="step">
+  <div class="phone tg" aria-label="Схема: уведомление в Telegram">
+    <div class="ttl">D&amp;N бот</div>
+    <div class="msg"><b>−250 ₴</b> · АТБ<br><span style="opacity:.75">NovaPay *5050 · Apple Pay · 14:26</span><br><br>Куда ушли деньги?</div>
+    <div class="kb"><span>Личные ›</span><span>Отдел продаж</span><span class="tap" data-n="1">Приёмные пункты ›</span><span>Руководитель</span><span class="w">Все категории…</span></div>
+    <div class="m" style="font-size:11px;margin:8px 4px 4px">после нажатия «Приёмные пункты ›»:</div>
+    <div class="kb"><span class="w">✓ Просто «Приёмные пункты»</span><span class="tap" data-n="2">Пункт Житомир</span><span>Пункт Бердичев</span><span class="w">‹ Назад</span></div>
+  </div>
+  <div>
+    <div class="n">ШАГ 14</div>
+    <h3>Оплатите что-нибудь телефоном</h3>
+    <p>Через несколько секунд в Telegram придёт сообщение: сумма, магазин и <b>карта, определённая сама</b>.</p>
+    <ol>
+      <li>Нажмите категорию. Если у неё есть подпункты (стрелка ›), откроется следующий список.</li>
+      <li>Выберите подпункт или «✓ Просто «Категория»». Готово, записано.</li>
+    </ol>
+    <div class="callout ok">Не успели? Операция ждёт в D&amp;N красным блоком «Нужно записать» в «Истории», пока вы её не разнесёте.</div>
+  </div>
+</section>
+
+<section class="step" style="grid-template-columns:minmax(0,1fr)">
+  <div>
+    <div class="n">ЧТО ПРИХОДИТ САМО, А ЧТО НЕТ</div>
+    <h3>Какие операции D&amp;N видит</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Операция</th><th>Monobank</th><th>Остальные банки</th></tr></thead>
+      <tbody>
+        <tr><td>Оплата телефоном (Apple Pay)</td><td class="yes">сама</td><td class="yes">сама — через «Команды»</td></tr>
+        <tr><td>Оплата картой онлайн</td><td class="yes">сама</td><td class="no">вручную, кнопка «＋»</td></tr>
+        <tr><td>Перевод с карты на карту</td><td class="yes">сам</td><td class="no">вручную, кнопка «＋»</td></tr>
+        <tr><td>Наличные</td><td colspan="2" class="no">вручную, кнопка «＋»</td></tr>
+      </tbody>
+    </table></div>
+    <p class="sub" style="margin-top:12px">Оплата Apple Pay картой Monobank записывается один раз: её присылает банк, а сообщение из «Команд» D&amp;N пропускает.</p>
+  </div>
+</section>
+
+<section class="step" style="grid-template-columns:minmax(0,1fr)">
+  <div>
+    <div class="n">ЕСЛИ НИЧЕГО НЕ ПРИШЛО</div>
+    <h3>Проверьте по порядку</h3>
+    <ol>
+      <li>В «Командах» → «Автоматизация» откройте её: стоит <b>«Немедленный запуск»</b>?</li>
+      <li>В действии <b>Метод POST</b>, <b>Тело JSON</b> и <b>три поля</b> (amount, merchant, card)?</li>
+      <li>Операция появилась в D&amp;N в «Истории», но не в Telegram? Тогда переподключите Telegram в «Настройках».</li>
+      <li>Сайт открывается? Сразу после обновления Render 1–3 минуты показывает ошибку 502, это нормально.</li>
+    </ol>
+  </div>
+</section>
+</div>
