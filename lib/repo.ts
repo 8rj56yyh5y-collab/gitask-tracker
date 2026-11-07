@@ -1,4 +1,5 @@
 import { getDb } from "./db.ts";
+import { detectBank } from "./banks.ts";
 import { budgetStatus, forecastMonth, type BudgetStatus } from "./budget.ts";
 
 export interface CostCenter {
@@ -134,6 +135,13 @@ export function findCard(opts: { last4?: string | null; monoAccount?: string | n
   if (last4) {
     const r = db.prepare("SELECT * FROM cards WHERE last4 = ? AND archived = 0").get(last4);
     if (r) return r as unknown as Card;
+  }
+  // Wallet передаёт название карты («Monobank Black»), а не номер: узнаём по банку,
+  // если карта этого банка у вас одна.
+  const bank = detectBank(opts.hint);
+  if (bank) {
+    const same = db.prepare("SELECT * FROM cards WHERE bank = ? AND archived = 0").all(bank);
+    if (same.length === 1) return same[0] as unknown as Card;
   }
   return null;
 }

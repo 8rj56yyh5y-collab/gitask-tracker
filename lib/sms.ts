@@ -1,4 +1,5 @@
 import { parseAmount } from "./money.ts";
+import { detectBank } from "./banks.ts";
 
 // Разбор SMS / пушей банков. Форматы у банков разные и меняются,
 // поэтому разбор «мягкий»: ищем сумму, валюту, последние 4 цифры карты и направление.
@@ -12,14 +13,6 @@ export interface ParsedBankMessage {
   bank: string | null;
 }
 
-const BANKS: [RegExp, string][] = [
-  [/privat|приват/i, "ПриватБанк"],
-  [/pumb|пумб/i, "ПУМБ"],
-  [/a-?bank|а-?банк/i, "А-Банк"],
-  [/radabank|радабанк/i, "Радабанк"],
-  [/raiffeisen|райф/i, "Райффайзен"],
-  [/mono/i, "Monobank"],
-];
 
 const IN_WORDS = /(зарахування|зачисление|поповнення|пополнение|надходження|поступление|отримано|получено|credit|\+\s*\d)/i;
 const OUT_WORDS = /(списання|списание|оплата|покупка|переказ|перевод|зняття|снятие|purchase|payment|debit|-\s*\d)/i;
@@ -43,7 +36,7 @@ export function parseBankMessage(text: string): ParsedBankMessage | null {
   if (IN_WORDS.test(before) || IN_WORDS.test(clean) && !OUT_WORDS.test(clean)) direction = "in";
 
   const merchantMatch = clean.match(/(?:в|у|at|магазин|отримувач|получатель)\s+([A-Za-zА-Яа-яІіЇїЄєҐґ0-9"'«»._\- ]{3,40})/);
-  const bank = BANKS.find(([re]) => re.test(clean))?.[1] ?? null;
+  const bank = detectBank(clean);
 
   return {
     amount,
