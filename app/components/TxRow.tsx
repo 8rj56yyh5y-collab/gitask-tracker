@@ -26,7 +26,7 @@ export function TxRow({ tx, children }: { tx: Tx; children?: React.ReactNode }) 
         <div className="muted small">
           {d.toLocaleDateString("ru-RU", { day: "2-digit", month: "short" })}{" "}
           {d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
-          {tx.card_label && <> · {tx.card_label}</>} · {SOURCE[tx.source] ?? tx.source}
+          {tx.card_label ? <> · {tx.card_label}</> : tx.cashbox_name ? <> · касса «{tx.cashbox_name}»</> : null} · {SOURCE[tx.source] ?? tx.source}
           {tx.for_whom && <> · для: {tx.for_whom}</>}
         </div>
         {tx.center_name && (
@@ -34,7 +34,8 @@ export function TxRow({ tx, children }: { tx: Tx; children?: React.ReactNode }) 
             {tx.center_name}
           </span>
         )}
-        {tx.kind === "internal" && <span className="chip">внутренний перевод</span>}
+        {tx.kind === "internal" && <span className="chip">{tx.sale_id ? "деньги компании" : "перевод"}</span>}
+        {tx.plan_id && <span className="chip">по платежу</span>}
         {tx.cost_center_id === null && tx.kind !== "internal" && <span className="chip chip-pending">не разнесено</span>}
       </div>
       <div className={`tx-amount ${tx.amount < 0 ? "neg" : "pos"}`}>{formatMoney(tx.amount, tx.currency)}</div>

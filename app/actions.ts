@@ -9,6 +9,9 @@ import { publicBase } from "@/lib/url.ts";
 import { cookies } from "next/headers";
 import { THEME_COOKIE, normalizeTheme } from "@/lib/theme.ts";
 import { BANK_NAMES } from "@/lib/banks.ts";
+import { archiveCashbox, cashMove, createCashbox, parseAccount, transfer, updateCashbox } from "@/lib/cash.ts";
+import { cancelPlan, createPlan, payPlan, updatePlan } from "@/lib/plans.ts";
+import { archiveGroup, archiveProduct, createSale, deleteSale, payCompany, saveGroup, saveProduct, setSalesBase } from "@/lib/sales.ts";
 import { redirect } from "next/navigation";
 import { toKop, parseAmount } from "@/lib/money.ts";
 import {
@@ -58,7 +61,7 @@ export async function addTransaction(f: FormData) {
   insertTx({
     amountKop: direction * toKop(amount),
     occurredAt: date ? new Date(date).toISOString() : undefined,
-    cardId: num(f, "cardId"),
+    ...accountOf(f),
     costCenterId: num(f, "centerId"),
     forWhom: str(f, "forWhom"),
     counterparty: str(f, "counterparty"),
@@ -258,6 +261,161 @@ export async function mergeCardsAction(f: FormData) {
 export async function setCardParentAction(f: FormData) {
   const id = num(f, "id");
   if (id) setCardParent(id, num(f, "parentId"));
+  refresh();
+  back(f);
+}
+
+// ---------- Счета: карта или касса ----------
+const accountOf = (f: FormData, k = "account") => {
+  const a = parseAccount(str(f, k));
+  return { cardId: a && "card" in a ? a.card : null, cashboxId: a && "cashbox" in a ? a.cashbox : null };
+};
+const kop = (f: FormData, k: string) => toKop(parseAmount(str(f, k)) ?? 0);
+const isoDate = (f: FormData, k: string) => {
+  const v = str(f, k);
+  return v ? new Date(v.length === 10 ? `${v}T12:00:00` : v).toISOString() : undefined;
+};
+const pct = (f: FormData, k: string) => {
+  const n = Number(str(f, k).replace(",", "."));
+  return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0;
+};
+
+// ---------- Кассы ----------
+export async function createCashboxAction(f: FormData) {
+  const name = str(f, "name");
+  if (!name) throw new Error("Назовите кассу");
+  const id = createCashbox({ name, owner: str(f, "owner"), color: hexColor(str(f, "color")) ?? "#16a34a", opening: kop(f, "opening") });
+  refresh();
+  redirect(`/cash/${id}`);
+}
+
+export async function updateCashboxAction(f: FormData) {
+  const id = num(f, "id");
+  if (!id) return;
+  updateCashbox(id, { name: str(f, "name") || "Касса", owner: str(f, "owner"), color: hexColor(str(f, "color")) ?? "#16a34a", opening: kop(f, "opening") });
+  refresh();
+  back(f);
+}
+
+export async function archiveCashboxAction(f: FormData) {
+  const id = num(f, "id");
+  if (id) archiveCashbox(id);
+  refresh();
+  redirect("/cash");
+}
+
+export async function cashMoveAction(f: FormData) {
+  const id = num(f, "id");
+  const amount = kop(f, "amount");
+  if (!id || !amount) throw new Error("Укажите сумму");
+  const sign = str(f, "dir") === "in" ? 1 : -1;
+  cashMove(id, { amountKop: sign * amount, counterparty: str(f, "who"), note: str(f, "note"), centerId: num(f, "centerId"), at: isoDate(f, "at"), planId: num(f, "planId") });
+  refresh();
+  back(f);
+}
+
+export async function transferAction(f: FormData) {
+  const from = parseAccount(str(f, "from"));
+  const to = parseAccount(str(f, "to"));
+  const amount = kop(f, "amount");
+  if (!from || !to) throw new Error("Выберите, откуда и куда");
+  if (str(f, "from") === str(f, "to")) throw new Error("Откуда и куда — одно и то же");
+  transfer(from, to, amount, str(f, "note"), isoDate(f, "at"));
+  refresh();
+  back(f);
+}
+
+// ---------- Платежи ----------
+function planFields(f: FormData) {
+  const acc = accountOf(f);
+  return {
+    title: str(f, "title"), payee: str(f, "payee"), total: kop(f, "total"), dueDate: str(f, "due") || null,
+    cardId: acc.cardId, cashboxId: acc.cashboxId, centerId: num(f, "centerId"), note: str(f, "note"),
+    repeat: (str(f, "repeat") === "month" ? "month" : "none") as "month" | "none",
+  };
+}
+
+export async function createPlanAction(f: FormData) {
+  const id = createPlan(planFields(f));
+  const advance = kop(f, "advance");
+  if (advance > 0) payPlan(id, advance, { ...accountOf(f) });
+  refresh();
+  redirect(str(f, "next") || "/plans");
+}
+
+export async function updatePlanAction(f: FormData) {
+  const id = num(f, "id");
+  if (id) updatePlan(id, planFields(f));
+  refresh();
+  back(f);
+}
+
+export async function payPlanAction(f: FormData) {
+  const id = num(f, "id");
+  if (!id) return;
+  payPlan(id, kop(f, "amount"), { ...accountOf(f), at: isoDate(f, "at") });
+  refresh();
+  back(f);
+}
+
+export async function cancelPlanAction(f: FormData) {
+  const id = num(f, "id");
+  if (id) cancelPlan(id);
+  refresh();
+  redirect("/plans");
+}
+
+// ---------- Продажи товара компании ----------
+export async function saveGroupAction(f: FormData) {
+  const name = str(f, "name");
+  if (!name) throw new Error("Назовите группу");
+  saveGroup({ id: num(f, "id"), name, sales_rate: pct(f, "sales_rate"), mp_rate: pct(f, "mp_rate") });
+  refresh();
+  back(f);
+}
+export async function archiveGroupAction(f: FormData) {
+  const id = num(f, "id");
+  if (id) archiveGroup(id);
+  refresh();
+  back(f);
+}
+export async function saveProductAction(f: FormData) {
+  const name = str(f, "name");
+  if (!name) throw new Error("Назовите товар");
+  saveProduct({ id: num(f, "id"), name, group_id: num(f, "groupId"), unit: str(f, "unit") || "уп.", tiersText: str(f, "tiers") });
+  refresh();
+  back(f);
+}
+export async function archiveProductAction(f: FormData) {
+  const id = num(f, "id");
+  if (id) archiveProduct(id);
+  refresh();
+  back(f);
+}
+export async function setSalesBaseAction(f: FormData) {
+  setSalesBase(str(f, "base") === "net" ? "net" : "gross");
+  refresh();
+  back(f);
+}
+export async function createSaleAction(f: FormData) {
+  const productId = num(f, "productId");
+  if (!productId) throw new Error("Выберите товар");
+  const qty = Number(str(f, "qty").replace(",", ".")) || 0;
+  createSale({
+    productId, qty, total: kop(f, "total") || null, channel: str(f, "channel") === "mp" ? "mp" : "direct",
+    ...accountOf(f), txId: num(f, "txId"), at: isoDate(f, "at"), note: str(f, "note"),
+  });
+  refresh();
+  redirect("/sales");
+}
+export async function deleteSaleAction(f: FormData) {
+  const id = num(f, "id");
+  if (id) deleteSale(id);
+  refresh();
+  redirect("/sales");
+}
+export async function payCompanyAction(f: FormData) {
+  payCompany(kop(f, "amount"), accountOf(f), str(f, "note"), isoDate(f, "at"));
   refresh();
   back(f);
 }

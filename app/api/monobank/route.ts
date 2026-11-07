@@ -3,6 +3,7 @@ import { bearer, ingestTokenOk } from "@/lib/auth.ts";
 import { saveMonoItem } from "@/lib/monobank.ts";
 import { revalidatePath } from "next/cache";
 import { notifyNewTx } from "@/lib/telegram.ts";
+import { matchPlanForTx } from "@/lib/plans.ts";
 
 // Вебхук Monobank (личный API, https://api.monobank.ua/docs/).
 // Регистрируется на адрес https://<домен>/api/monobank?key=<DN_INGEST_TOKEN>.
@@ -43,7 +44,10 @@ export async function POST(req: Request) {
 
   // Операции до даты, с которой ведётся карта, пропускаются.
   const saved = saveMonoItem(body.data?.account, item);
-  if (saved && !saved.duplicate) await notifyNewTx(saved.id);
+  if (saved && !saved.duplicate) {
+    matchPlanForTx(saved.id);
+    await notifyNewTx(saved.id);
+  }
   revalidatePath("/", "layout");
   return new NextResponse("ok");
 }

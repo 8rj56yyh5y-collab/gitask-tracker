@@ -2,6 +2,7 @@ import { randomBytes, randomInt } from "node:crypto";
 import { formatMoney } from "./money.ts";
 import { assignTx, centerTree, getTx, suggestCenters, type Tx } from "./repo.ts";
 import { getSetting, setSetting } from "./settings.ts";
+import { getPlan, markReminded, payPlan, plansToRemind, type Plan } from "./plans.ts";
 
 // Уведомления в Telegram: после каждой новой операции бот присылает сообщение
 // с кнопками категорий. Нажатие кнопки сразу записывает операцию.
@@ -152,6 +153,40 @@ export async function notifyNewTx(txId: number): Promise<void> {
   }
 }
 
+/** Напоминание о платеже в день оплаты (и о просроченных — раз в день). */
+export async function remindPlan(p: Plan): Promise<boolean> {
+  const token = getSetting("tg_token");
+  const chat = getSetting("tg_chat_id");
+  if (!token || !chat) return false;
+  const left = p.total - p.paid;
+  const today = new Date();
+  const overdue = p.due_date && p.due_date < `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const buttons: Button[][] = [[{ text: "✓ Оплачено", callback_data: `p:${p.id}` }]];
+  const url = publicUrl();
+  if (url) buttons[0].push({ text: "Открыть", url: `${url}/plans/${p.id}` });
+  await call(token, "sendMessage", {
+    chat_id: chat,
+    parse_mode: "HTML",
+    text: `${overdue ? "⚠️ Просрочен платёж" : "📅 Сегодня оплатить"}: <b>${esc(p.title)}</b>\n${esc(formatMoney(left))}${p.payee ? ` · ${esc(p.payee)}` : ""}${p.paid ? `\nуже оплачено ${esc(formatMoney(p.paid))} из ${esc(formatMoney(p.total))}` : ""}\n\nПлатите с Monobank или Apple Pay — нажимать не нужно, D&N отметит сам.`,
+    reply_markup: { inline_keyboard: buttons },
+  });
+  return true;
+}
+
+/** Разослать напоминания о платежах, срок которых наступил (раз в день, с 9 утра). */
+export async function sendPlanReminders(now = new Date()): Promise<number> {
+  if (now.getHours() < 9 || !getSetting("tg_chat_id")) return 0;
+  let n = 0;
+  for (const p of plansToRemind(now)) {
+    try {
+      if (await remindPlan(p)) { markReminded(p.id, now); n++; }
+    } catch (e) {
+      console.error("Plan reminder failed:", e);
+    }
+  }
+  return n;
+}
+
 interface Update {
   message?: { chat: { id: number }; text?: string };
   callback_query?: {
@@ -195,6 +230,18 @@ export async function handleUpdate(update: Update): Promise<void> {
     return;
   }
   const [action, txRaw, centerRaw] = q.data.split(":");
+  if (action === "p") {
+    // «✓ Оплачено» из напоминания о платеже: записываем остаток с карты/кассы платежа.
+    const p = getPlan(Number(txRaw));
+    if (!p || p.status !== "open") {
+      await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: "Платёж уже закрыт" });
+      return;
+    }
+    payPlan(p.id, p.total - p.paid, { cardId: p.card_id, cashboxId: p.cashbox_id });
+    await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: "Записано: оплачено" });
+    await call(token, "editMessageText", { chat_id: chatId, message_id: q.message.message_id, text: `✓ Оплачено: <b>${esc(p.title)}</b> · ${esc(formatMoney(p.total - p.paid))}`, parse_mode: "HTML" });
+    return;
+  }
   const tx = getTx(Number(txRaw));
   const target = { chat_id: chatId, message_id: q.message.message_id };
   if (!tx) {

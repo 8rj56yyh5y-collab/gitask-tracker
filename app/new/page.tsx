@@ -1,12 +1,18 @@
+import Link from "next/link";
 import { addTransaction } from "../actions.ts";
-import { centerTree, listCards } from "@/lib/repo.ts";
+import { AccountSelect } from "../components/AccountSelect.tsx";
+import { centerTree } from "@/lib/repo.ts";
 
 export default function NewTx() {
   const tree = centerTree();
-  const cards = listCards();
   return (
     <div className="narrow">
       <h1>Новая операция</h1>
+      <div className="inline" style={{ marginBottom: 12 }}>
+        <Link href="/sales/new" className="btn btn-sm">Продажа товара ›</Link>
+        <Link href="/plans#new" className="btn btn-sm">Запланировать платёж ›</Link>
+        <Link href="/cash" className="btn btn-sm">Касса ›</Link>
+      </div>
       <form action={addTransaction} className="card form">
         <div className="seg">
           <label>
@@ -36,14 +42,7 @@ export default function NewTx() {
         </label>
         <label>
           Карта / касса
-          <select name="cardId" defaultValue="">
-            <option value="">наличные / не указано</option>
-            {cards.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.bank} *{c.last4}
-              </option>
-            ))}
-          </select>
+          <AccountSelect none="наличные / не указано" />
         </label>
         <label>
           Кому / где

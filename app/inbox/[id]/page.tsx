@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { assignTransaction, removeTransaction } from "../../actions.ts";
 import { TxRow } from "../../components/TxRow.tsx";
@@ -13,7 +14,13 @@ export default async function AssignOne({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="narrow-wide">
-      <h1>Куда ушли деньги?</h1>
+      <h1>{tx.amount > 0 ? "Откуда пришли деньги?" : "Куда ушли деньги?"}</h1>
+      {tx.amount > 0 && !tx.sale_id && (
+        <Link href={`/sales/new?tx=${tx.id}`} className="card alert-budget plain" style={{ display: "block" }}>
+          <strong>Это оплата за товар компании?</strong>
+          <div className="muted small">Записать как продажу: посчитается ваша комиссия, остальное — долг компании ›</div>
+        </Link>
+      )}
       <div className="card">
         <TxRow tx={tx} />
       </div>

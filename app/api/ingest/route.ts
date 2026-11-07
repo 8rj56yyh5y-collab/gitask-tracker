@@ -7,6 +7,7 @@ import { findCard, insertTx, monobankConnected } from "@/lib/repo.ts";
 import { detectBank } from "@/lib/banks.ts";
 import { revalidatePath } from "next/cache";
 import { notifyNewTx } from "@/lib/telegram.ts";
+import { matchPlanForTx } from "@/lib/plans.ts";
 
 // Приём операций из «Команд» iOS.
 //   Проще всего: POST https://<сайт>/api/ingest?key=<ключ> с телом «Форма»: amount, merchant, card
@@ -82,7 +83,11 @@ export async function POST(req: Request) {
     occurredAt: now.toISOString(),
   });
 
-  if (!duplicate) await notifyNewTx(id);
+  if (!duplicate) {
+    // Это оплата запланированного платежа? Тогда он закроется сам и операция получит его категорию.
+    matchPlanForTx(id);
+    await notifyNewTx(id);
+  }
   revalidatePath("/", "layout");
   const base = process.env.DN_PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || new URL(req.url).origin;
   return NextResponse.json({ id, duplicate, url: `${base}/inbox/${id}` });

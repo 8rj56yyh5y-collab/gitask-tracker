@@ -329,3 +329,21 @@ input[readonly] { color: var(--muted); font-size: 14px; }
 .subcard { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
 .subcard:first-of-type { border-top: 0; }
 .subcard .grow { flex: 1; min-width: 0; }
+
+/* ---------- Платежи, кассы, продажи ---------- */
+.grid-2-tight { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.card.plan { border-left: 5px solid var(--line); }
+.card.plan.due-over { border-left-color: var(--red); }
+.card.plan.due-today { border-left-color: var(--orange); }
+.card.plan.due-soon { border-left-color: var(--yellow); }
+.due.due-over { color: var(--red); font-weight: 700; }
+.due.due-today { color: var(--orange); font-weight: 700; }
+.due.due-soon { color: var(--yellow); font-weight: 600; }
+.cashbox-tile { display: block; padding: 16px; border-radius: 16px; color: #fff; background: linear-gradient(135deg, var(--c) 0%, color-mix(in srgb, var(--c) 70%, #000) 100%); margin-bottom: 12px; }
+.cashbox-tile .big { font-size: 28px; }
+.kv { display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 12px; background: var(--bg); font-variant-numeric: tabular-nums; }
+.kv .row-between span:first-child { color: var(--muted); }
+.kv .total { border-top: 1px solid var(--line); padding-top: 6px; font-weight: 700; }
+.seg2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.seg2 label { flex-direction: row !important; align-items: center; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; color: var(--text) !important; font-size: 14px !important; }
+.seg2 label:has(input:checked) { border-color: var(--accent); outline: 1px solid var(--accent); }

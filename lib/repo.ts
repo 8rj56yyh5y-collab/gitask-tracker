@@ -42,6 +42,10 @@ export interface Tx {
   card_bank?: string | null;
   card_color?: string | null;
   card_badge?: string | null;
+  cashbox_id?: number | null;
+  cashbox_name?: string | null;
+  plan_id?: number | null;
+  sale_id?: number | null;
   center_name?: string | null;
   center_color?: string | null;
 }
@@ -263,10 +267,11 @@ export function cardUsage(): Map<number, number> {
 
 const TX_SELECT = `
   SELECT t.*, c.bank || ' *' || c.last4 AS card_label, c.bank AS card_bank, c.color AS card_color, c.badge AS card_badge,
-    cc.name AS center_name, cc.color AS center_color
+    cc.name AS center_name, cc.color AS center_color, cb.name AS cashbox_name
   FROM transactions t
   LEFT JOIN cards c ON c.id = t.card_id
-  LEFT JOIN cost_centers cc ON cc.id = t.cost_center_id`;
+  LEFT JOIN cost_centers cc ON cc.id = t.cost_center_id
+  LEFT JOIN cashboxes cb ON cb.id = t.cashbox_id`;
 
 export interface NewTx {
   occurredAt?: string;
@@ -281,6 +286,9 @@ export interface NewTx {
   source: string;
   externalId?: string | null;
   raw?: string | null;
+  cashboxId?: number | null;
+  planId?: number | null;
+  saleId?: number | null;
 }
 
 /** Добавляет операцию. Возвращает id, или id уже существующей при дубле externalId. */
@@ -299,8 +307,9 @@ export function insertTx(t: NewTx): { id: number; duplicate: boolean } {
   const res = db
     .prepare(
       `INSERT INTO transactions
-        (occurred_at, amount, currency, card_id, cost_center_id, kind, for_whom, counterparty, description, source, external_id, raw, assigned_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (occurred_at, amount, currency, card_id, cost_center_id, kind, for_whom, counterparty, description, source, external_id, raw, assigned_at,
+         cashbox_id, plan_id, sale_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       t.occurredAt ?? new Date().toISOString(),
@@ -315,7 +324,10 @@ export function insertTx(t: NewTx): { id: number; duplicate: boolean } {
       t.source,
       t.externalId ?? null,
       t.raw ?? null,
-      t.costCenterId ? new Date().toISOString() : null,
+      t.costCenterId || kind === "internal" ? new Date().toISOString() : null,
+      t.cashboxId ?? null,
+      t.planId ?? null,
+      t.saleId ?? null,
     );
   return { id: Number(res.lastInsertRowid), duplicate: false };
 }
@@ -596,4 +608,10 @@ export function saveAiReport(month: string, text: string) {
   getDb()
     .prepare("INSERT INTO ai_reports (month, text) VALUES (?, ?) ON CONFLICT(month) DO UPDATE SET text = excluded.text, created_at = datetime('now')")
     .run(month, text);
+}
+
+/** Категория для переводов и транзитных денег (не расход и не доход). */
+export function internalCenterId(): number | null {
+  const r = getDb().prepare("SELECT id FROM cost_centers WHERE is_internal = 1 AND archived = 0 ORDER BY id LIMIT 1").get() as Row | undefined;
+  return r ? Number(r.id) : null;
 }
