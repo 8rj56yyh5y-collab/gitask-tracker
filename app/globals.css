@@ -321,3 +321,11 @@ input[readonly] { color: var(--muted); font-size: 14px; }
 .card-hero { max-width: 420px; }
 .color-row { display: flex; gap: 10px; align-items: center; }
 .color-row input[type="color"] { width: 64px; flex: none; }
+.copy-field { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.copy-field input { flex: 1 1 200px; min-width: 0; }
+.copy-btn { width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+.ctile .more-cards { font-size: 12px; opacity: 0.85; }
+.merge-box { border-left: 5px solid var(--accent); }
+.subcard { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.subcard:first-of-type { border-top: 0; }
+.subcard .grow { flex: 1; min-width: 0; }

@@ -112,8 +112,10 @@ export async function connectMonobank(token: string, webhookUrl: string, opts: M
       db.prepare("UPDATE cards SET mono_account_id = ?, track_from = ? WHERE id = ?").run(acc.id, from.toISOString(), existing.id);
       linked++;
     } else {
+      // Если основная карта Monobank уже есть — новая карта входит в неё (у банка один лимит).
+      const main = listCards().find((c: Card) => c.bank === "Monobank" && !c.parent_id);
       createCard({ bank: "Monobank", last4, owner: client.name ?? "", kind: acc.type === "fop" ? "fop" : "personal", monthly_limit: 0, mono_account_id: acc.id });
-      db.prepare("UPDATE cards SET track_from = ? WHERE mono_account_id = ?").run(from.toISOString(), acc.id);
+      db.prepare("UPDATE cards SET track_from = ?, parent_id = ? WHERE mono_account_id = ?").run(from.toISOString(), main?.id ?? null, acc.id);
       added++;
     }
     accounts.push(acc.id);

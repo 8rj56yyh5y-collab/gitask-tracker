@@ -29,6 +29,8 @@ import {
   applyDefaultLimit,
   setDefaultCardLimit,
   updateCard,
+  mergeBankCards,
+  setCardParent,
 } from "@/lib/repo.ts";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -244,4 +246,18 @@ export async function setDefaultLimitAction(f: FormData) {
 export async function setThemeAction(f: FormData) {
   (await cookies()).set(THEME_COOKIE, normalizeTheme(str(f, "theme")), { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
   refresh();
+}
+
+export async function mergeCardsAction(f: FormData) {
+  const id = num(f, "mainId");
+  if (id) mergeBankCards(id);
+  refresh();
+  back(f);
+}
+
+export async function setCardParentAction(f: FormData) {
+  const id = num(f, "id");
+  if (id) setCardParent(id, num(f, "parentId"));
+  refresh();
+  back(f);
 }

@@ -85,6 +85,8 @@ export function getDb(): DatabaseSync {
   // Цвет и значок карты (по умолчанию — цвета банка).
   if (!cardCols.includes("color")) db.exec("ALTER TABLE cards ADD COLUMN color TEXT");
   if (!cardCols.includes("badge")) db.exec("ALTER TABLE cards ADD COLUMN badge TEXT");
+  // Дополнительная карта входит в основную: у группы один лимит (например, все карты Monobank).
+  if (!cardCols.includes("parent_id")) db.exec("ALTER TABLE cards ADD COLUMN parent_id INTEGER");
   const count = db.prepare("SELECT COUNT(*) AS n FROM cost_centers").get() as { n: number };
   if (count.n === 0) {
     const ins = db.prepare("INSERT INTO cost_centers (name, color, is_internal) VALUES (?, ?, ?)");

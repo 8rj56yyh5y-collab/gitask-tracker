@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connectMonobankAction, connectTelegramAction, disconnectTelegramAction, setThemeAction } from "../actions.ts";
 import { SubmitButton } from "../components/SubmitButton.tsx";
-import { CopyButton } from "../components/CopyButton.tsx";
+import { CopyField } from "../components/CopyField.tsx";
 import { aiConfigured } from "@/lib/ai.ts";
 import { telegramState } from "@/lib/telegram.ts";
 import { MAX_BACKFILL_DAYS } from "@/lib/monobank.ts";
@@ -83,8 +83,9 @@ export default async function Settings({
               Открыть бота и нажать «Старт»
             </a>
             <p className="muted small">
-              Или отправьте боту: <code>/start {tg.linkCode}</code>. Потом обновите эту страницу.
+              Или отправьте боту эту строку, потом обновите страницу:
             </p>
+            <CopyField value={`/start ${tg.linkCode}`} label="команда для бота" />
           </>
         ) : (
           <p className="small">
@@ -131,11 +132,12 @@ export default async function Settings({
           После оплаты телефоном iPhone сам отправит в D&amp;N сумму, магазин и карту. Карту D&amp;N узнает по названию банка.
           {tg.linked ? " Сразу придёт сообщение в Telegram с выбором категории." : " Подключите Telegram выше — тогда сразу придёт сообщение с выбором категории."}
         </p>
-        <label>
-          Ваша ссылка для «Команд» (в ней уже есть ваш секретный ключ)
-          <input readOnly value={ingestKey ? `${base}/api/ingest?key=${ingestKey}` : "ключ не задан на сервере (DN_INGEST_TOKEN)"} />
-        </label>
-        {ingestKey && <CopyButton text={`${base}/api/ingest?key=${ingestKey}`} label="Скопировать ссылку" />}
+        <div className="f-label small muted">Ваша ссылка для «Команд» (в ней уже есть ваш секретный ключ)</div>
+        {ingestKey ? (
+          <CopyField value={`${base}/api/ingest?key=${ingestKey}`} label="ссылка для «Команд»" />
+        ) : (
+          <p className="danger small">Ключ не задан на сервере (DN_INGEST_TOKEN).</p>
+        )}
         <ol className="small steps">
           <li>
             «Команды» → <b>Автоматизация</b> → <b>+</b> → <b>Транзакция</b>. Карты — <b>все</b>, <b>Запускать сразу</b> → Далее.

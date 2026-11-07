@@ -1,15 +1,22 @@
-import { addCard, setDefaultLimitAction } from "../actions.ts";
+import { addCard, mergeCardsAction, setDefaultLimitAction } from "../actions.ts";
 import { CardTile } from "../components/CardTile.tsx";
 import { LimitBar } from "../components/LimitBar.tsx";
-import { cardUsage, defaultCardLimit, listCards } from "@/lib/repo.ts";
+import { defaultCardLimit, groupUsage, listCards, listMainCards } from "@/lib/repo.ts";
 import { formatMoney } from "@/lib/money.ts";
 import { BANK_NAMES } from "@/lib/banks.ts";
 
 const KINDS: Record<string, string> = { personal: "Личная", fop: "ФОП", corporate: "Корпоративная", cash: "Касса (наличные)" };
 
 export default function Cards() {
-  const cards = listCards();
-  const usage = cardUsage();
+  // Показываем основные карты; дополнительные (например, остальные карты Monobank) — внутри основной.
+  const all = listCards();
+  const cards = listMainCards();
+  const usage = groupUsage();
+  const extra = (id: number) => all.filter((c) => c.parent_id === id).length;
+  // Банки, у которых несколько отдельных карт — предлагаем объединить под одной основной.
+  const byBank = new Map<string, typeof cards>();
+  for (const c of cards) byBank.set(c.bank, [...(byBank.get(c.bank) ?? []), c]);
+  const toMerge = [...byBank.entries()].filter(([, list]) => list.length > 1);
   const limited = cards.filter((c) => c.monthly_limit > 0);
   const totalLimit = limited.reduce((a, c) => a + c.monthly_limit, 0);
   const totalUsed = limited.reduce((a, c) => a + (usage.get(c.id) ?? 0), 0);
@@ -41,11 +48,34 @@ export default function Cards() {
       ) : (
         <div className="ctiles">
           {cards.map((c) => (
-            <CardTile key={c.id} card={c} used={usage.get(c.id) ?? 0} href={`/cards/${c.id}`} />
+            <CardTile key={c.id} card={c} used={usage.get(c.id) ?? 0} href={`/cards/${c.id}`} extra={extra(c.id)} />
           ))}
         </div>
       )}
       <p className="muted small">Нажмите на карту, чтобы изменить лимит, цвет и значок или посмотреть её операции.</p>
+
+      {toMerge.map(([bank, list]) => (
+        <form key={bank} action={mergeCardsAction} className="card form merge-box">
+          <h2>
+            {list.length} карты {bank} — объединить в одну?
+          </h2>
+          <p className="small" style={{ margin: 0 }}>
+            У основной карты будет один лимит на все карты банка. Траты каждой карты видны внутри основной.
+          </p>
+          <label>
+            Основная карта
+            <select name="mainId" defaultValue={list[0].id}>
+              {list.map((c) => (
+                <option key={c.id} value={c.id}>
+                  •••• {c.last4}
+                  {c.owner ? ` · ${c.owner}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="btn btn-primary">Объединить</button>
+        </form>
+      ))}
 
       <form action={setDefaultLimitAction} className="card form">
         <h2>Лимит по умолчанию</h2>
