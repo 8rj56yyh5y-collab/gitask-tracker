@@ -3,6 +3,9 @@ import { formatMoney } from "@/lib/money.ts";
 import { limitState } from "@/lib/limits.ts";
 import { budgetAlerts, groupUsage, listMainCards, monthSpendByCenter, unassignedSummary } from "@/lib/repo.ts";
 import { BudgetLine } from "./components/BudgetLine.tsx";
+import { cashBalances, listCashboxes } from "@/lib/cash.ts";
+import { listPlans, ymd } from "@/lib/plans.ts";
+import { companyDebt } from "@/lib/sales.ts";
 
 export default function Home() {
   const un = unassignedSummary();
@@ -45,6 +48,50 @@ export default function Home() {
           ))}
         </section>
       )}
+
+      {(() => {
+        const today = ymd(new Date());
+        const week = ymd(new Date(Date.now() + 7 * 864e5));
+        const soon = listPlans("open").filter((p) => p.due_date && p.due_date <= week);
+        const boxes = listCashboxes();
+        const bal = cashBalances();
+        const debt = companyDebt();
+        return (
+          <>
+            {soon.length > 0 && (
+              <Link href="/plans" className="card alert-budget span-all">
+                <h2>Скоро оплатить</h2>
+                {soon.slice(0, 4).map((p) => (
+                  <div key={p.id} className="row-between small" style={{ padding: "3px 0" }}>
+                    <span>
+                      {p.due_date! < today ? <strong className="danger">просрочен · </strong> : p.due_date === today ? <strong className="warn-text">сегодня · </strong> : null}
+                      {p.title}
+                    </span>
+                    <strong>{formatMoney(p.total - p.paid)}</strong>
+                  </div>
+                ))}
+                {soon.length > 4 && <div className="muted small">и ещё {soon.length - 4} ›</div>}
+              </Link>
+            )}
+            {(boxes.length > 0 || debt > 0) && (
+              <div className="card">
+                {boxes.length > 0 && (
+                  <Link href="/cash" className="row-between plain" style={{ padding: "2px 0" }}>
+                    <span>Наличные в кассах</span>
+                    <strong>{formatMoney(boxes.reduce((a, b) => a + (bal.get(b.id) ?? 0), 0))} ›</strong>
+                  </Link>
+                )}
+                {debt > 0 && (
+                  <Link href="/sales" className="row-between plain" style={{ padding: "2px 0" }}>
+                    <span>Долг компании за товар</span>
+                    <strong>{formatMoney(debt)} ›</strong>
+                  </Link>
+                )}
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       <section className="card">
         <h2>Расходы · {month}</h2>

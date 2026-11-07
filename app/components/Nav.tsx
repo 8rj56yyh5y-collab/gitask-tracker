@@ -10,7 +10,7 @@ export function Nav({ pending }: { pending: number }) {
   const path = usePathname();
   const cls = (href: string) => `nav-item ${isActive(path, href) ? "is-active" : ""}`;
   const badge = pending > 0 ? <span className="badge">{pending > 99 ? "99+" : pending}</span> : null;
-  const moreActive = ["/more", "/inbox", "/analytics", "/centers", "/settings"].some((h) => isActive(path, h));
+  const moreActive = ["/more", "/inbox", "/analytics", "/centers", "/settings", "/plans", "/cash", "/sales"].some((h) => isActive(path, h));
 
   return (
     <>
@@ -65,6 +65,15 @@ export function Nav({ pending }: { pending: number }) {
         </Link>
         <Link href="/centers" className={cls("/centers")}>
           <Icon name="tag" /> Категории
+        </Link>
+        <Link href="/plans" className={cls("/plans")}>
+          <Icon name="history" /> Платежи
+        </Link>
+        <Link href="/cash" className={cls("/cash")}>
+          <Icon name="card" /> Кассы
+        </Link>
+        <Link href="/sales" className={cls("/sales")}>
+          <Icon name="tag" /> Продажи
         </Link>
         <Link href="/settings" className={cls("/settings")}>
           <Icon name="settings" /> Настройки

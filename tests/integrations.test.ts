@@ -182,3 +182,24 @@ test("monobank: new accounts join the existing main Monobank card; connected fla
     assert.ok(c.parent_id === main.id || c.parent_id === null);
   }
 });
+
+test("telegram: plan reminder once a day after 9:00, «✓ Оплачено» pays the rest", async () => {
+  setSetting("tg_chat_id", "42");
+  const plans = await import("../lib/plans.ts");
+  const id = plans.createPlan({ title: "Аренда пункта", payee: "Петренко", total: 1_500_000, dueDate: plans.ymd(new Date(Date.now() - 864e5)) });
+  plans.payPlan(id, 500_000);
+  calls.length = 0;
+  const morning = new Date(); morning.setHours(8, 0, 0, 0);
+  assert.equal(await tg.sendPlanReminders(morning), 0, "not before 9:00");
+  const ten = new Date(); ten.setHours(10, 0, 0, 0);
+  assert.ok((await tg.sendPlanReminders(ten)) >= 1);
+  const msg = calls.find((c) => c.path.endsWith("/sendMessage") && c.body.text.includes("Аренда пункта"))!;
+  assert.match(msg.body.text, /Просрочен/);
+  assert.match(msg.body.text, /10[\s ]000/, "shows what is left");
+  assert.equal(await tg.sendPlanReminders(ten), 0, "only once a day");
+  await tg.handleUpdate({ callback_query: { id: "qp", data: `p:${id}`, message: { chat: { id: 42 }, message_id: 9 } } });
+  assert.equal(plans.getPlan(id)!.status, "done");
+  calls.length = 0;
+  await tg.handleUpdate({ callback_query: { id: "qp2", data: `p:${id}`, message: { chat: { id: 42 }, message_id: 9 } } });
+  assert.match(calls.find((c) => c.path.endsWith("/answerCallbackQuery"))!.body.text, /уже закрыт/);
+});
