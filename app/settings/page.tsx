@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { connectMonobankAction, connectTelegramAction, disconnectTelegramAction, setThemeAction } from "../actions.ts";
 import { SubmitButton } from "../components/SubmitButton.tsx";
+import { CopyButton } from "../components/CopyButton.tsx";
 import { aiConfigured } from "@/lib/ai.ts";
 import { telegramState } from "@/lib/telegram.ts";
 import { MAX_BACKFILL_DAYS } from "@/lib/monobank.ts";
@@ -131,9 +132,10 @@ export default async function Settings({
           {tg.linked ? " Сразу придёт сообщение в Telegram с выбором категории." : " Подключите Telegram выше — тогда сразу придёт сообщение с выбором категории."}
         </p>
         <label>
-          Ваша ссылка для «Команд»
+          Ваша ссылка для «Команд» (в ней уже есть ваш секретный ключ)
           <input readOnly value={ingestKey ? `${base}/api/ingest?key=${ingestKey}` : "ключ не задан на сервере (DN_INGEST_TOKEN)"} />
         </label>
+        {ingestKey && <CopyButton text={`${base}/api/ingest?key=${ingestKey}`} label="Скопировать ссылку" />}
         <ol className="small steps">
           <li>
             «Команды» → <b>Автоматизация</b> → <b>+</b> → <b>Транзакция</b>. Карты — <b>все</b>, <b>Запускать сразу</b> → Далее.
@@ -142,7 +144,7 @@ export default async function Settings({
             <b>Новая пустая автоматизация</b> → <b>Добавить действие</b> → <b>Получить содержимое URL</b>. Вставьте ссылку выше.
           </li>
           <li>
-            Нажмите <b>›</b> у действия: <b>Метод</b> — POST, <b>Тело запроса</b> — <b>Форма</b>. Добавьте три поля «Текст»:
+            Нажмите <b>›</b> у действия: <b>Метод</b> — POST, <b>Тело запроса</b> — <b>JSON</b>. Добавьте три поля «Текст»:
             <br />
             <code>amount</code> → «Ввод команды» → <b>Сумма</b>; <code>merchant</code> → <b>Продавец</b>; <code>card</code> → <b>Карта или пропуск</b>.
           </li>
