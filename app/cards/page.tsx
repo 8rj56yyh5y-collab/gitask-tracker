@@ -1,11 +1,10 @@
-import { addCard, removeCard, setCardLimit } from "../actions.ts";
+import { addCard, setDefaultLimitAction } from "../actions.ts";
+import { CardTile } from "../components/CardTile.tsx";
 import { LimitBar } from "../components/LimitBar.tsx";
-import { cardUsage, listCards } from "@/lib/repo.ts";
+import { cardUsage, defaultCardLimit, listCards } from "@/lib/repo.ts";
 import { formatMoney } from "@/lib/money.ts";
-import { forecastExhaustDay, limitState } from "@/lib/limits.ts";
 import { BANK_NAMES } from "@/lib/banks.ts";
 
-const BANKS = BANK_NAMES;
 const KINDS: Record<string, string> = { personal: "Личная", fop: "ФОП", corporate: "Корпоративная", cash: "Касса (наличные)" };
 
 export default function Cards() {
@@ -14,65 +13,62 @@ export default function Cards() {
   const limited = cards.filter((c) => c.monthly_limit > 0);
   const totalLimit = limited.reduce((a, c) => a + c.monthly_limit, 0);
   const totalUsed = limited.reduce((a, c) => a + (usage.get(c.id) ?? 0), 0);
-  const today = new Date();
+  const def = defaultCardLimit();
   // Подсказка: карта с наибольшим остатком лимита.
-  const best = limited
-    .map((c) => ({ c, left: c.monthly_limit - (usage.get(c.id) ?? 0) }))
-    .sort((a, b) => b.left - a.left)[0];
+  const best = limited.map((c) => ({ c, left: c.monthly_limit - (usage.get(c.id) ?? 0) })).sort((a, b) => b.left - a.left)[0];
+  const noLimit = cards.filter((c) => c.monthly_limit === 0).length;
 
   return (
-    <div className="grid grid-auto">
-      <h1>Лимиты карт</h1>
+    <>
+      <h1>Карты</h1>
       {limited.length > 0 && (
         <div className="card">
-          <h2>Итого по всем картам</h2>
+          <h2>Лимиты всех карт за месяц</h2>
           <LimitBar used={totalUsed} limit={totalLimit} />
           {best && best.left > 0 && (
-            <p className="small">
-              Платить лучше с <strong>{best.c.bank} *{best.c.last4}</strong> — там осталось {formatMoney(best.left)}.
+            <p className="small" style={{ marginBottom: 0 }}>
+              Платить лучше с <strong>{best.c.bank} •••• {best.c.last4}</strong> — там осталось {formatMoney(best.left)}.
             </p>
           )}
         </div>
       )}
 
-      {cards.map((c) => {
-        const used = usage.get(c.id) ?? 0;
-        const s = limitState(used, c.monthly_limit);
-        const day = forecastExhaustDay(used, c.monthly_limit, today);
-        return (
-          <div key={c.id} className={`card card-${c.monthly_limit ? s.level : "none"}`}>
-            <div className="row-between">
-              <div>
-                <strong>
-                  {c.bank} *{c.last4}
-                </strong>
-                <div className="muted small">
-                  {KINDS[c.kind] ?? c.kind}
-                  {c.owner && <> · {c.owner}</>}
-                </div>
-              </div>
-              <form action={removeCard}>
-                <input type="hidden" name="id" value={c.id} />
-                <button className="btn btn-ghost btn-sm" title="Скрыть карту">✕</button>
-              </form>
-            </div>
-            <LimitBar used={used} limit={c.monthly_limit} />
-            {day && <div className="small warn">При текущем темпе лимит закончится {day}-го числа.</div>}
-            <form action={setCardLimit} className="inline">
-              <input type="hidden" name="id" value={c.id} />
-              <input name="limit" inputMode="decimal" placeholder="Лимит в месяц, ₴" defaultValue={c.monthly_limit ? c.monthly_limit / 100 : ""} />
-              <button className="btn btn-sm">Сохранить</button>
-            </form>
-          </div>
-        );
-      })}
+      {cards.length === 0 ? (
+        <div className="card">
+          <strong>Карт пока нет</strong>
+          <p className="muted small">Добавьте карты ниже. Monobank добавляется сам — в «Настройках».</p>
+        </div>
+      ) : (
+        <div className="ctiles">
+          {cards.map((c) => (
+            <CardTile key={c.id} card={c} used={usage.get(c.id) ?? 0} href={`/cards/${c.id}`} />
+          ))}
+        </div>
+      )}
+      <p className="muted small">Нажмите на карту, чтобы изменить лимит, цвет и значок или посмотреть её операции.</p>
+
+      <form action={setDefaultLimitAction} className="card form">
+        <h2>Лимит по умолчанию</h2>
+        <p className="small" style={{ margin: 0 }}>
+          Ставится каждой новой карте, в том числе из Monobank. У каждой карты его можно поменять.
+        </p>
+        <div className="inline">
+          <input name="limit" inputMode="decimal" placeholder="например, 30000" defaultValue={def ? def / 100 : ""} aria-label="Лимит по умолчанию, ₴" />
+          <button className="btn btn-sm">Сохранить</button>
+        </div>
+        {noLimit > 0 && (
+          <label className="check">
+            <input type="checkbox" name="applyAll" /> Поставить и картам без лимита ({noLimit})
+          </label>
+        )}
+      </form>
 
       <form action={addCard} className="card form">
         <h2>Добавить карту</h2>
         <label>
           Банк
           <select name="bank">
-            {BANKS.map((b) => (
+            {BANK_NAMES.map((b) => (
               <option key={b}>{b}</option>
             ))}
           </select>
@@ -83,7 +79,7 @@ export default function Cards() {
         </label>
         <label>
           Чья карта
-          <input name="owner" placeholder="например, я / Иван" />
+          <input name="owner" placeholder="например, моя / Иван" />
         </label>
         <label>
           Тип
@@ -97,14 +93,10 @@ export default function Cards() {
         </label>
         <label>
           Лимит в месяц, ₴
-          <input name="limit" inputMode="decimal" placeholder="30000" />
-        </label>
-        <label>
-          ID счёта Monobank (необязательно)
-          <input name="monoAccount" placeholder="для автоматического приёма операций" />
+          <input name="limit" inputMode="decimal" placeholder={def ? `по умолчанию ${def / 100}` : "30000"} />
         </label>
         <button className="btn btn-primary">Добавить</button>
       </form>
-    </div>
+    </>
   );
 }

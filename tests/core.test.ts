@@ -66,3 +66,12 @@ test("bank detection: Wallet card names and SMS senders", async () => {
   assert.equal(detectBank("ПриватБанк Універсальна"), "ПриватБанк");
   assert.equal(detectBank("Visa Gold"), null);
 });
+
+test("card style: bank defaults, custom colour, readable text", async () => {
+  const { cardStyle, inkOn } = await import("../lib/banks.ts");
+  assert.deepEqual(cardStyle({ bank: "Monobank" }), { color: "#141414", badge: "mono", ink: "#ffffff" });
+  assert.equal(cardStyle({ bank: "Райффайзен" }).ink, "#111111", "dark text on yellow");
+  assert.equal(cardStyle({ bank: "ПУМБ", color: "#00ff00", badge: "МОЙ" }).badge, "МОЙ");
+  assert.equal(cardStyle({ bank: "ПУМБ", color: "red" }).color, "#d71920", "invalid colour falls back to bank colour");
+  assert.equal(inkOn("#ffffff"), "#111111");
+});

@@ -6,6 +6,9 @@ import { analyzeMonth } from "@/lib/ai.ts";
 import { connectMonobank } from "@/lib/monobank.ts";
 import { connectTelegram, disconnectTelegram } from "@/lib/telegram.ts";
 import { publicBase } from "@/lib/url.ts";
+import { cookies } from "next/headers";
+import { THEME_COOKIE, normalizeTheme } from "@/lib/theme.ts";
+import { BANK_NAMES } from "@/lib/banks.ts";
 import { redirect } from "next/navigation";
 import { toKop, parseAmount } from "@/lib/money.ts";
 import {
@@ -23,6 +26,9 @@ import {
   updateCardLimit,
   updateCenter,
   restoreCenter,
+  applyDefaultLimit,
+  setDefaultCardLimit,
+  updateCard,
 } from "@/lib/repo.ts";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -87,6 +93,7 @@ export async function addCard(f: FormData) {
     monthly_limit: toKop(parseAmount(str(f, "limit")) ?? 0),
     mono_account_id: str(f, "monoAccount") || null,
   });
+  back(f);
   refresh();
 }
 
@@ -100,6 +107,7 @@ export async function removeCard(f: FormData) {
   const id = num(f, "id");
   if (id) archiveCard(id);
   refresh();
+  back(f);
 }
 
 export async function addCenter(f: FormData) {
@@ -203,5 +211,37 @@ export async function updateCenterAction(f: FormData) {
 export async function restoreCenterAction(f: FormData) {
   const id = num(f, "id");
   if (id) restoreCenter(id);
+  refresh();
+}
+
+const hexColor = (v: string) => (/^#[0-9a-f]{6}$/i.test(v) ? v : null);
+
+export async function updateCardAction(f: FormData) {
+  const id = num(f, "id");
+  if (!id) return;
+  const last4 = str(f, "last4").replace(/\D/g, "").slice(-4);
+  if (last4.length !== 4) throw new Error("Нужны последние 4 цифры карты");
+  const bank = BANK_NAMES.includes(str(f, "bank")) ? str(f, "bank") : "Другой";
+  updateCard(id, {
+    bank,
+    last4,
+    owner: str(f, "owner"),
+    kind: str(f, "kind") || "personal",
+    monthly_limit: toKop(parseAmount(str(f, "limit")) ?? 0),
+    color: f.get("resetStyle") === "on" ? null : hexColor(str(f, "color")),
+    badge: f.get("resetStyle") === "on" ? null : str(f, "badge").slice(0, 4) || null,
+  });
+  refresh();
+  back(f);
+}
+
+export async function setDefaultLimitAction(f: FormData) {
+  setDefaultCardLimit(toKop(parseAmount(str(f, "limit")) ?? 0));
+  if (f.get("applyAll") === "on") applyDefaultLimit();
+  refresh();
+}
+
+export async function setThemeAction(f: FormData) {
+  (await cookies()).set(THEME_COOKIE, normalizeTheme(str(f, "theme")), { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
   refresh();
 }

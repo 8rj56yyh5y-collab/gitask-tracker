@@ -111,3 +111,17 @@ test("card is found by Wallet card name when there is one card of that bank", ()
   assert.equal(repo.findCard({ hint: "Radabank Visa" }), null, "two cards of one bank — ambiguous");
   assert.equal(repo.findCard({ hint: "Radabank •••• 2222" })!.last4, "2222");
 });
+
+test("default card limit applies to new cards and can be applied to cards without a limit", () => {
+  repo.setDefaultCardLimit(3_000_000);
+  repo.createCard({ bank: "А-Банк", last4: "4321", owner: "", kind: "personal", monthly_limit: 0, mono_account_id: null });
+  assert.equal(repo.findCard({ last4: "4321" })!.monthly_limit, 3_000_000);
+  repo.createCard({ bank: "ПУМБ", last4: "9876", owner: "", kind: "personal", monthly_limit: 1_000_000, mono_account_id: null });
+  assert.equal(repo.findCard({ last4: "9876" })!.monthly_limit, 1_000_000, "explicit limit wins");
+  const id = repo.findCard({ last4: "9876" })!.id;
+  repo.updateCard(id, { bank: "ПУМБ", last4: "9876", owner: "", kind: "personal", monthly_limit: 0, color: "#000000", badge: "PB" });
+  assert.ok(repo.applyDefaultLimit() >= 1);
+  const c = repo.getCard(id)!;
+  assert.deepEqual([c.monthly_limit, c.color, c.badge], [3_000_000, "#000000", "PB"]);
+  repo.setDefaultCardLimit(0);
+});

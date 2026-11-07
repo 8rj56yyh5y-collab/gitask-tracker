@@ -20,6 +20,9 @@ export interface Card {
   monthly_limit: number;
   mono_account_id: string | null;
   track_from?: string | null;
+  color?: string | null;
+  badge?: string | null;
+  archived?: number;
 }
 
 export interface Tx {
@@ -35,6 +38,9 @@ export interface Tx {
   description: string;
   source: string;
   card_label?: string | null;
+  card_bank?: string | null;
+  card_color?: string | null;
+  card_badge?: string | null;
   center_name?: string | null;
   center_color?: string | null;
 }
@@ -111,10 +117,49 @@ export function listCards(): Card[] {
   return rows<Card>(getDb().prepare("SELECT * FROM cards WHERE archived = 0 ORDER BY bank, last4").all());
 }
 
-export function createCard(c: Omit<Card, "id">) {
+/** Лимит по умолчанию для новых карт (копейки), задаётся на странице «Карты». */
+export function defaultCardLimit(): number {
+  const r = getDb().prepare("SELECT value FROM settings WHERE key = 'default_card_limit'").get() as { value: string } | undefined;
+  return Number(r?.value ?? 0) || 0;
+}
+
+export function setDefaultCardLimit(kop: number) {
   getDb()
-    .prepare("INSERT INTO cards (bank, last4, owner, kind, monthly_limit, mono_account_id) VALUES (?, ?, ?, ?, ?, ?)")
-    .run(c.bank, c.last4, c.owner, c.kind, c.monthly_limit, c.mono_account_id);
+    .prepare("INSERT INTO settings (key, value) VALUES ('default_card_limit', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+    .run(String(Math.max(0, kop)));
+}
+
+/** Проставить лимит по умолчанию всем картам без лимита. Возвращает, скольким картам поставлен. */
+export function applyDefaultLimit(): number {
+  const lim = defaultCardLimit();
+  if (!lim) return 0;
+  return Number(getDb().prepare("UPDATE cards SET monthly_limit = ? WHERE monthly_limit = 0 AND archived = 0").run(lim).changes);
+}
+
+/** Новая карта. Без указанного лимита получает лимит по умолчанию. */
+export function createCard(c: Omit<Card, "id">) {
+  const limit = c.monthly_limit > 0 ? c.monthly_limit : defaultCardLimit();
+  getDb()
+    .prepare("INSERT INTO cards (bank, last4, owner, kind, monthly_limit, mono_account_id, color, badge) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+    .run(c.bank, c.last4, c.owner, c.kind, limit, c.mono_account_id, c.color ?? null, c.badge ?? null);
+}
+
+export function getCard(id: number): Card | null {
+  return (getDb().prepare("SELECT * FROM cards WHERE id = ?").get(id) as unknown as Card) ?? null;
+}
+
+export function updateCard(id: number, c: Pick<Card, "bank" | "last4" | "owner" | "kind" | "monthly_limit" | "color" | "badge">) {
+  getDb()
+    .prepare("UPDATE cards SET bank = ?, last4 = ?, owner = ?, kind = ?, monthly_limit = ?, color = ?, badge = ? WHERE id = ?")
+    .run(c.bank, c.last4, c.owner, c.kind, c.monthly_limit, c.color ?? null, c.badge ?? null, id);
+}
+
+/** Операции карты за месяц. */
+export function cardTransactions(cardId: number, today = new Date()): Tx[] {
+  const { from, to } = monthBounds(today);
+  return rows<Tx>(
+    getDb().prepare(`${TX_SELECT} WHERE t.card_id = ? AND t.occurred_at >= ? AND t.occurred_at < ? ORDER BY t.occurred_at DESC`).all(cardId, from, to),
+  );
 }
 
 export function updateCardLimit(id: number, limitKop: number) {
@@ -162,7 +207,8 @@ export function cardUsage(): Map<number, number> {
 // ---------- Операции ----------
 
 const TX_SELECT = `
-  SELECT t.*, c.bank || ' *' || c.last4 AS card_label, cc.name AS center_name, cc.color AS center_color
+  SELECT t.*, c.bank || ' *' || c.last4 AS card_label, c.bank AS card_bank, c.color AS card_color, c.badge AS card_badge,
+    cc.name AS center_name, cc.color AS center_color
   FROM transactions t
   LEFT JOIN cards c ON c.id = t.card_id
   LEFT JOIN cost_centers cc ON cc.id = t.cost_center_id`;

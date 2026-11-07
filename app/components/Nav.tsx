@@ -10,7 +10,7 @@ export function Nav({ pending }: { pending: number }) {
   const path = usePathname();
   const cls = (href: string) => `nav-item ${isActive(path, href) ? "is-active" : ""}`;
   const badge = pending > 0 ? <span className="badge">{pending > 99 ? "99+" : pending}</span> : null;
-  const moreActive = ["/more", "/inbox", "/cards", "/centers", "/settings"].some((h) => isActive(path, h));
+  const moreActive = ["/more", "/inbox", "/analytics", "/centers", "/settings"].some((h) => isActive(path, h));
 
   return (
     <>
@@ -20,19 +20,19 @@ export function Nav({ pending }: { pending: number }) {
           <Icon name="home" />
           <span>Главная</span>
         </Link>
+        <Link href="/cards" className={cls("/cards")}>
+          <Icon name="card" />
+          <span>Карты</span>
+        </Link>
+        <Link href="/new" className="nav-plus" aria-label="Новая операция">
+          <Icon name="plus" size={28} />
+        </Link>
         <Link href="/history" className={cls("/history")}>
           <span className="icon-wrap">
             <Icon name="history" />
             {badge}
           </span>
           <span>История</span>
-        </Link>
-        <Link href="/new" className="nav-plus" aria-label="Новая операция">
-          <Icon name="plus" size={28} />
-        </Link>
-        <Link href="/analytics" className={cls("/analytics")}>
-          <Icon name="chart" />
-          <span>Аналитика</span>
         </Link>
         <Link href="/more" className={`nav-item ${moreActive ? "is-active" : ""}`}>
           <Icon name="more" />
@@ -61,7 +61,7 @@ export function Nav({ pending }: { pending: number }) {
           <Icon name="chart" /> Аналитика
         </Link>
         <Link href="/cards" className={cls("/cards")}>
-          <Icon name="card" /> Лимиты карт
+          <Icon name="card" /> Карты
         </Link>
         <Link href="/centers" className={cls("/centers")}>
           <Icon name="tag" /> Категории

@@ -59,8 +59,15 @@ export default function Home() {
         </ul>
       </section>
 
+      <Link href="/analytics" className="card">
+        <h2>Аналитика ›</h2>
+        <p className="muted small" style={{ margin: 0 }}>
+          Любой месяц, год по месяцам, сравнение с прошлым месяцем, разбор от ИИ.
+        </p>
+      </Link>
+
       <Link href="/cards" className="card">
-        <h2>Лимиты карт</h2>
+        <h2>Лимиты карт ›</h2>
         {limited.length === 0 ? (
           <p className="muted">Добавьте карты и лимиты, чтобы видеть, сколько осталось.</p>
         ) : (
