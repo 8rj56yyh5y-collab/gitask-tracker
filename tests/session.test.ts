@@ -19,3 +19,14 @@ test("without a password access is closed in production", async () => {
   assert.equal(await sessionValid(undefined), false);
   env.NODE_ENV = prev;
 });
+
+test("ingest key with '+' works when '+' became a space in the link", async () => {
+  const { ingestTokenOk, bearer } = await import("../lib/auth.ts");
+  process.env.DN_INGEST_TOKEN = "Ab3dEf9+Gh1jKl2/Mn4pQr5StUv6+Wx7Yz8=";
+  const req = new Request("https://x.test/api/ingest?key=Ab3dEf9+Gh1jKl2/Mn4pQr5StUv6+Wx7Yz8=");
+  assert.equal(bearer(req), "Ab3dEf9 Gh1jKl2/Mn4pQr5StUv6 Wx7Yz8=", "URL turns + into a space");
+  assert.equal(ingestTokenOk(bearer(req)), true);
+  assert.equal(ingestTokenOk("Ab3dEf9+Gh1jKl2/Mn4pQr5StUv6+Wx7Yz8="), true);
+  assert.equal(ingestTokenOk("wrong-key-wrong-key-wrong"), false);
+  assert.equal(ingestTokenOk(""), false);
+});
