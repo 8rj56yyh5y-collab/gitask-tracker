@@ -144,3 +144,26 @@ test("норма трат: 30 дней сбора, предложение, пр�
   assert.equal(norms.normState().elapsed, 0);
   assert.equal(norms.roundUpNorm(0), 0);
 });
+
+test("отмена оплаты: ручная удаляется, банковская отвязывается; ежемесячный «следующий» убирается", () => {
+  const id = plans.createPlan({ title: "Интернет", total: 30_000, repeat: "month", dueDate: "2026-11-10" });
+  const tx = plans.payPlan(id, 30_000);
+  assert.equal(plans.getPlan(id)!.status, "done");
+  assert.ok(plans.listPlans("open").some((p) => p.title === "Интернет" && p.due_date === "2026-12-10"), "создан следующий");
+  assert.equal(plans.undoPlanPayment(tx), id);
+  assert.equal(plans.getPlan(id)!.status, "open");
+  assert.equal(plans.getPlan(id)!.paid, 0);
+  assert.equal(repo.getTx(tx), null, "ручная оплата удалена");
+  assert.ok(!plans.listPlans("open").some((p) => p.title === "Интернет" && p.due_date === "2026-12-10"), "следующий убран");
+  // оплата из банка: операция остаётся, но платёж снова открыт
+  const bank = repo.insertTx({ amountKop: -30_000, source: "monobank", occurredAt: "2026-11-10T10:00:00.000Z" }).id;
+  assert.equal(plans.matchPlanForTx(bank), id);
+  plans.undoPlanPayment(bank);
+  assert.ok(repo.getTx(bank));
+  assert.equal(repo.getTx(bank)!.plan_id, null);
+  assert.equal(plans.getPlan(id)!.status, "open");
+  // отменённый платёж можно вернуть
+  plans.cancelPlan(id);
+  plans.restorePlan(id);
+  assert.equal(plans.getPlan(id)!.status, "open");
+});

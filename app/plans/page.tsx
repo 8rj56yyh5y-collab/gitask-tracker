@@ -1,3 +1,4 @@
+import { Hint } from "../components/Hint.tsx";
 import Link from "next/link";
 import { createPlanAction, payCompanyAction } from "../actions.ts";
 import { AccountSelect } from "../components/AccountSelect.tsx";
@@ -77,6 +78,7 @@ export default async function Plans({ searchParams }: { searchParams: Promise<{ 
   return (
     <div className="narrow-wide">
       <h1>Платежи</h1>
+      <Hint>Что нужно оплатить, кто должен вам и сколько отдать компании. Напомним в Telegram в день оплаты.</Hint>
       <nav className="ptabs" aria-label="Разделы платежей">
         {TABS.map((t) => (
           <Link key={t.id} href={`/plans?tab=${t.id}`} className={`ptab ${tab === t.id ? "is-on" : ""}`} aria-current={tab === t.id ? "page" : undefined}>

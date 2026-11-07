@@ -7,6 +7,7 @@ import { cashBalances, listCashboxes } from "@/lib/cash.ts";
 import { listPlans, ymd } from "@/lib/plans.ts";
 import { companyDebt } from "@/lib/sales.ts";
 import { normState } from "@/lib/norms.ts";
+import { SetupCard } from "./components/SetupCard.tsx";
 
 export default function Home() {
   const un = unassignedSummary();
@@ -25,6 +26,7 @@ export default function Home() {
 
   return (
     <div className="grid grid-home">
+      <SetupCard />
       <Link href="/inbox" className={`card alert span-all ${un.count ? "alert-on" : "alert-ok"}`}>
         {un.count ? (
           <>

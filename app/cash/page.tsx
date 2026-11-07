@@ -1,3 +1,4 @@
+import { Hint } from "../components/Hint.tsx";
 import Link from "next/link";
 import { createCashboxAction, transferAction } from "../actions.ts";
 import { AccountSelect } from "../components/AccountSelect.tsx";
@@ -11,6 +12,7 @@ export default function Cash() {
   return (
     <div className="narrow-wide">
       <h1>Кассы</h1>
+      <Hint>Наличные деньги. Каждая касса — отдельный кошелёк со своим остатком.</Hint>
       {boxes.length > 0 && (
         <p className="muted small" style={{ marginTop: -6 }}>
           Наличных во всех кассах: <strong>{formatMoney(total)}</strong>

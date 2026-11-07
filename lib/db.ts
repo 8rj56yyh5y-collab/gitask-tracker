@@ -162,6 +162,8 @@ export function getDb(): DatabaseSync {
   const planCols = (db.prepare("PRAGMA table_info(plans)").all() as { name: string }[]).map((c) => c.name);
   // out — я плачу; in — мне должны (ожидаемое поступление).
   if (!planCols.includes("direction")) db.exec("ALTER TABLE plans ADD COLUMN direction TEXT NOT NULL DEFAULT 'out'");
+  // Ежемесячный платёж, созданный автоматически после оплаты предыдущего (чтобы отмена оплаты убрала его).
+  if (!planCols.includes("prev_id")) db.exec("ALTER TABLE plans ADD COLUMN prev_id INTEGER");
   const txCols = (db.prepare("PRAGMA table_info(transactions)").all() as { name: string }[]).map((c) => c.name);
   // Движение кассы, оплата по плану, продажа товара.
   for (const col of ["cashbox_id", "plan_id", "sale_id"]) if (!txCols.includes(col)) db.exec(`ALTER TABLE transactions ADD COLUMN ${col} INTEGER`);

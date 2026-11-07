@@ -361,3 +361,23 @@ input[readonly] { color: var(--muted); font-size: 14px; }
 .top-actions { display: flex; gap: 6px; align-items: center; }
 .top-btn { display: inline-flex; align-items: center; gap: 4px; height: 38px; min-width: 38px; justify-content: center; padding: 0 10px; border-radius: 19px; background: var(--card); border: 1px solid var(--line); color: var(--text); font-size: 14px; font-weight: 600; }
 .top-btn.is-active { color: var(--accent); border-color: var(--accent); }
+.pay-row { display: flex; align-items: center; gap: 8px; }
+.pay-row-main { flex: 1; min-width: 0; }
+.ok-note { border-color: var(--green); color: var(--green); font-weight: 600; }
+.page-hint { margin: -6px 0 14px; color: var(--muted); font-size: 14px; line-height: 1.4; }
+.setup-card { border: 1px solid var(--accent); }
+.setup-steps { list-style: none; margin: 10px 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.setup-step { display: flex; align-items: center; gap: 12px; padding: 8px 4px; border-radius: 10px; }
+.setup-steps .is-next .setup-step { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.setup-mark { width: 26px; height: 26px; flex: none; border-radius: 50%; border: 2px solid var(--line); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; }
+.is-done .setup-mark { background: var(--green); border-color: var(--green); color: #fff; }
+.is-done strong { color: var(--muted); font-weight: 500; text-decoration: line-through; }
+.setup-why { display: block; }
+.setup-go { margin-left: auto; color: var(--accent); font-size: 22px; }
+.help-q { border-bottom: 1px solid var(--line); padding: 12px 0; }
+.help-q:last-child { border-bottom: 0; }
+.help-q summary { font-weight: 600; cursor: pointer; list-style: none; display: flex; justify-content: space-between; gap: 10px; }
+.help-q summary::after { content: "+"; color: var(--accent); font-size: 20px; line-height: 1; }
+.help-q[open] summary::after { content: "−"; }
+.help-q p, .help-q ol { margin: 8px 0 0; color: var(--text); line-height: 1.5; }
+.menu-group { margin: 18px 4px 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }

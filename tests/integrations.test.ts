@@ -202,4 +202,11 @@ test("telegram: plan reminder once a day after 9:00, «✓ Оплачено» pa
   calls.length = 0;
   await tg.handleUpdate({ callback_query: { id: "qp2", data: `p:${id}`, message: { chat: { id: 42 }, message_id: 9 } } });
   assert.match(calls.find((c) => c.path.endsWith("/answerCallbackQuery"))!.body.text, /уже закрыт/);
+  // нажали по ошибке — «↩ Отменить» снова открывает платёж
+  const paidTx = (await import("../lib/repo.ts")).listRecent(50).filter((t) => t.plan_id === id).sort((a, b) => b.id - a.id)[0];
+  calls.length = 0;
+  await tg.handleUpdate({ callback_query: { id: "qu", data: `u:${paidTx.id}`, message: { chat: { id: 42 }, message_id: 9 } } });
+  assert.equal(plans.getPlan(id)!.status, "open");
+  assert.equal(plans.getPlan(id)!.paid, 500_000);
+  assert.match(calls.find((c) => c.path.endsWith("/editMessageText"))!.body.text, /отменена/);
 });
