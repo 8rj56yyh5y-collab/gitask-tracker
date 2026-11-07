@@ -6,6 +6,7 @@ import { getSetting, setSetting } from "./settings.ts";
 // поправить вручную или собирать данные ещё 30 дней.
 
 const DAY = 864e5;
+const localYmd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 export const NORM_STEP_DAYS = 30;
 
 export interface NormRow {
@@ -35,7 +36,7 @@ function startDate(): string {
   const saved = getSetting("norm_start");
   if (saved) return saved;
   const first = getDb().prepare("SELECT MIN(occurred_at) AS m FROM transactions").get() as { m: string | null };
-  const start = (first.m ?? new Date().toISOString()).slice(0, 10);
+  const start = localYmd(first.m ? new Date(first.m) : new Date());
   setSetting("norm_start", start);
   return start;
 }
@@ -106,12 +107,12 @@ export function extendNorm() {
 export function acceptNorms(values: Map<number, number>, now = new Date()) {
   const upd = getDb().prepare("UPDATE cost_centers SET monthly_budget = ? WHERE id = ?");
   for (const [id, kop] of values) upd.run(Math.max(0, kop), id);
-  setSetting("norm_accepted", now.toISOString().slice(0, 10));
+  setSetting("norm_accepted", localYmd(now));
 }
 
 /** Начать сбор заново с сегодняшнего дня. */
 export function restartNorm(now = new Date()) {
-  setSetting("norm_start", now.toISOString().slice(0, 10));
+  setSetting("norm_start", localYmd(now));
   setSetting("norm_days", String(NORM_STEP_DAYS));
   setSetting("norm_accepted", null);
 }

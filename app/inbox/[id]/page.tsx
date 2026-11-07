@@ -4,21 +4,21 @@ import { assignTransaction, createTransitAction, linkTransitAction, markIncomeAc
 import { listTransits } from "@/lib/transit.ts";
 import { formatMoney } from "@/lib/money.ts";
 import { TxRow } from "../../components/TxRow.tsx";
-import { centerTree, getTx, suggestCenters } from "@/lib/repo.ts";
+import { CenterChips } from "../../components/Pickers.tsx";
+import { getTx, suggestCenters } from "@/lib/repo.ts";
 
 // Экран «Куда ушли деньги?» — его открывает «Команда» iOS сразу после оплаты.
 export default async function AssignOne({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const tx = getTx(Number(id));
   if (!tx) notFound();
-  const tree = centerTree();
   const sugg = new Set(suggestCenters(tx));
   const transits = listTransits(true);
   const isIn = tx.amount > 0;
 
   return (
     <div className="narrow-wide">
-      <h1>{tx.amount > 0 ? "Откуда пришли деньги?" : "На что ушли деньги?"}</h1>
+      <h1>{tx.amount > 0 ? "Что это за поступление?" : "На что ушли деньги?"}</h1>
       {tx.amount > 0 && !tx.sale_id && (
         <Link href={`/sales/new?tx=${tx.id}`} className="card alert-budget plain" style={{ display: "block" }}>
           <strong>Это оплата за товар компании?</strong>
@@ -31,15 +31,7 @@ export default async function AssignOne({ params }: { params: Promise<{ id: stri
       <form action={assignTransaction} className="card form">
         <input type="hidden" name="id" value={tx.id} />
         <input type="hidden" name="next" value="/inbox" />
-        <div className="choices">
-          {tree.map((c) => (
-            <label key={c.id} className={`choice ${sugg.has(c.id) ? "choice-sugg" : ""}`} style={{ marginLeft: c.depth * 16 }}>
-              <input type="radio" name="centerId" value={c.id} defaultChecked={tx.cost_center_id === c.id} required />
-              <i className="dot" style={{ background: c.color }} />
-              {c.name}
-            </label>
-          ))}
-        </div>
+        <CenterChips label={isIn ? "К какому направлению относится" : "Выберите направление"} required defaultValue={tx.cost_center_id} first={[...sugg]} />
         <label>
           Для кого
           <input name="forWhom" defaultValue={tx.for_whom} placeholder="например, семья" />
@@ -48,7 +40,7 @@ export default async function AssignOne({ params }: { params: Promise<{ id: stri
           Комментарий
           <input name="description" defaultValue={tx.description} placeholder="необязательно" />
         </label>
-        <button className="btn btn-primary">Записать</button>
+        <button className="btn btn-primary btn-big">Сохранить</button>
       </form>
       {isIn && !tx.sale_id && (
         <section className="card">

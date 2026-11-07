@@ -395,3 +395,129 @@ button.top-btn { cursor: pointer; font: inherit; }
 .row-between.plain { display: flex; }
 .mm-scope { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
 .chip-mine { margin-left: 6px; font-size: 11px; padding: 1px 6px; border-radius: 8px; background: color-mix(in srgb, var(--green) 15%, transparent); color: var(--green); vertical-align: middle; }
+
+/* ==========================================================================
+   Обновлённый дизайн: мягкие карточки, крупные поля, выбор кнопками.
+   ========================================================================== */
+:root {
+  --bg: #f3f4f8; --card: #ffffff; --text: #0b1220; --muted: #667085; --line: #e6e8ef;
+  --field: #f2f4f7; --accent: #2563eb; --radius: 18px;
+  --shadow: 0 1px 2px rgb(16 24 40 / 0.04), 0 6px 20px rgb(16 24 40 / 0.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) { --bg: #0b0f19; --card: #141a26; --line: #232b3a; --field: #1b2232; --muted: #98a2b3; --shadow: none; }
+}
+:root[data-theme="dark"] { --bg: #0b0f19; --card: #141a26; --line: #232b3a; --field: #1b2232; --shadow: none; }
+:root[data-theme="redblack"] { --field: #1f1f1f; --shadow: none; }
+:root[data-theme="redwhite"] { --field: #f5f5f5; }
+
+body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; letter-spacing: -0.005em; }
+h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; margin: 6px 0 10px; }
+h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 10px; }
+section > h2, .history > h2 { margin: 18px 4px 10px; }
+.card > h2, .card h2:first-child { margin: 0 0 10px; }
+.card { border: 1px solid transparent; box-shadow: var(--shadow); border-radius: var(--radius); padding: 16px; }
+:root[data-theme="dark"] .card, :root[data-theme="redblack"] .card { border-color: var(--line); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme]) .card { border-color: var(--line); } }
+.big { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.page-hint { font-size: 15px; margin: -4px 2px 16px; }
+.crumbs { font-size: 14px; color: var(--muted); margin: 4px 2px 0; }
+.crumbs a { color: var(--accent); }
+
+/* Поля и кнопки */
+.form { gap: 14px; }
+.form label { font-size: 13px; font-weight: 600; color: var(--muted); gap: 6px; }
+input, select {
+  min-height: 48px; border-radius: 12px; border: 1.5px solid transparent; background: var(--field); padding: 11px 14px;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+input:focus, select:focus { outline: none; border-color: var(--accent); background: var(--card); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 15%, transparent); }
+input[type="checkbox"], input[type="radio"] { min-height: 0; width: 20px; height: 20px; accent-color: var(--accent); }
+input[type="color"] { min-height: 48px; }
+select { appearance: none; -webkit-appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 20px) 21px, calc(100% - 15px) 21px; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 36px; }
+.btn { border-radius: 12px; min-height: 46px; padding: 11px 16px; font-weight: 600; border: 1.5px solid var(--line); transition: transform 0.08s, opacity 0.15s; }
+.btn:active { transform: scale(0.98); }
+.btn-sm { min-height: 36px; padding: 6px 12px; border-radius: 10px; }
+.btn-primary { box-shadow: 0 4px 14px color-mix(in srgb, var(--primary) 25%, transparent); }
+.btn-ghost { border-color: transparent; box-shadow: none; }
+.btn-big { width: 100%; min-height: 54px; font-size: 17px; border-radius: 14px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Крупная сумма */
+.amount-field { position: relative; display: block !important; }
+.amount-field .amount-input { font-size: 40px; font-weight: 800; letter-spacing: -0.02em; text-align: center; min-height: 76px; padding-right: 48px; padding-left: 48px; background: var(--field); }
+.amount-cur { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); font-size: 26px; font-weight: 700; color: var(--muted); }
+
+/* Выбор кнопками */
+.chips-field { border: 0; margin: 0; padding: 0; min-width: 0; }
+.chips-field legend { font-size: 13px; font-weight: 600; color: var(--muted); padding: 0; margin-bottom: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-opt {
+  position: relative; display: inline-flex !important; flex-direction: row !important; align-items: center; gap: 8px !important;
+  min-height: 42px; padding: 8px 14px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--card);
+  color: var(--text) !important; font-size: 15px !important; font-weight: 500 !important; cursor: pointer; user-select: none;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.chip-opt.is-sub { font-size: 14px !important; min-height: 36px; padding: 6px 12px; }
+.chip-opt input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.chip-opt:has(input:checked) { background: var(--primary); border-color: var(--primary); color: var(--primary-text) !important; }
+.chip-opt:has(input:focus-visible) { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
+.chip-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--card) 70%, transparent); }
+
+/* Вкладки-переключатель */
+.segtabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; background: var(--field); border-radius: 14px; margin: 0 0 14px; }
+.segtab { text-align: center; padding: 10px 8px; border-radius: 11px; font-weight: 600; font-size: 15px; color: var(--muted); }
+.segtab.is-on { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgb(16 24 40 / 0.1); }
+
+/* «Добавить детали» */
+.more-fields { border-top: 1px dashed var(--line); padding-top: 10px; }
+.more-fields > summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: 14px; list-style: none; }
+.more-fields > summary::before { content: "+ "; }
+.more-fields[open] > summary::before { content: "− "; }
+.more-fields > .form { margin-top: 12px; }
+.settings-fold > summary { cursor: pointer; font-weight: 700; list-style: none; display: flex; justify-content: space-between; }
+.settings-fold > summary::after { content: "›"; color: var(--muted); transition: transform 0.15s; }
+.settings-fold[open] > summary::after { transform: rotate(90deg); }
+
+/* Быстрые ссылки на странице «Новая операция» */
+.new-links { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 4px; }
+.new-link { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; padding: 12px 6px; border-radius: 14px; background: var(--card); box-shadow: var(--shadow); font-size: 13px; font-weight: 600; }
+
+/* Касса */
+.cash-hero {
+  --c: #16a34a; margin: 10px 0 14px; padding: 18px; border-radius: 22px; color: #fff;
+  background: radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--c) 60%, #fff) 0%, var(--c) 45%, color-mix(in srgb, var(--c) 70%, #000) 100%);
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--c) 35%, transparent);
+}
+.cash-hero-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.cash-hero-name { font-weight: 700; font-size: 17px; }
+.cash-hero-tag { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: rgb(255 255 255 / 0.2); }
+.cash-hero-label { margin-top: 14px; font-size: 13px; opacity: 0.85; }
+.cash-hero-balance { font-size: 38px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.cash-hero-month { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+.cash-hero-month > div { background: rgb(255 255 255 / 0.16); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.cash-hero-month span { font-size: 12px; opacity: 0.9; }
+.cash-hero-month strong { font-size: 17px; font-variant-numeric: tabular-nums; }
+
+/* История по дням */
+.day { margin-bottom: 6px; }
+.day-head { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: var(--muted); padding: 8px 4px 6px; }
+.day-list { padding: 4px 14px; }
+.day-list > a + a .tx { border-top: 1px solid var(--line); }
+
+/* Операция в списке */
+.tx { padding: 12px 0; align-items: center; }
+.tx-title { font-weight: 600; }
+.tx-amount { font-size: 16px; font-variant-numeric: tabular-nums; }
+.chip { border-radius: 999px; font-weight: 500; }
+.chip-in { color: var(--green); border-color: color-mix(in srgb, var(--green) 40%, transparent); }
+
+/* Нижнее меню */
+.tabbar { border-top: 1px solid var(--line); }
+.nav-plus { box-shadow: 0 8px 20px color-mix(in srgb, var(--primary) 35%, transparent); }
+.top { background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: saturate(180%) blur(14px); -webkit-backdrop-filter: saturate(180%) blur(14px); }
+.top-btn { border: 0; box-shadow: var(--shadow); }
+.menu-row { min-height: 66px; }
+.menu-icon { border-radius: 12px; background: color-mix(in srgb, var(--accent) 10%, var(--card)); }
+.ptab { border: 0; box-shadow: var(--shadow); }
+.ptab.is-on { outline: 2px solid var(--accent); }

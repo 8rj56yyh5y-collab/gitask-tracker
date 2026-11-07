@@ -502,10 +502,11 @@ export async function addIncomeAction(f: FormData) {
   const acc = accountOf(f);
   const kind = str(f, "kind");
   const title = kind === "Другое" || !kind ? str(f, "title") || "Доход" : kind;
-  addOtherIncome({
+  const id = addOtherIncome({
     amountKop: kop(f, "amount"), title, cardId: acc.cardId, cashboxId: acc.cashboxId,
     centerId: num(f, "centerId"), note: str(f, "note"), at: isoDate(f, "at"),
   });
+  if (kind === "Ставка") getDb().prepare("UPDATE transactions SET income_kind = 'salary' WHERE id = ?").run(id);
   refresh();
   redirect("/income?ok=income");
 }

@@ -59,11 +59,11 @@ export interface CashMove {
 }
 
 /**
- * Приход или расход кассы. Расход без выбранной категории идёт в категорию кассы;
+ * Приход или расход кассы. Без выбранного направления — идёт в направление кассы (и приход, и расход);
  * если и у кассы её нет — попадёт в «Нужно записать», как любая операция.
  */
 export function cashMove(cashboxId: number, m: CashMove): number {
-  const boxCenter = m.amountKop < 0 && m.centerId == null ? (getCashbox(cashboxId)?.center_id ?? null) : null;
+  const boxCenter = m.centerId == null ? (getCashbox(cashboxId)?.center_id ?? null) : null;
   return insertTx({
     amountKop: m.amountKop,
     cashboxId,

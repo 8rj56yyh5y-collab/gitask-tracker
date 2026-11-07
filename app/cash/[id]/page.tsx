@@ -3,155 +3,230 @@ import { notFound } from "next/navigation";
 import { archiveCashboxAction, cashMoveAction, transferAction, updateCashboxAction } from "../../actions.ts";
 import { AccountSelect } from "../../components/AccountSelect.tsx";
 import { CenterSelect } from "../../components/CenterSelect.tsx";
+import { CenterChips, SegTabs } from "../../components/Pickers.tsx";
 import { TxRow } from "../../components/TxRow.tsx";
 import { cashBalances, getCashbox } from "@/lib/cash.ts";
 import { getDb } from "@/lib/db.ts";
 import { formatMoney } from "@/lib/money.ts";
 import { listPlans } from "@/lib/plans.ts";
-import { monthBounds, type Tx } from "@/lib/repo.ts";
+import { getCenter, monthBounds, type Tx } from "@/lib/repo.ts";
 
-export default async function CashboxPage({ params }: { params: Promise<{ id: string }> }) {
+const dayKey = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+};
+const dayTitle = (iso: string) => {
+  const d = new Date(iso);
+  const today = new Date();
+  const y = new Date(Date.now() - 864e5);
+  if (d.toDateString() === today.toDateString()) return "Сегодня";
+  if (d.toDateString() === y.toDateString()) return "Вчера";
+  return d.toLocaleDateString("ru-RU", { day: "numeric", month: "long", weekday: "short" });
+};
+
+export default async function CashboxPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ op?: string }> }) {
   const { id: raw } = await params;
+  const { op: rawOp } = await searchParams;
+  const op = rawOp === "in" || rawOp === "move" ? rawOp : "out";
   const b = getCashbox(Number(raw));
   if (!b || b.archived) notFound();
   const balance = cashBalances().get(b.id) ?? 0;
+  const center = b.center_id ? getCenter(b.center_id) : null;
   const { from, to } = monthBounds();
   const moves = getDb()
     .prepare(
       `SELECT t.*, cc.name AS center_name, cc.color AS center_color, cb.name AS cashbox_name FROM transactions t
        LEFT JOIN cost_centers cc ON cc.id = t.cost_center_id LEFT JOIN cashboxes cb ON cb.id = t.cashbox_id
-       WHERE t.cashbox_id = ? ORDER BY t.occurred_at DESC LIMIT 200`,
+       WHERE t.cashbox_id = ? ORDER BY t.occurred_at DESC LIMIT 300`,
     )
     .all(b.id) as unknown as Tx[];
   const month = moves.filter((t) => t.occurred_at >= from && t.occurred_at < to);
   const inM = month.filter((t) => t.amount > 0).reduce((a, t) => a + t.amount, 0);
   const outM = month.filter((t) => t.amount < 0).reduce((a, t) => a - t.amount, 0);
-  const plans = listPlans("open");
-  const next = `/cash/${b.id}`;
+  const plans = listPlans("open", 200, "out");
+  const base = `/cash/${b.id}`;
+  const next = `${base}?op=${op}`;
+  const monthName = new Date().toLocaleDateString("ru-RU", { month: "long" });
+
+  // История по дням
+  const days: { key: string; title: string; total: number; list: Tx[] }[] = [];
+  for (const t of moves) {
+    const k = dayKey(t.occurred_at);
+    let d = days[days.length - 1];
+    if (!d || d.key !== k) days.push((d = { key: k, title: dayTitle(t.occurred_at), total: 0, list: [] }));
+    d.total += t.amount;
+    d.list.push(t);
+  }
 
   return (
     <div className="narrow-wide">
-      <div className="muted small">
-        <Link href="/cash">Кассы</Link>
-      </div>
-      <h1>{b.name}</h1>
-      <div className="cashbox-tile" style={{ "--c": b.color } as React.CSSProperties}>
-        <div className="small" style={{ opacity: 0.85 }}>{b.owner || "остаток"}</div>
-        <div className="big">{formatMoney(balance)}</div>
-        <div className="small" style={{ opacity: 0.85 }}>
-          за месяц: приход {formatMoney(inM)} · расход {formatMoney(outM)}
-        </div>
-      </div>
-
-      <form action={cashMoveAction} className="card form">
-        <h2>Приход или расход</h2>
-        <input type="hidden" name="id" value={b.id} />
-        <input type="hidden" name="next" value={next} />
-        <div className="seg2">
-          <label>
-            <input type="radio" name="dir" value="out" defaultChecked /> Расход
-          </label>
-          <label>
-            <input type="radio" name="dir" value="in" /> Приход
-          </label>
-        </div>
-        <label>
-          Сумма, ₴
-          <input name="amount" inputMode="decimal" required className="amount-input" placeholder="0" />
-        </label>
-        <label>
-          Название
-          <input name="who" placeholder="например, Продукты или Зарплата" />
-        </label>
-        <label>
-          Комментарий
-          <input name="note" placeholder="необязательно" />
-        </label>
-        <label>
-          Направление расхода
-          <CenterSelect defaultValue={b.center_id} none="— выберу позже —" />
-        </label>
-        {plans.length > 0 && (
-          <label>
-            Это оплата по платежу (необязательно)
-            <select name="planId" defaultValue="">
-              <option value="">— нет —</option>
-              {plans.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.title} · осталось {formatMoney(p.total - p.paid)}
-                </option>
-              ))}
-            </select>
-          </label>
+      <div className="crumbs">
+        <Link href="/centers">Направления и кассы</Link>
+        {center && (
+          <>
+            {" › "}
+            <Link href={`/centers/${center.id}`}>{center.name}</Link>
+          </>
         )}
-        <label>
-          Дата
-          <input name="at" type="date" />
-        </label>
-        <button className="btn btn-primary">Записать</button>
-      </form>
+      </div>
 
-      <form action={transferAction} className="card form">
-        <h2>Перевод из этой кассы</h2>
-        <input type="hidden" name="from" value={`cash:${b.id}`} />
-        <input type="hidden" name="next" value={next} />
-        <label>
-          Куда
-          <AccountSelect name="to" />
-        </label>
-        <label>
-          Сумма, ₴
-          <input name="amount" inputMode="decimal" required />
-        </label>
-        <label>
-          Комментарий
-          <input name="note" />
-        </label>
-        <button className="btn">Перевести</button>
-      </form>
+      <section className="cash-hero" style={{ "--c": b.color } as React.CSSProperties}>
+        <div className="cash-hero-top">
+          <span className="cash-hero-name">💵 {b.name}</span>
+          {center && center.name !== b.name && <span className="cash-hero-tag">{center.name}</span>}
+        </div>
+        <div className="cash-hero-label">В кассе сейчас</div>
+        <div className="cash-hero-balance">{formatMoney(balance)}</div>
+        <div className="cash-hero-month">
+          <div>
+            <span>Пришло за {monthName}</span>
+            <strong>+{formatMoney(inM)}</strong>
+          </div>
+          <div>
+            <span>Ушло за {monthName}</span>
+            <strong>−{formatMoney(outM)}</strong>
+          </div>
+        </div>
+      </section>
 
-      <section className="card">
-        <h2>Операции кассы</h2>
-        {moves.length === 0 && <p className="muted small">Пока ничего не было.</p>}
-        {moves.map((t) => (
-          <Link key={t.id} href={`/inbox/${t.id}`} className="plain">
-            <TxRow tx={t} />
-          </Link>
+      <SegTabs
+        active={op}
+        tabs={[
+          { id: "out", label: "− Расход", href: `${base}?op=out` },
+          { id: "in", label: "+ Приход", href: `${base}?op=in` },
+          { id: "move", label: "↔ Перевод", href: `${base}?op=move` },
+        ]}
+      />
+
+      {op !== "move" ? (
+        <form action={cashMoveAction} className="card form form-big">
+          <input type="hidden" name="id" value={b.id} />
+          <input type="hidden" name="next" value={next} />
+          <input type="hidden" name="dir" value={op} />
+          <label className="amount-field">
+            <input name="amount" inputMode="decimal" required placeholder="0" className="amount-input" aria-label="Сумма в гривнах" />
+            <span className="amount-cur" aria-hidden>
+              ₴
+            </span>
+          </label>
+          <label>
+            {op === "out" ? "За что" : "Откуда деньги"}
+            <input name="who" placeholder={op === "out" ? "например, Продукты, Бензин" : "например, Выручка, Из сейфа"} />
+          </label>
+          {op === "out" && (
+            <CenterChips label="Направление" defaultValue={b.center_id} withNone="Выберу позже" includeInternal={false} />
+          )}
+          {op === "out" && plans.length > 0 && (
+            <label>
+              Это оплата запланированного платежа?
+              <select name="planId" defaultValue="">
+                <option value="">Нет</option>
+                {plans.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title} · осталось {formatMoney(p.total - p.paid)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <details className="more-fields">
+            <summary>Комментарий и дата</summary>
+            <div className="form">
+              <label>
+                Комментарий
+                <input name="note" />
+              </label>
+              <label>
+                Дата
+                <input name="at" type="date" />
+              </label>
+            </div>
+          </details>
+          <button className="btn btn-primary btn-big">{op === "out" ? "Записать расход" : "Записать приход"}</button>
+        </form>
+      ) : (
+        <form action={transferAction} className="card form form-big">
+          <input type="hidden" name="from" value={`cash:${b.id}`} />
+          <input type="hidden" name="next" value={next} />
+          <label className="amount-field">
+            <input name="amount" inputMode="decimal" required placeholder="0" className="amount-input" aria-label="Сумма в гривнах" />
+            <span className="amount-cur" aria-hidden>
+              ₴
+            </span>
+          </label>
+          <label>
+            Куда переложить
+            <AccountSelect name="to" />
+          </label>
+          <label>
+            Комментарий
+            <input name="note" placeholder="например, положил на карту" />
+          </label>
+          <button className="btn btn-primary btn-big">Перевести</button>
+          <p className="muted small" style={{ margin: 0 }}>
+            Перевод в другую кассу или на карту — это не расход. Чтобы положить деньги в эту кассу с карты, сделайте перевод на карте или в
+            разделе «＋ → Перевод».
+          </p>
+        </form>
+      )}
+
+      <section className="history">
+        <h2>История кассы</h2>
+        {days.length === 0 && <div className="card muted small">Пока ничего не было. Запишите первый приход или расход выше.</div>}
+        {days.map((d) => (
+          <div key={d.key} className="day">
+            <div className="day-head">
+              <span>{d.title}</span>
+              <span className={d.total >= 0 ? "pos-text" : undefined}>
+                {d.total >= 0 ? "+" : "−"}
+                {formatMoney(Math.abs(d.total))}
+              </span>
+            </div>
+            <div className="card day-list">
+              {d.list.map((t) => (
+                <Link key={t.id} href={`/inbox/${t.id}`} className="plain">
+                  <TxRow tx={t} />
+                </Link>
+              ))}
+            </div>
+          </div>
         ))}
       </section>
 
-      <form action={updateCashboxAction} className="card form">
-        <h2>Настройки кассы</h2>
-        <input type="hidden" name="id" value={b.id} />
-        <input type="hidden" name="next" value={next} />
-        <label>
-          Название
-          <input name="name" defaultValue={b.name} required />
-        </label>
-        <label>
-          Чья
-          <input name="owner" defaultValue={b.owner} />
-        </label>
-        <label>
-          Направление кассы
-          <CenterSelect defaultValue={b.center_id} none="— для разных —" />
-        </label>
-        <div className="grid-2-tight">
+      <details className="card settings-fold">
+        <summary>Настройки кассы</summary>
+        <form action={updateCashboxAction} className="form" style={{ marginTop: 12 }}>
+          <input type="hidden" name="id" value={b.id} />
+          <input type="hidden" name="next" value={base} />
           <label>
-            Начальный остаток, ₴
-            <input name="opening" inputMode="decimal" defaultValue={b.opening / 100} />
+            Название
+            <input name="name" defaultValue={b.name} required />
           </label>
           <label>
-            Цвет
-            <input name="color" type="color" defaultValue={b.color} />
+            Чья касса
+            <input name="owner" defaultValue={b.owner} placeholder="необязательно" />
           </label>
-        </div>
-        <button className="btn">Сохранить</button>
-      </form>
-      <form action={archiveCashboxAction}>
-        <input type="hidden" name="id" value={b.id} />
-        <button className="btn btn-ghost btn-sm danger">Скрыть кассу</button>
-      </form>
+          <label>
+            Направление
+            <CenterSelect defaultValue={b.center_id} none="Для разных направлений" />
+          </label>
+          <div className="grid-2-tight">
+            <label>
+              Сколько было в начале, ₴
+              <input name="opening" inputMode="decimal" defaultValue={b.opening / 100} />
+            </label>
+            <label>
+              Цвет
+              <input name="color" type="color" defaultValue={b.color} />
+            </label>
+          </div>
+          <button className="btn">Сохранить</button>
+        </form>
+        <form action={archiveCashboxAction} style={{ marginTop: 8 }}>
+          <input type="hidden" name="id" value={b.id} />
+          <button className="btn btn-ghost btn-sm danger">Скрыть кассу</button>
+        </form>
+      </details>
     </div>
   );
 }

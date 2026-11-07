@@ -2,6 +2,7 @@
 // Порядок важен: «Радабанк» проверяем раньше «А-Банка», иначе «radAbank» примет за А-Банк.
 export const BANK_PATTERNS: [RegExp, string][] = [
   [/radabank|радабанк|рада ?банк/i, "Радабанк"],
+  [/\botp\b|otp ?bank|отп ?банк|(^|[^а-яёa-z])отп([^а-яёa-z]|$)/i, "OTP Bank"],
   [/alliance|альянс/i, "Альянс Банк"],
   [/nova ?pay|нова ?пей|новапей/i, "NovaPay"],
   [/privat|приват/i, "ПриватБанк"],
@@ -11,7 +12,7 @@ export const BANK_PATTERNS: [RegExp, string][] = [
   [/a-?bank|а-?банк/i, "А-Банк"],
 ];
 
-export const BANK_NAMES = ["Monobank", "ПриватБанк", "ПУМБ", "А-Банк", "Радабанк", "Альянс Банк", "NovaPay", "Райффайзен", "Другой"];
+export const BANK_NAMES = ["Monobank", "ПриватБанк", "ПУМБ", "А-Банк", "Радабанк", "Альянс Банк", "NovaPay", "OTP Bank", "Райффайзен", "Другой"];
 
 /** Название банка по тексту или null. */
 export function detectBank(text: string | null | undefined): string | null {
@@ -28,6 +29,7 @@ export const BANK_STYLE: Record<string, { color: string; badge: string }> = {
   "Радабанк": { color: "#1f4e9c", badge: "Р" },
   "Альянс Банк": { color: "#00468c", badge: "АБ" },
   NovaPay: { color: "#e30613", badge: "NP" },
+  "OTP Bank": { color: "#52ae30", badge: "OTP" },
   "Райффайзен": { color: "#f5d800", badge: "R" },
   "Другой": { color: "#64748b", badge: "•" },
 };
