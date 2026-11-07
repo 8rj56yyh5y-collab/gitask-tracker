@@ -58,7 +58,7 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
       <section className="card span-all">
         <div className="kpis">
           <div>
-            <div className="muted small">Расход за месяц{isCurrent && " (идёт)"}</div>
+            <div className="muted small">Потрачено{isCurrent ? " в этом месяце" : " за месяц"}</div>
             <div className="big">{formatMoney(cur.expense)}</div>
             {change !== null && (
               <div className={`small ${change > 0 ? "up" : "down"}`}>
@@ -67,11 +67,11 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
             )}
           </div>
           <div>
-            <div className="muted small">Поступления</div>
+            <div className="muted small">Пришло денег</div>
             <div className="big">{formatMoney(cur.income)}</div>
           </div>
           <div>
-            <div className="muted small">Расход за 12 месяцев</div>
+            <div className="muted small">Потрачено за год</div>
             <div className="big">{formatMoney(yearTotal)}</div>
           </div>
         </div>
@@ -86,9 +86,9 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
           <thead>
             <tr>
               <th>Направление</th>
-              <th>Сейчас</th>
-              <th>Было</th>
-              <th>Изменение</th>
+              <th>Этот месяц</th>
+              <th>Прошлый</th>
+              <th>Разница</th>
             </tr>
           </thead>
           <tbody>
@@ -124,7 +124,7 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
       </section>
 
       <section className="card ai-card" id="ai">
-        <h2>Разбор от ИИ</h2>
+        <h2>Помощник ИИ</h2>
         {ai_error && <p className="danger small">{AI_ERRORS[ai_error] ?? AI_ERRORS.api}</p>}
         {report ? (
           <>
@@ -135,7 +135,7 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
           </>
         ) : (
           <p className="muted small">
-            ИИ посмотрит на расходы месяца, сравнит с прошлым, сделает прогноз и подскажет, где риск выйти за лимит.
+            ИИ посмотрит на траты месяца, сравнит с прошлым, сделает прогноз и подскажет, где можно сэкономить.
           </p>
         )}
         {aiConfigured() ? (
@@ -144,7 +144,7 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
             <SubmitButton pending="ИИ думает… (до минуты)">{report ? "Обновить разбор" : "Сделать разбор"}</SubmitButton>
           </form>
         ) : (
-          <p className="small warn-text">Чтобы включить ИИ, задайте на сервере ключ ANTHROPIC_API_KEY (см. docs/DEPLOY.md).</p>
+          <p className="small warn-text">ИИ ещё не подключён — скоро включим.</p>
         )}
       </section>
     </div>

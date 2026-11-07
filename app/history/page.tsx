@@ -16,12 +16,12 @@ export default function History() {
   return (
     <div className="narrow-wide">
       <h1>История</h1>
-      <Hint>Все операции по датам. Нажмите на операцию, чтобы поменять направление или удалить.</Hint>
+      <Hint>Все ваши операции, новые сверху. Нажмите на любую, чтобы поменять направление или удалить.</Hint>
 
       {pending.length > 0 && (
         <section className="pending-block">
           <h2 className="danger">
-            Без направления · {pending.length} на {formatMoney(pendingSum)}
+            Ждут направления · {formatMoney(pendingSum)}
           </h2>
           {pending.map((t) => (
             <UnassignedItem key={t.id} tx={t} centers={centers} next="/history" />
@@ -30,7 +30,13 @@ export default function History() {
       )}
 
       <h2>{pending.length > 0 ? "Записанные" : "Все операции"}</h2>
-      {done.length === 0 && <p className="muted">Операций пока нет.</p>}
+      {done.length === 0 && pending.length === 0 && (
+        <div className="empty">
+          <div className="empty-icon">🧾</div>
+          <strong>Операций пока нет</strong>
+          <p>Нажмите «＋» внизу, чтобы записать первую.</p>
+        </div>
+      )}
       {done.length > 0 && (
         <div className="card">
           {done.map((t) => (

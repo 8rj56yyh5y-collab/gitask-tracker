@@ -119,7 +119,7 @@ export function Nav({ pending }: { pending: number }) {
           <Icon name="income" /> Доходы
         </Link>
         <Link href="/transit" className={cls("/transit")}>
-          <Icon name="swap" /> Транзит
+          <Icon name="swap" /> Чужие деньги
         </Link>
         <Link href="/sales" className={cls("/sales")}>
           <Icon name="bag" /> Продажи

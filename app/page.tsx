@@ -99,7 +99,7 @@ export default function Home() {
                 )}
                 {transit > 0 && (
                   <Link href="/transit" className="row-between plain" style={{ padding: "2px 0" }}>
-                    <span>Чужие деньги (транзит)</span>
+                    <span>Чужие деньги</span>
                     <strong>{formatMoney(transit)} ›</strong>
                   </Link>
                 )}

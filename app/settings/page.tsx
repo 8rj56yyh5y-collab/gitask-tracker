@@ -9,8 +9,24 @@ import { publicBase } from "@/lib/url.ts";
 import { cookies } from "next/headers";
 import { THEMES, THEME_COOKIE, normalizeTheme } from "@/lib/theme.ts";
 import { SIGNAL_TEXT, lastShortcutSignal, shortcutWorks } from "@/lib/setup.ts";
+import { monobankConnected } from "@/lib/repo.ts";
+import { HashOpen } from "../components/HashOpen.tsx";
 
 const DOCS = "https://github.com/8rj56yyh5y-collab/gitask-tracker/blob/main/docs";
+
+function SecHead({ icon, title, status, ok }: { icon: string; title: string; status: string; ok?: boolean }) {
+  return (
+    <span className="set-head">
+      <span className="set-icon" aria-hidden>
+        {icon}
+      </span>
+      <span className="set-title">
+        <strong>{title}</strong>
+        <span className={ok ? "pos-text" : "muted"}>{status}</span>
+      </span>
+    </span>
+  );
+}
 
 export default async function Settings({
   searchParams,
@@ -26,13 +42,19 @@ export default async function Settings({
   const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const today = ymd(new Date());
   const minDay = ymd(new Date(Date.now() - MAX_BACKFILL_DAYS * 864e5));
+  const monoOn = monobankConnected();
+  const applePayOk = shortcutWorks();
 
   return (
     <div className="narrow-wide">
       <h1>Настройки</h1>
+      <HashOpen />
 
-      <section className="card form" id="theme">
-        <h2>Оформление</h2>
+      <details className="card set-sec" id="theme">
+        <summary>
+          <SecHead icon="🎨" title="Оформление" status={THEMES.find((t) => t.id === theme)?.name ?? ""} />
+        </summary>
+        <div className="form set-body">
         {/* У каждой темы своя форма: значение нажатой кнопки в общей форме до сервера не доходит. */}
         <div className="themes">
           {THEMES.map((t) => (
@@ -48,17 +70,21 @@ export default async function Settings({
           ))}
         </div>
         <p className="muted small" style={{ margin: 0 }}>
-          Сохраняется на этом устройстве.
+          Тема запоминается на этом устройстве.
         </p>
-      </section>
+        </div>
+      </details>
 
-      <section className="card form" id="telegram">
-        <h2>Уведомления в Telegram</h2>
+      <details className="card set-sec" id="telegram" open={!tg.linked}>
+        <summary>
+          <SecHead icon="✈️" title="Уведомления в Telegram" status={tg.linked ? "Подключено ✓" : tg.connected ? "Остался один шаг" : "Не подключено"} ok={tg.linked} />
+        </summary>
+        <div className="form set-body">
         {sp.tg_error && <p className="danger small">{sp.tg_error}</p>}
         {!tg.connected ? (
           <>
             <p className="small">
-              После каждой операции бот пришлёт сообщение с кнопками направлений — нажали, и операция записана.
+              После каждой оплаты бот пришлёт сообщение: сумма, магазин и кнопки направлений. Нажали кнопку — операция записана.
             </p>
             <ol className="small steps">
               <li>
@@ -73,7 +99,7 @@ export default async function Settings({
                 Подключить
               </SubmitButton>
             </form>
-            {!https && <p className="small warn-text">Подключить получится, когда сайт будет открыт по https (в интернете).</p>}
+            {!https && <p className="small warn-text">Подключение работает только на сайте в интернете (адрес начинается с https).</p>}
           </>
         ) : !tg.linked ? (
           <>
@@ -84,7 +110,7 @@ export default async function Settings({
               Открыть бота и нажать «Старт»
             </a>
             <p className="muted small">
-              Или отправьте боту эту строку, потом обновите страницу:
+              Если кнопка не сработала — отправьте боту эту строку и обновите страницу:
             </p>
             <CopyField value={`/start ${tg.linkCode}`} label="команда для бота" />
           </>
@@ -98,37 +124,45 @@ export default async function Settings({
             <button className="btn btn-ghost btn-sm">Отключить Telegram</button>
           </form>
         )}
-      </section>
+        </div>
+      </details>
 
-      <section className="card form" id="monobank">
-        <h2>Monobank</h2>
+      <details className="card set-sec" id="monobank" open={Boolean(sp.mono_error || sp.mono_ok)}>
+        <summary>
+          <SecHead icon="🐈‍⬛" title="Monobank" status={monoOn ? "Подключено ✓" : "Не подключено"} ok={monoOn} />
+        </summary>
+        <div className="form set-body">
         {sp.mono_ok && <p className="ok-text small">{sp.mono_ok}</p>}
         {sp.mono_error && <p className="danger small">{sp.mono_error}</p>}
         <p className="small">
-          Откройте <a href="https://api.monobank.ua/" className="link" target="_blank" rel="noreferrer">api.monobank.ua</a>, войдите
-          через приложение Monobank и скопируйте токен. D&amp;N сам добавит все карты и будет получать каждую операцию с выбранного дня.
-          Токен не сохраняется.
+          Все операции Monobank будут приходить сами — и оплаты, и переводы. Откройте{" "}
+          <a href="https://api.monobank.ua/" className="link" target="_blank" rel="noreferrer">api.monobank.ua</a>, войдите через приложение
+          Monobank, скопируйте ключ (токен) и вставьте ниже. Карты добавятся сами.
         </p>
         <form action={connectMonobankAction} className="form">
-          <input name="token" required placeholder="Токен Monobank" autoComplete="off" aria-label="Токен Monobank" />
+          <input name="token" required placeholder="Вставьте ключ Monobank" autoComplete="off" aria-label="Ключ Monobank" />
           <label>
-            Вести операции с
+            Записывать операции, начиная с
             <input name="from" type="date" defaultValue={today} max={today} min={minDay} />
           </label>
           <label className="check">
-            <input type="checkbox" name="backfill" /> Загрузить прошлые операции с этой даты (не дальше {MAX_BACKFILL_DAYS} дней)
+            <input type="checkbox" name="backfill" /> Подтянуть и прошлые операции с этой даты (до {MAX_BACKFILL_DAYS} дней назад)
           </label>
           <p className="muted small">
-            По умолчанию — с сегодняшнего дня: старые операции не подтягиваются, только новые.
+            Если не включать — будут записываться только новые операции, с сегодняшнего дня.
           </p>
           <SubmitButton className="btn btn-primary" pending="Подключаю…">
             Подключить
           </SubmitButton>
         </form>
-      </section>
+        </div>
+      </details>
 
-      <section className="card form" id="shortcuts">
-        <h2>Оплаты Apple Pay с любой карты</h2>
+      <details className="card set-sec" id="shortcuts" open={!applePayOk}>
+        <summary>
+          <SecHead icon="📱" title="Оплаты Apple Pay с любой карты" status={applePayOk ? "Работает ✓" : "Не настроено"} ok={applePayOk} />
+        </summary>
+        <div className="form set-body">
         {(() => {
           const sig = lastShortcutSignal();
           const works = shortcutWorks();
@@ -152,14 +186,15 @@ export default async function Settings({
           );
         })()}
         <p className="small" style={{ margin: 0 }}>
-          После оплаты телефоном iPhone сам отправит в D&amp;N сумму, магазин и карту. Карту D&amp;N узнает по названию банка.
+          Платите телефоном любой картой — iPhone сам отправит в D&amp;N сумму, магазин и карту. Настраивается один раз в приложении
+          «Команды».
           {tg.linked ? " Сразу придёт сообщение в Telegram с выбором направления." : " Подключите Telegram выше — тогда сразу придёт сообщение с выбором направления."}
         </p>
-        <div className="f-label small muted">Ваша ссылка для «Команд» (в ней уже есть ваш секретный ключ)</div>
+        <div className="f-label small muted">Ваша личная ссылка — понадобится в шаге 2</div>
         {ingestKey ? (
           <CopyField value={`${base}/api/ingest?key=${ingestKey}`} label="ссылка для «Команд»" />
         ) : (
-          <p className="danger small">Ключ не задан на сервере (DN_INGEST_TOKEN).</p>
+          <p className="danger small">Ссылка ещё не готова: на сервере не задан секретный ключ (DN_INGEST_TOKEN).</p>
         )}
         <ol className="small steps">
           <li>
@@ -178,21 +213,26 @@ export default async function Settings({
           </li>
         </ol>
         <p className="muted small" style={{ margin: 0 }}>
-          Добавьте карты в разделе <Link href="/cards" className="link">Карты</Link>: если карта банка одна, D&amp;N сам поймёт, с какой она. Ссылка содержит
-          секретный ключ — не пересылайте её никому.
+          Чтобы D&amp;N понимал, с какой карты оплата, добавьте свои карты в <Link href="/cards" className="link">Картах</Link>. Ссылку никому не
+          пересылайте — по ней можно добавлять операции в ваш D&amp;N.
         </p>
-      </section>
+        </div>
+      </details>
 
-      <section className="card form">
-        <h2>ИИ</h2>
+      <details className="card set-sec" id="ai">
+        <summary>
+          <SecHead icon="✨" title="Помощник ИИ" status={aiConfigured() ? "Подключён ✓" : "Не подключён"} ok={aiConfigured()} />
+        </summary>
+        <div className="form set-body">
         <p className="small">
           {aiConfigured() ? (
-            <span className="ok-text">✓ Подключён — разбор месяца в «Аналитике».</span>
+            <span className="ok-text">✓ Подключён. Разбор месяца — в «Аналитике».</span>
           ) : (
-            <>Не подключён. Задайте на сервере ключ ANTHROPIC_API_KEY (console.anthropic.com).</>
+            <>ИИ посмотрит на ваши траты за месяц, сравнит с прошлым, сделает прогноз и подскажет, где можно сэкономить. Скоро подключим.</>
           )}
         </p>
-      </section>
+        </div>
+      </details>
 
       <form action="/logout" method="post">
         <button className="btn btn-ghost">Выйти</button>

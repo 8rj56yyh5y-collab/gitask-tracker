@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { createTransitAction, deleteTransitAction, finishTransitAction } from "../actions.ts";
 import { Hint } from "../components/Hint.tsx";
 import { formatMoney } from "@/lib/money.ts";
@@ -12,16 +11,16 @@ export default function TransitPage() {
   const sum = transitOpenSum();
   return (
     <div className="narrow-wide">
-      <h1>Транзит денег</h1>
+      <h1>Чужие деньги</h1>
       <Hint>
-        Чужие деньги, которые прошли через вас: например, сняли в банке деньги компании и передали дальше. Пока не отдали — они заморожены и не
-        считаются ни доходом, ни расходом.
+        Деньги, которые не ваши и которые нужно кому-то передать. Например, сняли в банке наличные компании. Пока не отдали — они лежат
+        отдельно и не считаются ни доходом, ни расходом.
       </Hint>
 
       <section className={`card ${sum > 0 ? "transit-hold" : ""}`}>
-        <div className="muted small">Сейчас у вас чужих денег</div>
-        <div className="big">{formatMoney(sum)}</div>
-        {sum > 0 && <div className="small">Не тратьте их — отметьте «Отдал», когда передадите.</div>}
+        <div className="summary-label">Сейчас у вас чужих денег</div>
+        <div className="summary-value">{formatMoney(sum)}</div>
+        {sum > 0 && <div className="small">Это не ваши деньги — нажмите «✓ Отдал», когда передадите.</div>}
       </section>
 
       {open.map((t) => {
@@ -46,35 +45,35 @@ export default function TransitPage() {
               <form action={deleteTransitAction}>
                 <input type="hidden" name="id" value={t.id} />
                 <input type="hidden" name="next" value="/transit" />
-                <button className="btn btn-ghost btn-sm danger">Удалить</button>
+                <button className="btn btn-ghost btn-sm danger">Удалить запись</button>
               </form>
             </div>
           </section>
         );
       })}
 
-      <form action={createTransitAction} className="card form">
-        <h2>Взял чужие деньги</h2>
+      <details className="card settings-fold add-fold" open={open.length === 0}>
+        <summary>+ Взял чужие деньги</summary>
+        <form action={createTransitAction} className="form form-big" style={{ marginTop: 14 }}>
+        <label className="amount-field">
+          <input name="amount" inputMode="decimal" required className="amount-input" placeholder="0" aria-label="Сумма, ₴" />
+          <span className="amount-cur" aria-hidden>₴</span>
+        </label>
         <label>
           Что за деньги
           <input name="title" required placeholder="например, Наличные для компании" />
         </label>
-        <div className="grid-2-tight">
-          <label>
-            Сумма, ₴
-            <input name="amount" inputMode="decimal" required placeholder="200000" />
-          </label>
-          <label>
-            Кому отдать
-            <input name="note" placeholder="необязательно" />
-          </label>
-        </div>
-        <button className="btn btn-primary">Заморозить</button>
+        <label>
+          Кому отдать
+          <input name="note" placeholder="необязательно" />
+        </label>
+        <button className="btn btn-primary btn-big">Отложить как чужие</button>
         <p className="muted small" style={{ margin: 0 }}>
-          Если деньги прошли через вашу карту, в Telegram или в разделе <Link href="/inbox" className="link">Без направления</Link> отметьте
-          эти операции как «Транзит» — они не попадут в ваши доходы и расходы.
+          Деньги прошли через вашу карту? Откройте эту операцию (или нажмите в Telegram «↔ Чужие деньги») — она не попадёт в ваши доходы и
+          расходы.
         </p>
-      </form>
+        </form>
+      </details>
 
       {done.length > 0 && (
         <section className="card">

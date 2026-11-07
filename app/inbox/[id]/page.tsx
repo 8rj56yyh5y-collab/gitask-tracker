@@ -63,7 +63,7 @@ export default async function AssignOne({ params }: { params: Promise<{ id: stri
 
       {!tx.transit_id && (
         <section className="card form">
-          <h2>Это чужие деньги (транзит)?</h2>
+          <h2>Это чужие деньги?</h2>
           <p className="muted small" style={{ margin: 0 }}>
             Например, сняли наличные компании и отдадите их. Операция не будет считаться ни доходом, ни расходом.
           </p>

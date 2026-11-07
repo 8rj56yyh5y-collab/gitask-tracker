@@ -147,6 +147,7 @@ export async function removeCenter(f: FormData) {
   const id = num(f, "id");
   if (id) archiveCenter(id);
   refresh();
+  back(f);
 }
 
 export async function requestAiReport(f: FormData) {

@@ -20,7 +20,7 @@ function when(d: Date): string {
   return `${d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}, ${time}`;
 }
 
-export function TxRow({ tx, children }: { tx: Tx; children?: React.ReactNode }) {
+export function TxRow({ tx, children, hidePending }: { tx: Tx; children?: React.ReactNode; hidePending?: boolean }) {
   const d = new Date(tx.occurred_at);
   const src = SOURCE[tx.source] ?? tx.source;
   return (
@@ -52,7 +52,7 @@ export function TxRow({ tx, children }: { tx: Tx; children?: React.ReactNode }) 
         )}
         {tx.income_kind && <span className="chip chip-in">{tx.income_kind === "salary" ? "ставка" : "доход"}</span>}
         {tx.plan_id && <span className="chip">по платежу</span>}
-        {tx.cost_center_id === null && tx.kind !== "internal" && !tx.income_kind && <span className="chip chip-pending">без направления</span>}
+        {!hidePending && tx.cost_center_id === null && tx.kind !== "internal" && !tx.income_kind && <span className="chip chip-pending">без направления</span>}
       </div>
       <div className={`tx-amount ${tx.amount < 0 ? "neg" : "pos"}`}>{formatMoney(tx.amount, tx.currency)}</div>
       {children}

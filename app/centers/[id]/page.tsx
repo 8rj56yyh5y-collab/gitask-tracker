@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { addCenter, createCenterCashboxAction, updateCenterAction, updateCenterBudget } from "../../actions.ts";
+import { addCenter, createCenterCashboxAction, removeCenter, updateCenterAction, updateCenterBudget } from "../../actions.ts";
 import { BudgetLine } from "../../components/BudgetLine.tsx";
 import { TxRow } from "../../components/TxRow.tsx";
 import { centerStats, centerTransactions, centerTree, childStats, getCenter } from "@/lib/repo.ts";
@@ -41,7 +41,7 @@ export default async function CenterPage({ params }: { params: Promise<{ id: str
       </div>
 
       <section className="card">
-        <h2>Расход за {month}</h2>
+        <h2>Потрачено за {month}</h2>
         <div className="big">{formatMoney(s.spent)}</div>
         <BudgetLine s={{ ...s, name: s.budget > 0 ? "Лимит на месяц" : "Без лимита" }} total={s.spent} />
         {daily !== null && (
@@ -49,15 +49,15 @@ export default async function CenterPage({ params }: { params: Promise<{ id: str
             Чтобы уложиться в лимит, тратьте не больше <strong>{formatMoney(daily)} в день</strong> до конца месяца.
           </p>
         )}
-        <form action={updateCenterBudget} className="inline">
+        <form action={updateCenterBudget} className="form limit-form">
           <input type="hidden" name="id" value={id} />
-          <input
-            name="budget"
-            inputMode="decimal"
-            placeholder="Лимит на месяц, ₴ (0 — без лимита)"
-            defaultValue={center.monthly_budget ? center.monthly_budget / 100 : ""}
-          />
-          <button className="btn btn-sm">Сохранить лимит</button>
+          <label>
+            Сколько можно тратить в месяц, ₴
+            <span className="input-row">
+              <input name="budget" inputMode="decimal" placeholder="без лимита" defaultValue={center.monthly_budget ? center.monthly_budget / 100 : ""} />
+              <button className="btn btn-sm">Сохранить</button>
+            </span>
+          </label>
         </form>
       </section>
 
@@ -95,7 +95,7 @@ export default async function CenterPage({ params }: { params: Promise<{ id: str
           );
         })()}
       <section className="card">
-        <h2>Внутри: {children.length ? "вложенные направления" : "пока ничего"}</h2>
+        <h2>{children.length ? "Внутри" : "Разбить подробнее"}</h2>
         {children.length === 0 && (
           <p className="muted small">Можно разбить подробнее, например «Продукты» и «Топливо», — будет виден прогноз по каждому.</p>
         )}
@@ -106,18 +106,23 @@ export default async function CenterPage({ params }: { params: Promise<{ id: str
             </li>
           ))}
         </ul>
-        <form action={addCenter} className="inline add-child">
+        <form action={addCenter} className="form" style={{ marginTop: 10 }}>
           <input type="hidden" name="parentId" value={id} />
           <input type="hidden" name="color" value={center.color} />
           <input type="hidden" name="next" value={`/centers/${id}`} />
-          <input name="name" required placeholder="Новое направление" />
-          <input name="budget" inputMode="decimal" placeholder="Лимит, ₴" className="input-short" />
-          <button className="btn btn-sm">Добавить</button>
+          <label>
+            Добавить внутрь
+            <span className="input-row">
+              <input name="name" required placeholder="например, Продукты" />
+              <button className="btn btn-sm">Добавить</button>
+            </span>
+          </label>
         </form>
       </section>
 
-      <form action={updateCenterAction} className="card form">
-        <h2>Настройки направления</h2>
+      <details className="card settings-fold">
+        <summary>Настройки направления</summary>
+      <form action={updateCenterAction} className="form" style={{ marginTop: 14 }}>
         <input type="hidden" name="id" value={id} />
         <label>
           Название
@@ -126,7 +131,7 @@ export default async function CenterPage({ params }: { params: Promise<{ id: str
         <label>
           Входит в
           <select name="parentId" defaultValue={center.parent_id ?? ""}>
-            <option value="">— верхний уровень —</option>
+            <option value="">Самостоятельное</option>
             {centerTree()
               .filter((c) => c.id !== id && !c.path.split(" › ").includes(center.name))
               .map((c) => (
@@ -141,18 +146,24 @@ export default async function CenterPage({ params }: { params: Promise<{ id: str
           <input name="color" type="color" defaultValue={center.color} />
         </label>
         <label className="check">
-          <input type="checkbox" name="personal" defaultChecked={Boolean((center as { is_personal?: number }).is_personal)} /> Это мои личные деньги — учитывать в «Мои
-          деньги за месяц»
+          <input type="checkbox" name="personal" defaultChecked={Boolean((center as { is_personal?: number }).is_personal)} /> Мои личные деньги (входят в «Мои деньги за
+          месяц»)
         </label>
         <label className="check">
-          <input type="checkbox" name="internal" defaultChecked={Boolean(center.is_internal)} /> Не считать расходом (переводы между своими картами)
+          <input type="checkbox" name="internal" defaultChecked={Boolean(center.is_internal)} /> Только для переводов между своими картами (не расход)
         </label>
         <button className="btn btn-primary">Сохранить</button>
       </form>
+      <form action={removeCenter} style={{ marginTop: 8 }}>
+        <input type="hidden" name="id" value={id} />
+        <input type="hidden" name="next" value="/centers" />
+        <button className="btn btn-ghost btn-sm danger">Скрыть направление</button>
+      </form>
+      </details>
 
       <section className="card span-all">
         <h2>Операции за {month}</h2>
-        {txs.length === 0 && <p className="muted small">Операций пока нет.</p>}
+        {txs.length === 0 && <p className="muted small">В этом месяце операций нет.</p>}
         {txs.map((t) => (
           <Link key={t.id} href={`/inbox/${t.id}`} className="plain">
             <TxRow tx={t} />
