@@ -291,7 +291,7 @@ const pct = (f: FormData, k: string) => {
 export async function createCashboxAction(f: FormData) {
   const name = str(f, "name");
   if (!name) throw new Error("Назовите кассу");
-  const id = createCashbox({ name, owner: str(f, "owner"), color: hexColor(str(f, "color")) ?? "#16a34a", opening: kop(f, "opening") });
+  const id = createCashbox({ name, owner: str(f, "owner"), color: hexColor(str(f, "color")) ?? "#16a34a", opening: kop(f, "opening"), centerId: num(f, "centerId") });
   refresh();
   redirect(`/cash/${id}`);
 }
@@ -299,7 +299,7 @@ export async function createCashboxAction(f: FormData) {
 export async function updateCashboxAction(f: FormData) {
   const id = num(f, "id");
   if (!id) return;
-  updateCashbox(id, { name: str(f, "name") || "Касса", owner: str(f, "owner"), color: hexColor(str(f, "color")) ?? "#16a34a", opening: kop(f, "opening") });
+  updateCashbox(id, { name: str(f, "name") || "Касса", owner: str(f, "owner"), color: hexColor(str(f, "color")) ?? "#16a34a", opening: kop(f, "opening"), centerId: num(f, "centerId") });
   refresh();
   back(f);
 }

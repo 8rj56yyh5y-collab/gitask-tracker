@@ -6,6 +6,7 @@ import { TxRow } from "../../components/TxRow.tsx";
 import { centerStats, centerTransactions, centerTree, childStats, getCenter } from "@/lib/repo.ts";
 import { formatMoney } from "@/lib/money.ts";
 import { dailyAllowance } from "@/lib/budget.ts";
+import { cashBalances, listCashboxes } from "@/lib/cash.ts";
 
 export default async function CenterPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: raw } = await params;
@@ -60,6 +61,25 @@ export default async function CenterPage({ params }: { params: Promise<{ id: str
         </form>
       </section>
 
+      {(() => {
+        const boxes = listCashboxes().filter((b) => b.center_id === id);
+        if (!boxes.length) return null;
+        const bal = cashBalances();
+        return (
+          <section className="card">
+            <h2>Кассы этой категории</h2>
+            {boxes.map((b) => (
+              <Link key={b.id} href={`/cash/${b.id}`} className="row-between tree-row plain">
+                <span>
+                  <span className="dot" style={{ background: b.color }} />
+                  {b.name}
+                </span>
+                <strong>{formatMoney(bal.get(b.id) ?? 0)} ›</strong>
+              </Link>
+            ))}
+          </section>
+        );
+      })()}
       <section className="card">
         <h2>Внутри: {children.length ? "категории" : "пока ничего"}</h2>
         {children.length === 0 && (
