@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { addCenter, updateCenterBudget } from "../../actions.ts";
+import { addCenter, updateCenterAction, updateCenterBudget } from "../../actions.ts";
 import { BudgetLine } from "../../components/BudgetLine.tsx";
 import { TxRow } from "../../components/TxRow.tsx";
-import { centerStats, centerTransactions, childStats, getCenter } from "@/lib/repo.ts";
+import { centerStats, centerTransactions, centerTree, childStats, getCenter } from "@/lib/repo.ts";
 import { formatMoney } from "@/lib/money.ts";
 import { dailyAllowance } from "@/lib/budget.ts";
 
@@ -81,6 +81,36 @@ export default async function CenterPage({ params }: { params: Promise<{ id: str
           <button className="btn btn-sm">Добавить</button>
         </form>
       </section>
+
+      <form action={updateCenterAction} className="card form">
+        <h2>Настройки категории</h2>
+        <input type="hidden" name="id" value={id} />
+        <label>
+          Название
+          <input name="name" defaultValue={center.name} required maxLength={60} />
+        </label>
+        <label>
+          Входит в
+          <select name="parentId" defaultValue={center.parent_id ?? ""}>
+            <option value="">— верхний уровень —</option>
+            {centerTree()
+              .filter((c) => c.id !== id && !c.path.split(" › ").includes(center.name))
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.path}
+                </option>
+              ))}
+          </select>
+        </label>
+        <label>
+          Цвет
+          <input name="color" type="color" defaultValue={center.color} />
+        </label>
+        <label className="check">
+          <input type="checkbox" name="internal" defaultChecked={Boolean(center.is_internal)} /> Не считать расходом (переводы между своими картами)
+        </label>
+        <button className="btn btn-primary">Сохранить</button>
+      </form>
 
       <section className="card span-all">
         <h2>Операции за {month}</h2>

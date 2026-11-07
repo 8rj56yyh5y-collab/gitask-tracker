@@ -150,6 +150,13 @@ th:not(:first-child), td:not(:first-child) { text-align: right; }
 .empty { text-align: center; padding: 28px 16px; color: var(--muted); }
 .empty strong { display: block; color: var(--ink); font-size: 17px; margin-bottom: 6px; }
 
+/* Выбор цвета */
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.sw { position: relative; }
+.sw input { position: absolute; opacity: 0; width: 1px; height: 1px; min-height: 0; }
+.sw i { display: block; width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
+.sw input:checked + i { box-shadow: 0 0 0 2px var(--ink); }
+.sw input:focus-visible + i { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Продажи */
 .calc { display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 12px; background: var(--raised); font-variant-numeric: tabular-nums; }
 .calc .row span:first-child { color: var(--muted); }
@@ -263,9 +270,9 @@ const inRange = (t, r) => { const d = new Date(t.at); return d >= r.s && d < r.e
 // ---------- Категории ----------
 const active = () => [...S.cats.values()].filter((c) => !c.archived);
 function tree() {
-  const all = active(), out = [];
+  const all = active(), out = [], ids = new Set(all.map((c) => c.id));
   const walk = (p, depth, path) => all
-    .filter((c) => (c.parent || null) === p)
+    .filter((c) => (p === null ? !c.parent || !ids.has(c.parent) : c.parent === p))
     .sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.name.localeCompare(b.name, "ru"))
     .forEach((c) => { const pa = path ? `${path} › ${c.name}` : c.name; out.push({ ...c, depth, path: pa }); walk(c.id, depth + 1, pa); });
   walk(null, 0, "");
@@ -388,7 +395,7 @@ function vHome() {
     h += `<div class="card allclear wide"><strong>Всё разнесено ✓</strong></div>`;
   }
   if (alerts.length) h += `<section class="card wide stack"><h2>Сигналы по лимитам</h2>${alerts.map((s) => `<a class="signal ${s.status}" href="#cat-${esc(s.id)}">${esc(s.name)}: ${s.status === "over" ? `перелимит ${fmt(s.spent - s.budget)} (лимит ${fmt(s.budget)})` : `при таком темпе ≈ ${fmt(s.forecast)} при лимите ${fmt(s.budget)}`}</a>`).join("")}</section>`;
-  h += `<section class="card"><h2>Расходы · ${esc(r.label.toLowerCase())}</h2><div class="big">${fmt(total)}</div><div style="margin-top:8px">${roots.map((s) => budgetLine(s, total, "#cat-" + s.id)).join("") || '<p class="muted">Категорий пока нет — добавьте в «Категории».</p>'}</div></section>`;
+  h += `<section class="card"><div class="row"><h2 style="margin:0">Расходы · ${esc(r.label.toLowerCase())}</h2><a class="btn sm ghost" href="#categories">Категории ›</a></div><div class="big">${fmt(total)}</div><div style="margin-top:8px">${roots.map((s) => budgetLine(s, total, "#cat-" + s.id)).join("") || '<p class="muted">Категорий пока нет — добавьте в «Категории».</p>'}</div></section>`;
   const sm = salesMonth(0);
   h += `<a class="card" href="#sales"><h2>Продажи · ${esc(r.label.toLowerCase())}</h2>${sm.list.length ? `<div class="big">${fmt(sm.amount)}</div><div class="small" style="margin-top:6px">${sm.list.length} продаж · отделу продаж ${fmt(sm.salesFee)}${sm.unpaid ? ` · <strong>к выплате ${fmt(sm.unpaid)}</strong>` : ""} · чистыми ${fmt(sm.net)}</div>` : '<p class="muted" style="margin:0">Продажи пока не записаны. Нажмите + → «Продажа».</p>'}</a>`;
   h += `<a class="card" href="#analytics"><h2>Аналитика ›</h2><p class="muted" style="margin:0">Любой месяц, год по месяцам, сравнение с прошлым месяцем, разбор от ИИ.</p></a>`;
@@ -474,8 +481,10 @@ function vCards() {
 function vCategories() {
   view.className = "view narrow";
   const st = catStats(monthRange(0)), t = tree();
-  let h = `<h1>Категории</h1><section class="card">${t.map((c) => { const s = st.get(c.id); return `<a class="line" href="#cat-${esc(c.id)}" style="padding-left:${c.depth * 18}px"><div class="row"><span class="name"><i class="dot" style="background:${esc(c.color)}"></i>${esc(c.name)}${c.internal ? ' <span class="muted small">· не расход</span>' : ""}</span><span class="num small">${fmt(s.spent)}${s.budget ? ` <span class="muted">/ ${fmt(s.budget)}</span>` : ""}</span></div></a>`; }).join("") || '<p class="muted">Категорий пока нет.</p>'}</section>`;
+  let h = `<h1>Категории</h1><p class="muted small" style="margin:-6px 0 0">Нажмите на категорию, чтобы переименовать, сменить цвет, перенести или задать лимит.</p><section class="card">${t.map((c) => { const s = st.get(c.id); return `<a class="line" href="#cat-${esc(c.id)}" style="padding-left:${c.depth * 18}px"><div class="row"><span class="name"><i class="dot" style="background:${esc(c.color)}"></i>${esc(c.name)}${c.internal ? ' <span class="muted small">· не расход</span>' : ""}</span><span class="num small">${fmt(s.spent)}${s.budget ? ` <span class="muted">/ ${fmt(s.budget)}</span>` : ""}</span></div></a>`; }).join("") || '<p class="muted">Категорий пока нет.</p>'}</section>`;
   h += `<form class="card stack" id="addCat"><h2>Новая категория</h2><label class="f">Название<input id="cn" name="name" required placeholder="например, Пункт в Житомире"></label><label class="f">Входит в<select id="cp" name="parent"><option value="">— верхний уровень —</option>${t.map((c) => `<option value="${esc(c.id)}">${esc(c.path)}</option>`).join("")}</select></label><label class="f">Лимит в месяц, ₴ (необязательно)<input id="cbud" name="budget" inputmode="decimal"></label><button class="btn primary" ${S.readOnly ? "disabled" : ""}>Добавить</button></form>`;
+  const hidden = [...S.cats.values()].filter((c) => c.archived).sort((a, b) => a.name.localeCompare(b.name, "ru"));
+  if (hidden.length) h += `<section class="card"><h2>Скрытые категории</h2>${hidden.map((c) => `<div class="row" style="padding:8px 0;border-top:1px solid var(--line)"><span><i class="dot" style="background:${esc(c.color)}"></i>${esc(c.name)}</span><button type="button" class="btn sm" data-restorecat="${esc(c.id)}" ${S.readOnly ? "disabled" : ""}>Вернуть</button></div>`).join("")}</section>`;
   view.innerHTML = h;
 }
 
@@ -492,7 +501,9 @@ function vCategory(id) {
   h += `<section class="card stack"><h2>Расход за ${esc(MONTHS[r.s.getMonth()])}</h2><div class="big">${fmt(s.spent)}</div>${budgetLine({ ...s, name: s.budget ? "Лимит на месяц" : "Без лимита" }, s.spent)}${daily !== null ? `<p class="small" style="margin:0">Чтобы уложиться в лимит, тратьте не больше <strong>${fmt(daily)} в день</strong> до конца месяца.</p>` : ""}<form class="inline" id="setBudget"><input id="bud" name="budget" inputmode="decimal" placeholder="Лимит на месяц, ₴ (пусто — без лимита)" value="${c.budget ? c.budget / 100 : ""}" aria-label="Лимит на месяц"><button class="btn sm" ${S.readOnly ? "disabled" : ""}>Сохранить лимит</button></form></section>`;
   h += `<section class="card"><h2>Внутри</h2>${kids.map((k) => budgetLine(k, s.spent, "#cat-" + k.id)).join("") || '<p class="muted small" style="margin:0 0 8px">Добавьте подкатегории — например «Продукты» или «Топливо», чтобы видеть прогноз по каждой.</p>'}<form class="inline" id="addChild" style="margin-top:10px"><input id="kn" name="name" required placeholder="Новая подкатегория"><input id="kb" name="budget" inputmode="decimal" placeholder="Лимит, ₴" style="flex:0 1 120px"><button class="btn sm" ${S.readOnly ? "disabled" : ""}>Добавить</button></form></section>`;
   h += `<section class="card"><h2>Операции за месяц</h2>${txs.map((t) => txRow(t, { withDate: true })).join("") || '<p class="muted small" style="margin:0">Операций пока нет.</p>'}</section>`;
-  h += `<div><button type="button" class="btn ghost danger" data-hidecat="${esc(id)}" ${S.readOnly ? "disabled" : ""}>Скрыть категорию</button></div>`;
+  const palette = COLORS.includes(c.color) ? COLORS : [c.color, ...COLORS];
+  h += `<form class="card stack" id="editCat"><h2>Настройки категории</h2><label class="f">Название<input id="en" name="name" value="${esc(c.name)}" required maxlength="60"></label><label class="f">Входит в<select id="ep" name="parent"><option value="">— верхний уровень —</option>${tree().filter((x) => !ids.has(x.id)).map((x) => `<option value="${esc(x.id)}" ${x.id === c.parent ? "selected" : ""}>${esc(x.path)}</option>`).join("")}</select></label><div class="f"><span>Цвет</span><div class="swatches" role="radiogroup" aria-label="Цвет">${palette.map((col, i) => `<label class="sw"><input type="radio" name="color" value="${esc(col)}" ${col === c.color ? "checked" : ""} aria-label="Цвет ${i + 1}"><i style="background:${esc(col)}"></i></label>`).join("")}</div></div><label class="f" style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" name="internal" style="width:auto;min-height:0" ${c.internal ? "checked" : ""}> Не считать расходом (переводы между своими картами)</label><button class="btn primary" ${S.readOnly ? "disabled" : ""}>Сохранить</button></form>`;
+  h += `<div><button type="button" class="btn ghost danger" data-hidecat="${esc(id)}" ${S.readOnly ? "disabled" : ""}>Скрыть категорию</button><p class="muted small" style="margin:4px 0 0">Операции не удаляются: скрытую категорию можно вернуть в списке категорий.</p></div>`;
   view.innerHTML = h;
 }
 
@@ -513,7 +524,8 @@ function openSheet(tx) {
   <div class="seg ${tx ? "" : "seg3"}" role="group" aria-label="Тип"><button type="button" data-dir="out">Расход</button><button type="button" data-dir="in">Поступление</button>${tx ? "" : '<button type="button" data-tosale>Продажа</button>'}</div>
   <label class="f">Сумма, ₴<input id="fAmount" class="amount" inputmode="decimal" placeholder="0" value="${tx ? Math.abs(t.amount) / 100 : ""}" required></label>
   <div class="f"><span>Категория</span><div class="cats" id="fCats">${sug.map((id) => `<button type="button" data-cat="${esc(id)}">${esc(S.cats.get(id).name)}</button>`).join("")}</div>
-  <select id="fCat" aria-label="Все категории"><option value="">Пока не знаю — разнести позже</option>${tree().map((c) => `<option value="${esc(c.id)}">${"  ".repeat(c.depth)}${esc(c.name)}</option>`).join("")}</select></div>
+  <select id="fCat" aria-label="Все категории">${catOptions()}</select>
+  <div id="newCatZone"><button type="button" class="btn sm ghost" data-newcat ${S.readOnly ? "disabled" : ""}>+ Новая категория</button></div></div>
   <label class="f">Карта<select id="fCard"><option value="">Наличные / касса</option>${[...S.cards.values()].filter((c) => !c.archived || c.id === t.card).map((c) => `<option value="${esc(c.id)}">${esc(c.bank)} •• ${esc(c.last4)}</option>`).join("")}</select></label>
   <label class="f">Где / кому<input id="fWho" value="${esc(t.who)}" placeholder="магазин или получатель"></label>
   <label class="f">Для кого<input id="fFor" value="${esc(t.forWhom)}" placeholder="для себя, для руководителя…"></label>
@@ -526,6 +538,15 @@ function openSheet(tx) {
   syncForm();
   document.getElementById("sheet").hidden = false;
   if (!tx) setTimeout(() => f.querySelector("#fAmount").focus(), 50);
+}
+function catOptions() {
+  return `<option value="">Пока не знаю — разнести позже</option>${tree().map((c) => `<option value="${esc(c.id)}">${"  ".repeat(c.depth)}${esc(c.name)}</option>`).join("")}`;
+}
+function refreshCatSelect() {
+  const sel = document.getElementById("fCat");
+  if (!sel || document.getElementById("sheet").hidden) return;
+  sel.innerHTML = catOptions();
+  sel.value = S.cats.has(S.form.cat) ? S.form.cat : "";
 }
 function syncForm() {
   const f = document.getElementById("txForm");
@@ -575,6 +596,20 @@ document.getElementById("txForm").addEventListener("click", async (e) => {
   else if (b.hasAttribute("data-tosale")) { closeSheet(); openSale(null, document.getElementById("fAmount")?.value || ""); }
   else if (b.dataset.cat !== undefined && b.closest("#fCats")) { S.form.cat = S.form.cat === b.dataset.cat ? "" : b.dataset.cat; syncForm(); }
   else if (b.hasAttribute("data-close")) closeSheet();
+  else if (b.hasAttribute("data-newcat")) {
+    document.getElementById("newCatZone").innerHTML = `<div class="inline"><input id="ncName" placeholder="Название новой категории" maxlength="60" aria-label="Название новой категории"><select id="ncParent" aria-label="Входит в"><option value="">верхний уровень</option>${tree().map((c) => `<option value="${esc(c.id)}">в «${esc(c.name)}»</option>`).join("")}</select><button type="button" class="btn sm primary" data-newcat-save>Создать</button></div>`;
+    document.getElementById("ncName").focus();
+  }
+  else if (b.hasAttribute("data-newcat-save")) {
+    const name = document.getElementById("ncName").value.trim();
+    if (!name) { toast("Введите название"); return; }
+    const parent = document.getElementById("ncParent").value || null, pc = parent ? S.cats.get(parent) : null, id = newId("c");
+    const data = { name, parent, color: pc?.color || COLORS[active().filter((c) => !c.parent).length % COLORS.length], budget: 0, internal: false, archived: false, order: 99 };
+    if (await write(() => S.db.collection("categories").doc(id).set(data), "Категория создана")) {
+      S.cats.set(id, { id, ...data }); S.form.cat = id; refreshCatSelect(); syncForm();
+      document.getElementById("newCatZone").innerHTML = `<button type="button" class="btn sm ghost" data-newcat>+ Новая категория</button>`;
+    }
+  }
   else if (b.hasAttribute("data-del")) document.getElementById("delZone").innerHTML = `<div class="inline"><span class="small" style="align-self:center">Удалить безвозвратно?</span><button type="button" class="btn sm danger" data-del-yes>Удалить</button><button type="button" class="btn sm ghost" data-close>Отмена</button></div>`;
   else if (b.hasAttribute("data-del-yes")) { if (await write(() => S.db.collection("tx").doc(S.edit).delete(), "Удалено")) closeSheet(); }
 });
@@ -875,6 +910,21 @@ view.addEventListener("click", async (e) => {
   else if (b.hasAttribute("data-dropsheet")) { S.sheetPreview = null; render(); }
 });
 view.addEventListener("input", (e) => { if (e.target.id === "sheetText") S.sheetText = e.target.value; });
+view.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-restorecat]");
+  if (b) await write(() => S.db.collection("categories").doc(b.dataset.restorecat).update({ archived: false }), "Категория возвращена");
+});
+view.addEventListener("submit", async (e) => {
+  const f = e.target;
+  if (f.id !== "editCat") return;
+  e.preventDefault();
+  const id = route().slice(4), name = f.name.value.trim();
+  if (!name) return toast("Нужно название");
+  const parent = f.parent.value || null;
+  if (parent && chain(parent).includes(id)) return toast("Нельзя вложить категорию саму в себя");
+  document.activeElement?.blur();
+  await write(() => S.db.collection("categories").doc(id).update({ name, parent, color: f.color.value || S.cats.get(id).color, internal: f.internal.checked }), "Сохранено");
+});
 view.addEventListener("submit", async (e) => {
   const f = e.target;
   if (f.dataset.group) {
@@ -935,7 +985,7 @@ render();
   const fresh = { cats: false, cards: false, tx: false };
   const settle = (k, snap) => { S.loaded[k] = true; if (!snap.metadata.fromCache) fresh[k] = true; if (fresh.cats && fresh.cards && fresh.tx) { clearTimeout(timer); S.slow = false; } };
   const fail = (e) => { clearTimeout(timer); if (e?.code !== "revoked") S.error = e?.code || "unavailable"; else S.readOnly = true; render(); };
-  db.collection("categories").onSnapshot((snap) => { S.cats = new Map(snap.docs.map((d) => [d.id, { id: d.id, ...d.data() }])); settle("cats", snap); render(); }, fail);
+  db.collection("categories").onSnapshot((snap) => { S.cats = new Map(snap.docs.map((d) => [d.id, { id: d.id, ...d.data() }])); settle("cats", snap); render(); refreshCatSelect(); }, fail);
   db.collection("cards").onSnapshot((snap) => { S.cards = new Map(snap.docs.map((d) => [d.id, { id: d.id, ...d.data() }])); settle("cards", snap); render(); }, fail);
   db.collection("groups").onSnapshot((snap) => { S.groups = new Map(snap.docs.map((d) => [d.id, { id: d.id, ...d.data() }])); render(); if (S.sale) syncSale(); }, () => {});
   db.collection("sales").onSnapshot((snap) => { S.sales = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((x) => typeof x.amount === "number" && x.at); S.loaded.sales = true; render(); }, fail);

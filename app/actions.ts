@@ -21,6 +21,8 @@ import {
   saveAiReport,
   setCenterBudget,
   updateCardLimit,
+  updateCenter,
+  restoreCenter,
 } from "@/lib/repo.ts";
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -188,4 +190,18 @@ export async function connectMonobankAction(f: FormData) {
   }
   refresh();
   backToSettings(ok ? "mono_ok" : "mono_error", message);
+}
+
+export async function updateCenterAction(f: FormData) {
+  const id = num(f, "id");
+  const name = str(f, "name");
+  if (!id || !name) throw new Error("Нужно название категории");
+  updateCenter(id, { name, color: str(f, "color") || "#6b7280", parentId: num(f, "parentId"), internal: f.get("internal") === "on" });
+  refresh();
+}
+
+export async function restoreCenterAction(f: FormData) {
+  const id = num(f, "id");
+  if (id) restoreCenter(id);
+  refresh();
 }

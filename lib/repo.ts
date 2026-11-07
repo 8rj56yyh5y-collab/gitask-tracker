@@ -76,6 +76,30 @@ export function createCenter(name: string, parentId: number | null, color: strin
     .run(name, parentId, color, budgetKop, internal ? 1 : 0);
 }
 
+/** Переименовать, перекрасить, перенести категорию. Нельзя вложить её саму в себя или в свою подкатегорию. */
+export function updateCenter(id: number, c: { name: string; color: string; parentId: number | null; internal: boolean }) {
+  const db = getDb();
+  if (c.parentId !== null) {
+    let p: number | null = c.parentId;
+    const seen = new Set<number>();
+    while (p !== null && !seen.has(p)) {
+      if (p === id) throw new Error("Нельзя вложить категорию саму в себя");
+      seen.add(p);
+      const r = db.prepare("SELECT parent_id FROM cost_centers WHERE id = ?").get(p) as { parent_id: number | null } | undefined;
+      p = r?.parent_id ?? null;
+    }
+  }
+  db.prepare("UPDATE cost_centers SET name = ?, color = ?, parent_id = ?, is_internal = ? WHERE id = ?").run(c.name, c.color, c.parentId, c.internal ? 1 : 0, id);
+}
+
+export function restoreCenter(id: number) {
+  getDb().prepare("UPDATE cost_centers SET archived = 0 WHERE id = ?").run(id);
+}
+
+export function listHiddenCenters(): CostCenter[] {
+  return rows<CostCenter>(getDb().prepare("SELECT * FROM cost_centers WHERE archived = 1 ORDER BY name").all());
+}
+
 export function archiveCenter(id: number) {
   getDb().prepare("UPDATE cost_centers SET archived = 1 WHERE id = ?").run(id);
 }

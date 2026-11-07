@@ -87,3 +87,18 @@ test("sub-category spend and forecast roll up; fuel pace triggers an alert", () 
   repo.setCenterBudget(fuel, 120_000_00);
   assert.equal(repo.centerStats(today).get(fuel)!.status, "ok");
 });
+
+test("categories can be renamed, moved and restored; no cycles", () => {
+  repo.createCenter("Авто", null, "#111111", 0, false);
+  repo.createCenter("Шины", center("Авто").id, "#111111", 0, false);
+  const auto = center("Авто").id, tyres = center("Шины").id;
+  repo.updateCenter(auto, { name: "Машина", color: "#222222", parentId: null, internal: false });
+  assert.equal(repo.getCenter(auto)!.name, "Машина");
+  assert.throws(() => repo.updateCenter(auto, { name: "Машина", color: "#222222", parentId: tyres, internal: false }), /саму в себя/);
+  repo.updateCenter(tyres, { name: "Шины", color: "#111111", parentId: center("Личные").id, internal: false });
+  assert.equal(repo.getCenter(tyres)!.parent_id, center("Личные").id);
+  repo.archiveCenter(auto);
+  assert.ok(repo.listHiddenCenters().some((c) => c.id === auto));
+  repo.restoreCenter(auto);
+  assert.ok(repo.listCenters().some((c) => c.id === auto));
+});

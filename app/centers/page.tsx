@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { addCenter, removeCenter } from "../actions.ts";
-import { centerTree } from "@/lib/repo.ts";
+import { addCenter, removeCenter, restoreCenterAction } from "../actions.ts";
+import { centerTree, listHiddenCenters } from "@/lib/repo.ts";
 import { formatMoney } from "@/lib/money.ts";
 
 export default function Centers() {
@@ -8,6 +8,7 @@ export default function Centers() {
   return (
     <div className="grid grid-2">
       <h1>Категории</h1>
+      <p className="muted small">Нажмите на категорию, чтобы переименовать, сменить цвет, перенести или задать лимит.</p>
       <div className="card">
         {tree.map((c) => (
           <div key={c.id} className="row-between tree-row" style={{ paddingLeft: c.depth * 20 }}>
@@ -54,6 +55,21 @@ export default function Centers() {
         </label>
         <button className="btn btn-primary">Добавить</button>
       </form>
+      {listHiddenCenters().length > 0 && (
+        <section className="card">
+          <h2>Скрытые категории</h2>
+          {listHiddenCenters().map((c) => (
+            <form key={c.id} action={restoreCenterAction} className="row-between tree-row">
+              <input type="hidden" name="id" value={c.id} />
+              <span>
+                <i className="dot" style={{ background: c.color }} />
+                {c.name}
+              </span>
+              <button className="btn btn-sm">Вернуть</button>
+            </form>
+          ))}
+        </section>
+      )}
       <form action="/logout" method="post" className="span-all">
         <button className="btn btn-ghost btn-sm">Выйти</button>
       </form>
