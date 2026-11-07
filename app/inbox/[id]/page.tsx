@@ -38,7 +38,7 @@ export default async function AssignOne({ params }: { params: Promise<{ id: stri
         </div>
         <label>
           Для кого / по чьей просьбе
-          <input name="forWhom" defaultValue={tx.for_whom} placeholder="например, руководитель" />
+          <input name="forWhom" defaultValue={tx.for_whom} placeholder="например, семья" />
         </label>
         <label>
           Комментарий

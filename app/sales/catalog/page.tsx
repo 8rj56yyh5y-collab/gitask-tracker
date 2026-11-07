@@ -39,7 +39,7 @@ export default function Catalog() {
           <input type="hidden" name="next" value={next} />
           <label>
             Новая группа
-            <input name="name" required placeholder="например, Грузики" />
+            <input name="name" required placeholder="например, Свечи" />
           </label>
           <div className="grid-2-tight">
             <label>
@@ -91,7 +91,7 @@ export default function Catalog() {
           <input type="hidden" name="next" value={next} />
           <label>
             Новый товар
-            <input name="name" required placeholder="например, Грузики балансировочные" />
+            <input name="name" required placeholder="например, Свеча ароматическая" />
           </label>
           <div className="grid-2-tight">
             <label>

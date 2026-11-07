@@ -3,7 +3,7 @@ import Link from "next/link";
 import "./globals.css";
 import { unassignedSummary } from "@/lib/repo.ts";
 import { SwRegister } from "./sw-register.tsx";
-import { Nav } from "./components/Nav.tsx";
+import { Nav, TopNav } from "./components/Nav.tsx";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE, sessionValid } from "@/lib/session.ts";
 import { THEME_COOKIE, normalizeTheme } from "@/lib/theme.ts";
@@ -51,6 +51,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <Link href="/" className="brand">
             D&amp;N
           </Link>
+          <TopNav />
         </header>
         <main className="wrap">{children}</main>
         <Nav pending={count} />

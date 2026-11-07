@@ -98,3 +98,49 @@ test("an incoming bank transfer can be turned into a sale", () => {
   assert.equal(repo.getTx(t)!.kind, "internal");
   assert.ok(!repo.listUnassigned().some((x) => x.id === t));
 });
+
+test("«мне должны»: поступление частями и автозакрытие входящей суммой", () => {
+  const id = plans.createPlan({ title: "Вернуть долг — Олег", total: 500_000, direction: "in", dueDate: plans.ymd(new Date()) });
+  plans.payPlan(id, 200_000);
+  let p = plans.getPlan(id)!;
+  assert.equal(p.paid, 200_000);
+  assert.equal(p.direction, "in");
+  const tx = repo.listRecent(50).find((t) => t.plan_id === id)!;
+  assert.ok(tx.amount > 0, "поступление записано плюсом");
+  // расход на ту же сумму не закрывает «мне должны»
+  const spend = repo.insertTx({ amountKop: -300_000, source: "monobank" }).id;
+  assert.equal(plans.matchPlanForTx(spend), null);
+  const income = repo.insertTx({ amountKop: 300_000, source: "monobank" }).id;
+  assert.equal(plans.matchPlanForTx(income), id);
+  p = plans.getPlan(id)!;
+  assert.equal(p.status, "done");
+  assert.ok(!plans.listPlans("open", 200, "out").some((x) => x.id === id));
+  assert.ok(!plans.plansToRemind().some((x) => x.id === id), "о долгах мне в Telegram «оплатить» не пишем");
+});
+
+test("норма трат: 30 дней сбора, предложение, принять или продлить", async () => {
+  const norms = await import("../lib/norms.ts");
+  const settings = await import("../lib/settings.ts");
+  const start = new Date(Date.now() - 40 * 864e5);
+  settings.setSetting("norm_start", start.toISOString().slice(0, 10));
+  repo.createCenter("Еда тест", null, "#f59e0b", 0, false);
+  const food = center("Еда тест");
+  const t = repo.insertTx({ amountKop: -1_234_500, source: "manual", occurredAt: new Date(Date.now() - 5 * 864e5).toISOString() }).id;
+  repo.assignTx(t, food);
+  let s = norms.normState();
+  assert.ok(s.ready);
+  const row = s.rows.find((r) => r.id === food)!;
+  assert.equal(row.spent, 1_234_500);
+  // 12 345 ₴ за 40 дней → 9 258,75 ₴ в месяц → вверх до 9 300 ₴
+  assert.equal(row.suggested, 930_000);
+  norms.acceptNorms(new Map([[food, 1_000_000]]));
+  assert.equal(repo.getCenter(food)!.monthly_budget, 1_000_000);
+  assert.ok(norms.normState().acceptedAt);
+  norms.extendNorm();
+  s = norms.normState();
+  assert.equal(s.days, 70);
+  assert.ok(!s.ready && !s.acceptedAt && s.daysLeft === 30);
+  norms.restartNorm();
+  assert.equal(norms.normState().elapsed, 0);
+  assert.equal(norms.roundUpNorm(0), 0);
+});

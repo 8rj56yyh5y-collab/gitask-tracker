@@ -29,7 +29,7 @@ export default function Cash() {
       {boxes.length === 0 && (
         <div className="card">
           <strong>Касс пока нет</strong>
-          <p className="muted small">Например: «Касса руководителя», «Касса пункта Житомир». У каждой будет свой остаток.</p>
+          <p className="muted small">Например: «Домашняя», «Офис», «Магазин». У каждой будет свой остаток.</p>
         </div>
       )}
 
@@ -64,11 +64,11 @@ export default function Cash() {
         <h2>Новая касса</h2>
         <label>
           Название
-          <input name="name" required placeholder="например, Касса руководителя" />
+          <input name="name" required placeholder="например, Домашняя" />
         </label>
         <label>
           Чья
-          <input name="owner" placeholder="например, руководитель" />
+          <input name="owner" placeholder="например, Анна" />
         </label>
         <div className="grid-2-tight">
           <label>

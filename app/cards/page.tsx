@@ -109,7 +109,7 @@ export default function Cards() {
         </label>
         <label>
           Чья карта
-          <input name="owner" placeholder="например, моя / Иван" />
+          <input name="owner" placeholder="например, моя" />
         </label>
         <label>
           Тип

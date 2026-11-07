@@ -1,8 +1,9 @@
 import { getDb } from "./db.ts";
 import { insertTx } from "./repo.ts";
 
-// Запланированные платежи и покупки с оплатой частями.
-// Оплачено = сумма расходов с plan_id. Когда оплачено всё — платёж закрыт; ежемесячный создаёт следующий.
+// Запланированные платежи («я плачу») и ожидаемые поступления («мне должны»), с оплатой частями.
+// Оплачено = сумма операций с plan_id (для «я плачу» — расходы, для «мне должны» — поступления).
+// Когда оплачено всё — закрыт; ежемесячный создаёт следующий.
 
 export interface Plan {
   id: number;
@@ -15,6 +16,7 @@ export interface Plan {
   cost_center_id: number | null;
   note: string;
   repeat: "none" | "month";
+  direction: "out" | "in";
   status: "open" | "done" | "cancelled";
   reminded_on: string | null;
   created_at: string;
@@ -24,13 +26,15 @@ export interface Plan {
 }
 
 type Row = Record<string, unknown>;
-const SELECT = `SELECT p.*, COALESCE((SELECT SUM(-t.amount) FROM transactions t WHERE t.plan_id = p.id), 0) AS paid FROM plans p`;
+const SELECT = `SELECT p.*, COALESCE((SELECT SUM(CASE WHEN p.direction = 'in' THEN t.amount ELSE -t.amount END) FROM transactions t WHERE t.plan_id = p.id), 0) AS paid FROM plans p`;
 
 export const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-export function listPlans(status: "open" | "done" = "open", limit = 200): Plan[] {
+export function listPlans(status: "open" | "done" = "open", limit = 200, direction?: "out" | "in"): Plan[] {
   const order = status === "open" ? "p.due_date IS NULL, p.due_date ASC, p.id" : "p.done_at DESC";
-  return getDb().prepare(`${SELECT} WHERE p.status = ? ORDER BY ${order} LIMIT ?`).all(status, limit) as unknown as Plan[];
+  const dir = direction ? " AND p.direction = ?" : "";
+  const args: (string | number)[] = direction ? [status, direction, limit] : [status, limit];
+  return getDb().prepare(`${SELECT} WHERE p.status = ?${dir} ORDER BY ${order} LIMIT ?`).all(...args) as unknown as Plan[];
 }
 
 export function getPlan(id: number): Plan | null {
@@ -47,21 +51,22 @@ export interface NewPlan {
   centerId?: number | null;
   note?: string;
   repeat?: "none" | "month";
+  direction?: "out" | "in";
 }
 
 export function createPlan(p: NewPlan): number {
-  if (!p.title.trim()) throw new Error("Напишите, за что платёж");
+  if (!p.title.trim()) throw new Error("Напишите название");
   if (!(p.total > 0)) throw new Error("Укажите сумму");
   const r = getDb()
-    .prepare("INSERT INTO plans (title, payee, total, due_date, card_id, cashbox_id, cost_center_id, note, repeat) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-    .run(p.title.trim(), p.payee ?? "", p.total, p.dueDate || null, p.cardId ?? null, p.cashboxId ?? null, p.centerId ?? null, p.note ?? "", p.repeat ?? "none");
+    .prepare("INSERT INTO plans (title, payee, total, due_date, card_id, cashbox_id, cost_center_id, note, repeat, direction) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    .run(p.title.trim(), p.payee ?? "", p.total, p.dueDate || null, p.cardId ?? null, p.cashboxId ?? null, p.centerId ?? null, p.note ?? "", p.repeat ?? "none", p.direction ?? "out");
   return Number(r.lastInsertRowid);
 }
 
 export function updatePlan(id: number, p: NewPlan) {
   getDb()
-    .prepare("UPDATE plans SET title = ?, payee = ?, total = ?, due_date = ?, card_id = ?, cashbox_id = ?, cost_center_id = ?, note = ?, repeat = ? WHERE id = ?")
-    .run(p.title.trim(), p.payee ?? "", p.total, p.dueDate || null, p.cardId ?? null, p.cashboxId ?? null, p.centerId ?? null, p.note ?? "", p.repeat ?? "none", id);
+    .prepare("UPDATE plans SET title = ?, payee = COALESCE(?, payee), total = ?, due_date = ?, card_id = ?, cashbox_id = ?, cost_center_id = ?, note = ?, repeat = ? WHERE id = ?")
+    .run(p.title.trim(), p.payee ?? null, p.total, p.dueDate || null, p.cardId ?? null, p.cashboxId ?? null, p.centerId ?? null, p.note ?? "", p.repeat ?? "none", id);
   refreshStatus(id);
 }
 
@@ -84,7 +89,7 @@ function refreshStatus(id: number): Plan | null {
   if (p.repeat === "month") {
     createPlan({
       title: p.title, payee: p.payee, total: p.total, dueDate: p.due_date ? nextMonth(p.due_date) : null,
-      cardId: p.card_id, cashboxId: p.cashbox_id, centerId: p.cost_center_id, note: p.note, repeat: "month",
+      cardId: p.card_id, cashboxId: p.cashbox_id, centerId: p.cost_center_id, note: p.note, repeat: "month", direction: p.direction,
     });
   }
   return getPlan(id);
@@ -96,7 +101,7 @@ export function payPlan(id: number, amountKop: number, from: { cardId?: number |
   if (!p || p.status !== "open") throw new Error("Платёж уже закрыт");
   if (!(amountKop > 0)) throw new Error("Укажите сумму");
   const tx = insertTx({
-    amountKop: -amountKop,
+    amountKop: p.direction === "in" ? amountKop : -amountKop,
     cardId: from.cardId ?? null,
     cashboxId: from.cashboxId ?? null,
     costCenterId: p.cost_center_id,
@@ -118,10 +123,11 @@ export function payPlan(id: number, amountKop: number, from: { cardId?: number |
 export function matchPlanForTx(txId: number): number | null {
   const db = getDb();
   const tx = db.prepare("SELECT t.*, c.parent_id AS card_parent FROM transactions t LEFT JOIN cards c ON c.id = t.card_id WHERE t.id = ?").get(txId) as Row | undefined;
-  if (!tx || Number(tx.amount) >= 0 || tx.plan_id || tx.kind === "internal") return null;
-  const amount = -Number(tx.amount);
+  if (!tx || Number(tx.amount) === 0 || tx.plan_id || tx.kind === "internal") return null;
+  const direction = Number(tx.amount) < 0 ? "out" : "in";
+  const amount = Math.abs(Number(tx.amount));
   const at = new Date(String(tx.occurred_at));
-  const candidates = listPlans("open").filter((p) => {
+  const candidates = listPlans("open", 500, direction).filter((p) => {
     if (p.total - p.paid !== amount || !p.due_date) return false;
     const due = new Date(`${p.due_date}T12:00:00`);
     const days = (at.getTime() - due.getTime()) / 864e5;
@@ -141,7 +147,7 @@ export function matchPlanForTx(txId: number): number | null {
 /** Платежи, о которых пора напомнить сегодня (срок наступил, сегодня ещё не напоминали). */
 export function plansToRemind(today = new Date()): Plan[] {
   const d = ymd(today);
-  return listPlans("open").filter((p) => p.due_date && p.due_date <= d && p.reminded_on !== d);
+  return listPlans("open", 500, "out").filter((p) => p.due_date && p.due_date <= d && p.reminded_on !== d);
 }
 
 export function markReminded(id: number, today = new Date()) {
