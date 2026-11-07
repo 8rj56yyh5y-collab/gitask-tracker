@@ -1,0 +1,38 @@
+import Link from "next/link";
+import { Icon } from "../components/Icon.tsx";
+import { unassignedSummary } from "@/lib/repo.ts";
+
+export default function More() {
+  const { count } = unassignedSummary();
+  const items = [
+    { href: "/inbox", icon: "inbox", title: "Разнести", note: count ? `${count} ждут записи` : "Всё разнесено" },
+    { href: "/cards", icon: "card", title: "Лимиты карт", note: "Сколько осталось по каждой карте" },
+    { href: "/centers", icon: "tag", title: "Категории", note: "Лимиты и прогноз по каждой" },
+    { href: "/settings", icon: "settings", title: "Настройки", note: "Telegram, Monobank, Apple Pay, ИИ" },
+  ];
+  return (
+    <div className="narrow-wide">
+      <h1>Ещё</h1>
+      <div className="card menu-list">
+        {items.map((i) => (
+          <Link key={i.href} href={i.href} className="menu-row">
+            <span className="menu-icon">
+              <Icon name={i.icon} />
+            </span>
+            <span className="menu-text">
+              <strong>{i.title}</strong>
+              <span className="muted small">{i.note}</span>
+            </span>
+            {i.href === "/inbox" && count > 0 && <span className="badge">{count}</span>}
+            <Icon name="chevron" size={18} />
+          </Link>
+        ))}
+      </div>
+      <form action="/logout" method="post">
+        <button className="btn btn-ghost menu-logout">
+          <Icon name="logout" size={18} /> Выйти
+        </button>
+      </form>
+    </div>
+  );
+}
