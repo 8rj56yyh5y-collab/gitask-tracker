@@ -23,6 +23,7 @@ export interface Card {
   color?: string | null;
   badge?: string | null;
   archived?: number;
+  parent_id?: number | null;
 }
 
 export interface Tx {
@@ -117,6 +118,53 @@ export function listCards(): Card[] {
   return rows<Card>(getDb().prepare("SELECT * FROM cards WHERE archived = 0 ORDER BY bank, last4").all());
 }
 
+/** Подключён ли Monobank (есть карты с привязанным счётом). */
+export function monobankConnected(): boolean {
+  return Boolean(getDb().prepare("SELECT 1 FROM cards WHERE mono_account_id IS NOT NULL AND archived = 0 LIMIT 1").get());
+}
+
+/** Основные карты (без дополнительных, которые входят в другую карту). */
+export function listMainCards(): Card[] {
+  const all = listCards();
+  const ids = new Set(all.map((c) => c.id));
+  return all.filter((c) => !c.parent_id || !ids.has(c.parent_id));
+}
+
+/** Дополнительные карты, которые входят в эту. */
+export function childCards(id: number): Card[] {
+  return rows<Card>(getDb().prepare("SELECT * FROM cards WHERE parent_id = ? AND archived = 0 ORDER BY last4").all(id));
+}
+
+/** Сделать карту дополнительной к основной (или отделить: parentId = null). */
+export function setCardParent(id: number, parentId: number | null) {
+  const db = getDb();
+  if (parentId !== null) {
+    if (parentId === id) throw new Error("Карта не может входить сама в себя");
+    const parent = db.prepare("SELECT parent_id FROM cards WHERE id = ?").get(parentId) as { parent_id: number | null } | undefined;
+    if (!parent) throw new Error("Основная карта не найдена");
+    if (parent.parent_id) parentId = parent.parent_id; // только один уровень
+    db.prepare("UPDATE cards SET parent_id = ? WHERE parent_id = ?").run(parentId, id); // её дополнительные — к новой основной
+  }
+  db.prepare("UPDATE cards SET parent_id = ? WHERE id = ?").run(parentId, id);
+}
+
+/** Объединить все карты банка основной карты под ней. Возвращает, сколько карт добавлено в группу. */
+export function mergeBankCards(mainId: number): number {
+  const db = getDb();
+  const main = db.prepare("SELECT bank FROM cards WHERE id = ?").get(mainId) as { bank: string } | undefined;
+  if (!main) return 0;
+  db.prepare("UPDATE cards SET parent_id = NULL WHERE id = ?").run(mainId);
+  return Number(db.prepare("UPDATE cards SET parent_id = ? WHERE bank = ? AND id != ? AND archived = 0").run(mainId, main.bank, mainId).changes);
+}
+
+/** Траты за месяц с учётом дополнительных карт: у основной — её траты плюс траты всех её карт. */
+export function groupUsage(): Map<number, number> {
+  const own = cardUsage();
+  const out = new Map(own);
+  for (const c of listCards()) if (c.parent_id) out.set(c.parent_id, (out.get(c.parent_id) ?? 0) + (own.get(c.id) ?? 0));
+  return out;
+}
+
 /** Лимит по умолчанию для новых карт (копейки), задаётся на странице «Карты». */
 export function defaultCardLimit(): number {
   const r = getDb().prepare("SELECT value FROM settings WHERE key = 'default_card_limit'").get() as { value: string } | undefined;
@@ -158,7 +206,12 @@ export function updateCard(id: number, c: Pick<Card, "bank" | "last4" | "owner" 
 export function cardTransactions(cardId: number, today = new Date()): Tx[] {
   const { from, to } = monthBounds(today);
   return rows<Tx>(
-    getDb().prepare(`${TX_SELECT} WHERE t.card_id = ? AND t.occurred_at >= ? AND t.occurred_at < ? ORDER BY t.occurred_at DESC`).all(cardId, from, to),
+    getDb()
+      .prepare(
+        `${TX_SELECT} WHERE (t.card_id = ? OR t.card_id IN (SELECT id FROM cards WHERE parent_id = ?))
+         AND t.occurred_at >= ? AND t.occurred_at < ? ORDER BY t.occurred_at DESC`,
+      )
+      .all(cardId, cardId, from, to),
   );
 }
 
@@ -185,8 +238,10 @@ export function findCard(opts: { last4?: string | null; monoAccount?: string | n
   // если карта этого банка у вас одна.
   const bank = detectBank(opts.hint);
   if (bank) {
-    const same = db.prepare("SELECT * FROM cards WHERE bank = ? AND archived = 0").all(bank);
-    if (same.length === 1) return same[0] as unknown as Card;
+    const same = db.prepare("SELECT * FROM cards WHERE bank = ? AND archived = 0").all(bank) as unknown as Card[];
+    if (same.length === 1) return same[0];
+    const mains = same.filter((c) => !c.parent_id);
+    if (mains.length === 1) return mains[0];
   }
   return null;
 }

@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { bearer, ingestTokenOk } from "@/lib/auth.ts";
 import { parseAmount, toKop } from "@/lib/money.ts";
 import { parseBankMessage } from "@/lib/sms.ts";
-import { findCard, insertTx } from "@/lib/repo.ts";
+import { findCard, insertTx, monobankConnected } from "@/lib/repo.ts";
+import { detectBank } from "@/lib/banks.ts";
 import { revalidatePath } from "next/cache";
 import { notifyNewTx } from "@/lib/telegram.ts";
 
@@ -56,6 +57,10 @@ export async function POST(req: Request) {
     if (!amount) return NextResponse.json({ error: "Не удалось разобрать сумму" }, { status: 422 });
   }
 
+  // Оплаты Monobank приходят от самого банка — из «Команд» их не записываем, иначе будет дубль.
+  if (source === "applepay" && detectBank(cardHint) === "Monobank" && monobankConnected()) {
+    return NextResponse.json({ ignored: true, reason: "Monobank присылает эту операцию сам" });
+  }
   const card = findCard({ last4, hint: cardHint });
   const now = new Date();
   // Защита от дублей — только если «Команда» прислала свой id. Без него два одинаковых

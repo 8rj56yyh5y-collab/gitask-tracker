@@ -8,7 +8,7 @@ import type { Card } from "@/lib/repo.ts";
 const LEVEL_DOT = { green: "var(--green)", yellow: "var(--yellow)", orange: "var(--orange)", red: "var(--red)" } as const;
 
 /** Карта в виде плитки, как в Wallet: банк, номер, лимит и остаток. */
-export function CardTile({ card, used, href }: { card: Card; used: number; href?: string }) {
+export function CardTile({ card, used, href, extra = 0 }: { card: Card; used: number; href?: string; extra?: number }) {
   const st = cardStyle(card);
   const s = card.monthly_limit > 0 ? limitState(used, card.monthly_limit) : null;
   const body = (
@@ -21,6 +21,7 @@ export function CardTile({ card, used, href }: { card: Card; used: number; href?
         </div>
       </div>
       <div className="num">•••• {card.last4}</div>
+      {extra > 0 && <div className="more-cards">+ ещё {extra} {extra === 1 ? "карта" : extra < 5 ? "карты" : "карт"} банка · один лимит на все</div>}
       {s ? (
         <div>
           <div className="limit-track">

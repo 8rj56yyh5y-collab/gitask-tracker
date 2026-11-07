@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { formatMoney } from "@/lib/money.ts";
 import { limitState } from "@/lib/limits.ts";
-import { budgetAlerts, cardUsage, listCards, monthSpendByCenter, unassignedSummary } from "@/lib/repo.ts";
+import { budgetAlerts, groupUsage, listMainCards, monthSpendByCenter, unassignedSummary } from "@/lib/repo.ts";
 import { BudgetLine } from "./components/BudgetLine.tsx";
 
 export default function Home() {
@@ -9,8 +9,8 @@ export default function Home() {
   const spend = monthSpendByCenter();
   const alerts = budgetAlerts();
   const total = spend.reduce((a, s) => a + s.spent, 0);
-  const cards = listCards();
-  const usage = cardUsage();
+  const cards = listMainCards();
+  const usage = groupUsage();
   const limited = cards.filter((c) => c.monthly_limit > 0);
   const totalLimit = limited.reduce((a, c) => a + c.monthly_limit, 0);
   const totalUsed = limited.reduce((a, c) => a + (usage.get(c.id) ?? 0), 0);

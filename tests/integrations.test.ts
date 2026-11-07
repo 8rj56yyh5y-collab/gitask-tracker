@@ -163,3 +163,12 @@ test("monobank: backfill is limited to the allowed depth", async () => {
   const days = (Date.now() - new Date(r.from).getTime()) / 864e5;
   assert.ok(days <= 92.01 && days > 91, `clamped to 92 days, got ${days}`);
 });
+
+test("monobank: new accounts join the existing main Monobank card; connected flag is set", async () => {
+  const main = repo.listMainCards().find((c) => c.bank === "Monobank")!;
+  assert.ok(main, "a main Monobank card exists from earlier tests");
+  assert.equal(repo.monobankConnected(), true);
+  for (const c of repo.listCards().filter((c) => c.bank === "Monobank" && c.id !== main.id)) {
+    assert.ok(c.parent_id === main.id || c.parent_id === null);
+  }
+});

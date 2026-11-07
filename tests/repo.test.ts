@@ -125,3 +125,24 @@ test("default card limit applies to new cards and can be applied to cards withou
   assert.deepEqual([c.monthly_limit, c.color, c.badge], [3_000_000, "#000000", "PB"]);
   repo.setDefaultCardLimit(0);
 });
+
+test("cards of one bank merge under a main card with one shared limit", () => {
+  for (const l4 of ["0055", "1101", "2202"]) repo.createCard({ bank: "Monobank", last4: l4, owner: "", kind: "personal", monthly_limit: 3_000_000, mono_account_id: null });
+  const main = repo.findCard({ last4: "0055" })!, a = repo.findCard({ last4: "1101" })!, b = repo.findCard({ last4: "2202" })!;
+  assert.equal(repo.mergeBankCards(main.id) >= 2, true);
+  assert.deepEqual(repo.childCards(main.id).map((c) => c.last4).sort(), ["1101", "2202"]);
+  assert.ok(repo.listMainCards().some((c) => c.id === main.id));
+  assert.ok(!repo.listMainCards().some((c) => c.id === a.id || c.id === b.id));
+  repo.insertTx({ amountKop: -100_000, source: "monobank", cardId: a.id });
+  repo.insertTx({ amountKop: -50_000, source: "monobank", cardId: b.id });
+  repo.insertTx({ amountKop: -25_000, source: "monobank", cardId: main.id });
+  assert.equal(repo.groupUsage().get(main.id), 175_000, "main card limit counts all its cards");
+  assert.equal(repo.cardTransactions(main.id).length, 3);
+  // Apple Pay «Monobank Black»: банк один, основная карта одна — берём основную
+  assert.equal(repo.findCard({ hint: "Monobank Black" })!.id, main.id);
+  // отделить карту
+  repo.setCardParent(b.id, null);
+  assert.ok(repo.listMainCards().some((c) => c.id === b.id));
+  assert.equal(repo.groupUsage().get(main.id), 125_000);
+  assert.throws(() => repo.setCardParent(main.id, main.id), /сама в себя/);
+});
