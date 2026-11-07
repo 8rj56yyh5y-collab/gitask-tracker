@@ -130,6 +130,7 @@ export async function addCenter(f: FormData) {
   if (!name) throw new Error("Укажите название");
   const color = str(f, "color") || "#6b7280";
   const id = createCenter(name, num(f, "parentId"), color, toKop(parseAmount(str(f, "budget")) ?? 0), f.get("internal") === "on");
+  if (f.get("personal") === "on") getDb().prepare("UPDATE cost_centers SET is_personal = 1 WHERE id = ?").run(id);
   // Своя касса (наличные) у направления — сразу.
   if (f.get("withCash") === "on") createCashbox({ name, centerId: id, color, opening: kop(f, "opening") });
   refresh();
@@ -222,7 +223,7 @@ export async function updateCenterAction(f: FormData) {
   const id = num(f, "id");
   const name = str(f, "name");
   if (!id || !name) throw new Error("Напишите название направления");
-  updateCenter(id, { name, color: str(f, "color") || "#6b7280", parentId: num(f, "parentId"), internal: f.get("internal") === "on" });
+  updateCenter(id, { name, color: str(f, "color") || "#6b7280", parentId: num(f, "parentId"), internal: f.get("internal") === "on", personal: f.get("personal") === "on" });
   refresh();
 }
 

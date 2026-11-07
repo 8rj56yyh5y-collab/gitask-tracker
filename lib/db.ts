@@ -186,11 +186,19 @@ export function getDb(): DatabaseSync {
   if (!txCols.includes("transit_id")) db.exec("ALTER TABLE transactions ADD COLUMN transit_id INTEGER");
   // Вид дохода: salary — ставка, other — прочий доход.
   if (!txCols.includes("income_kind")) db.exec("ALTER TABLE transactions ADD COLUMN income_kind TEXT");
+  const centerCols = (db.prepare("PRAGMA table_info(cost_centers)").all() as { name: string }[]).map((c) => c.name);
+  // Личное направление: только его доходы и расходы входят в «Мои деньги за месяц».
+  if (!centerCols.includes("is_personal")) db.exec("ALTER TABLE cost_centers ADD COLUMN is_personal INTEGER NOT NULL DEFAULT 0");
   linkCashboxesByName(db);
   const count = db.prepare("SELECT COUNT(*) AS n FROM cost_centers").get() as { n: number };
   if (count.n === 0) {
     const ins = db.prepare("INSERT INTO cost_centers (name, color, is_internal) VALUES (?, ?, ?)");
     for (const [name, color, internal] of DEFAULT_CENTERS) ins.run(name, color, internal);
+  }
+  // Один раз: «Личные…» — это мои деньги (входит в «Мои деньги за месяц»). Дальше — как отметит человек.
+  if (!db.prepare("SELECT 1 FROM settings WHERE key = 'personal_marked'").get()) {
+    db.exec("UPDATE cost_centers SET is_personal = 1 WHERE name LIKE 'Личн%' OR name LIKE 'личн%' OR name LIKE 'Особист%'");
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('personal_marked', '1')").run();
   }
   return db;
 }
