@@ -68,8 +68,8 @@ export default async function CashboxPage({ params }: { params: Promise<{ id: st
           <input name="note" placeholder="необязательно" />
         </label>
         <label>
-          Категория расхода
-          <CenterSelect defaultValue={b.center_id} none="— разнести позже —" />
+          Направление расхода
+          <CenterSelect defaultValue={b.center_id} none="— выберу позже —" />
         </label>
         {plans.length > 0 && (
           <label>
@@ -111,7 +111,7 @@ export default async function CashboxPage({ params }: { params: Promise<{ id: st
       </form>
 
       <section className="card">
-        <h2>Движения</h2>
+        <h2>Операции кассы</h2>
         {moves.length === 0 && <p className="muted small">Пока ничего не было.</p>}
         {moves.map((t) => (
           <Link key={t.id} href={`/inbox/${t.id}`} className="plain">
@@ -133,7 +133,7 @@ export default async function CashboxPage({ params }: { params: Promise<{ id: st
           <input name="owner" defaultValue={b.owner} />
         </label>
         <label>
-          Для какой категории касса
+          Направление кассы
           <CenterSelect defaultValue={b.center_id} none="— для разных —" />
         </label>
         <div className="grid-2-tight">

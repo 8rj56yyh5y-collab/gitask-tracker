@@ -59,13 +59,13 @@ export default async function Plans({ searchParams }: { searchParams: Promise<{ 
   const today = ymd(new Date());
   const week = ymd(new Date(Date.now() + 7 * DAY));
   const outOpen = listPlans("open", 200, "out");
-  const inOpen = listPlans("open", 200, "in");
+  const inOpen = listPlans("open", 200, "in").filter((p) => p.kind !== "salary");
   const debt = companyDebt();
   const sum = (l: Plan[]) => l.reduce((a, p) => a + p.total - p.paid, 0);
   const counts: Record<string, string> = { out: formatMoney(sum(outOpen)), in: formatMoney(sum(inOpen)), company: formatMoney(Math.max(0, debt)) };
 
   const open = tab === "in" ? inOpen : outOpen;
-  const done = tab === "company" ? [] : listPlans("done", 15, tab);
+  const done = tab === "company" ? [] : listPlans("done", 15, tab).filter((p) => p.kind !== "salary");
   const groups: [string, Plan[]][] = [
     ["Просрочено", open.filter((p) => p.due_date && p.due_date < today)],
     ["Сегодня", open.filter((p) => p.due_date === today)],
@@ -159,7 +159,7 @@ export default async function Plans({ searchParams }: { searchParams: Promise<{ 
             </label>
             {!isIn && (
               <label>
-                Категория расхода
+                Направление
                 <CenterSelect />
               </label>
             )}

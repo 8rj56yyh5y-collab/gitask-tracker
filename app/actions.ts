@@ -14,6 +14,9 @@ import { afterTxDeleted, cancelPlan, createPlan, payPlan, restorePlan, undoPlanP
 import { archiveGroup, archiveProduct, createSale, deleteSale, payCompany, saveGroup, saveProduct, setSalesBase } from "@/lib/sales.ts";
 import { acceptNorms, extendNorm, restartNorm } from "@/lib/norms.ts";
 import { setSetting } from "@/lib/settings.ts";
+import { addOtherIncome, createSalary, creditDueSalaries } from "@/lib/income.ts";
+import { createTransit, deleteTransit, finishTransit, linkTxToTransit } from "@/lib/transit.ts";
+import { getDb } from "@/lib/db.ts";
 import { redirect } from "next/navigation";
 import { toKop, parseAmount } from "@/lib/money.ts";
 import {
@@ -78,7 +81,7 @@ export async function addTransaction(f: FormData) {
 export async function assignTransaction(f: FormData) {
   const id = num(f, "id");
   const centerId = num(f, "centerId");
-  if (!id || !centerId) throw new Error("Выберите категорию");
+  if (!id || !centerId) throw new Error("Выберите направление");
   assignTx(id, centerId, str(f, "forWhom"), str(f, "description"));
   refresh();
   back(f);
@@ -125,7 +128,10 @@ export async function removeCard(f: FormData) {
 export async function addCenter(f: FormData) {
   const name = str(f, "name");
   if (!name) throw new Error("Укажите название");
-  createCenter(name, num(f, "parentId"), str(f, "color") || "#6b7280", toKop(parseAmount(str(f, "budget")) ?? 0), f.get("internal") === "on");
+  const color = str(f, "color") || "#6b7280";
+  const id = createCenter(name, num(f, "parentId"), color, toKop(parseAmount(str(f, "budget")) ?? 0), f.get("internal") === "on");
+  // Своя касса (наличные) у направления — сразу.
+  if (f.get("withCash") === "on") createCashbox({ name, centerId: id, color, opening: kop(f, "opening") });
   refresh();
   back(f);
 }
@@ -215,7 +221,7 @@ export async function connectMonobankAction(f: FormData) {
 export async function updateCenterAction(f: FormData) {
   const id = num(f, "id");
   const name = str(f, "name");
-  if (!id || !name) throw new Error("Нужно название категории");
+  if (!id || !name) throw new Error("Напишите название направления");
   updateCenter(id, { name, color: str(f, "color") || "#6b7280", parentId: num(f, "parentId"), internal: f.get("internal") === "on" });
   refresh();
 }
@@ -340,6 +346,7 @@ function planFields(f: FormData) {
     cardId: acc.cardId, cashboxId: acc.cashboxId, centerId: num(f, "centerId"), note: str(f, "note"),
     repeat: (str(f, "repeat") === "month" ? "month" : "none") as "month" | "none",
     direction: (str(f, "direction") === "in" ? "in" : "out") as "in" | "out",
+    auto: f.has("autoShown") ? str(f, "auto") === "1" : undefined,
   };
 }
 
@@ -469,4 +476,89 @@ export async function toggleSetupAction(f: FormData) {
   setSetting("setup_hidden", str(f, "hide") === "1" ? "1" : null);
   refresh();
   back(f);
+}
+
+// ---------- Доходы ----------
+export async function createSalaryAction(f: FormData) {
+  const acc = accountOf(f);
+  createSalary({
+    title: str(f, "title") || "Ставка",
+    payer: str(f, "payer"),
+    amountKop: kop(f, "amount"),
+    day: num(f, "day") ?? 1,
+    cardId: acc.cardId,
+    cashboxId: acc.cashboxId,
+    centerId: num(f, "centerId"),
+    auto: str(f, "auto") === "1",
+  });
+  // Если день выплаты сегодня — зачисляем сразу, не дожидаясь фоновой проверки.
+  creditDueSalaries();
+  refresh();
+  redirect("/income?ok=salary");
+}
+
+export async function addIncomeAction(f: FormData) {
+  const acc = accountOf(f);
+  const kind = str(f, "kind");
+  const title = kind === "Другое" || !kind ? str(f, "title") || "Доход" : kind;
+  addOtherIncome({
+    amountKop: kop(f, "amount"), title, cardId: acc.cardId, cashboxId: acc.cashboxId,
+    centerId: num(f, "centerId"), note: str(f, "note"), at: isoDate(f, "at"),
+  });
+  refresh();
+  redirect("/income?ok=income");
+}
+
+/** Поступление из банка — это доход: ставка или прочий. */
+export async function markIncomeAction(f: FormData) {
+  const id = num(f, "id");
+  const kind = str(f, "kind") === "salary" ? "salary" : "other";
+  if (id) {
+    getDb()
+      .prepare("UPDATE transactions SET income_kind = ?, kind = 'income', assigned_at = COALESCE(assigned_at, ?) WHERE id = ? AND amount > 0")
+      .run(kind, new Date().toISOString(), id);
+  }
+  refresh();
+  redirect(str(f, "next") || "/inbox");
+}
+
+// ---------- Транзит ----------
+export async function createTransitAction(f: FormData) {
+  const id = createTransit({ title: str(f, "title"), amountKop: kop(f, "amount"), note: str(f, "note") });
+  const txId = num(f, "txId");
+  if (txId) linkTxToTransit(txId, id);
+  refresh();
+  redirect(txId ? "/inbox" : "/transit");
+}
+
+export async function finishTransitAction(f: FormData) {
+  const id = num(f, "id");
+  if (id) finishTransit(id, str(f, "undo") !== "1");
+  refresh();
+  back(f);
+}
+
+export async function deleteTransitAction(f: FormData) {
+  const id = num(f, "id");
+  if (id) deleteTransit(id);
+  refresh();
+  back(f);
+}
+
+export async function linkTransitAction(f: FormData) {
+  const tx = num(f, "txId");
+  const tr = num(f, "transitId");
+  if (tx && tr) linkTxToTransit(tx, tr);
+  refresh();
+  redirect(str(f, "next") || "/inbox");
+}
+
+// ---------- Касса направления ----------
+export async function createCenterCashboxAction(f: FormData) {
+  const centerId = num(f, "centerId");
+  const name = str(f, "name");
+  if (!centerId || !name) return;
+  const id = createCashbox({ name, centerId, opening: kop(f, "opening") });
+  refresh();
+  redirect(`/cash/${id}`);
 }

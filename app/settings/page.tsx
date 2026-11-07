@@ -53,12 +53,12 @@ export default async function Settings({
       </section>
 
       <section className="card form" id="telegram">
-        <h2>Уведомления в Telegram — чтобы не забыть записать</h2>
+        <h2>Уведомления в Telegram</h2>
         {sp.tg_error && <p className="danger small">{sp.tg_error}</p>}
         {!tg.connected ? (
           <>
             <p className="small">
-              После каждой операции бот пришлёт сообщение с кнопками категорий — нажали, и операция записана.
+              После каждой операции бот пришлёт сообщение с кнопками направлений — нажали, и операция записана.
             </p>
             <ol className="small steps">
               <li>
@@ -101,7 +101,7 @@ export default async function Settings({
       </section>
 
       <section className="card form" id="monobank">
-        <h2>Monobank — автоматически</h2>
+        <h2>Monobank</h2>
         {sp.mono_ok && <p className="ok-text small">{sp.mono_ok}</p>}
         {sp.mono_error && <p className="danger small">{sp.mono_error}</p>}
         <p className="small">
@@ -128,7 +128,7 @@ export default async function Settings({
       </section>
 
       <section className="card form" id="shortcuts">
-        <h2>Оплаты Apple Pay — с любой карты</h2>
+        <h2>Оплаты Apple Pay с любой карты</h2>
         {(() => {
           const sig = lastShortcutSignal();
           const works = shortcutWorks();
@@ -153,7 +153,7 @@ export default async function Settings({
         })()}
         <p className="small" style={{ margin: 0 }}>
           После оплаты телефоном iPhone сам отправит в D&amp;N сумму, магазин и карту. Карту D&amp;N узнает по названию банка.
-          {tg.linked ? " Сразу придёт сообщение в Telegram с выбором категории." : " Подключите Telegram выше — тогда сразу придёт сообщение с выбором категории."}
+          {tg.linked ? " Сразу придёт сообщение в Telegram с выбором направления." : " Подключите Telegram выше — тогда сразу придёт сообщение с выбором направления."}
         </p>
         <div className="f-label small muted">Ваша ссылка для «Команд» (в ней уже есть ваш секретный ключ)</div>
         {ingestKey ? (

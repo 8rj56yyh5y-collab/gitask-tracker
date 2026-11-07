@@ -36,7 +36,7 @@ export function TxRow({ tx, children }: { tx: Tx; children?: React.ReactNode }) 
         )}
         {tx.kind === "internal" && <span className="chip">{tx.sale_id ? "деньги компании" : "перевод"}</span>}
         {tx.plan_id && <span className="chip">по платежу</span>}
-        {tx.cost_center_id === null && tx.kind !== "internal" && <span className="chip chip-pending">не разнесено</span>}
+        {tx.cost_center_id === null && tx.kind !== "internal" && <span className="chip chip-pending">без направления</span>}
       </div>
       <div className={`tx-amount ${tx.amount < 0 ? "neg" : "pos"}`}>{formatMoney(tx.amount, tx.currency)}</div>
       {children}

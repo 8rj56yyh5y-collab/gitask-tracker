@@ -28,11 +28,15 @@ export default async function PlanPage({ params, searchParams }: { params: Promi
   return (
     <div className="narrow-wide">
       <div className="muted small">
-        <Link href={`/plans?tab=${p.direction}`}>Платежи · {isIn ? "Мне должны" : "Я плачу"}</Link>
+        {p.kind === "salary" ? (
+          <Link href="/income">Доходы · Ставка</Link>
+        ) : (
+          <Link href={`/plans?tab=${p.direction}`}>Платежи · {isIn ? "Мне должны" : "Я плачу"}</Link>
+        )}
       </div>
       <h1>{p.title}</h1>
       <section className="card">
-        <div className="muted small">{p.direction === "in" ? "мне должны" : "я плачу"}{p.payee && ` · ${p.payee}`}{p.due_date && ` · до ${new Date(`${p.due_date}T12:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}`}{p.repeat === "month" && " · каждый месяц"}</div>
+        <div className="muted small">{p.kind === "salary" ? "ставка, каждый месяц" : p.direction === "in" ? "мне должны" : "я плачу"}{p.payee && ` · ${p.payee}`}{p.due_date && ` · до ${new Date(`${p.due_date}T12:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}`}{p.repeat === "month" && " · каждый месяц"}</div>
         <div className="big" style={{ marginTop: 6 }}>{p.status === "open" ? `Осталось ${formatMoney(left)}` : p.status === "done" ? (isIn ? "Получено ✓" : "Оплачено ✓") : "Отменён"}</div>
         <div className="limit-track">
           <div className="limit-fill" style={{ width: `${Math.min(100, (p.paid / p.total) * 100)}%`, background: "var(--green)" }} />
@@ -64,7 +68,7 @@ export default async function PlanPage({ params, searchParams }: { params: Promi
           </label>
           <label>
             {isIn ? "Куда пришли" : "С какой карты или кассы"}
-            <AccountSelect defaultValue={acc} none="наличные / не указано" />
+            <AccountSelect defaultValue={acc} none="не указано" />
           </label>
           <label>
             Дата
@@ -126,13 +130,23 @@ export default async function PlanPage({ params, searchParams }: { params: Promi
         </label>
         {!isIn && (
           <label>
-            Категория расхода
+            Направление
             <CenterSelect defaultValue={p.cost_center_id} />
           </label>
         )}
-        <label className="check">
-          <input type="checkbox" name="repeat" value="month" defaultChecked={p.repeat === "month"} /> Повторять каждый месяц
-        </label>
+        {p.kind === "salary" ? (
+          <>
+            <input type="hidden" name="repeat" value="month" />
+            <input type="hidden" name="autoShown" value="1" />
+            <label className="check">
+              <input type="checkbox" name="auto" value="1" defaultChecked={Boolean(p.auto)} /> Зачислять автоматически в этот день
+            </label>
+          </>
+        ) : (
+          <label className="check">
+            <input type="checkbox" name="repeat" value="month" defaultChecked={p.repeat === "month"} /> Повторять каждый месяц
+          </label>
+        )}
         <label>
           Комментарий
           <input name="note" defaultValue={p.note} />
@@ -142,7 +156,7 @@ export default async function PlanPage({ params, searchParams }: { params: Promi
       {p.status === "open" && (
         <form action={cancelPlanAction}>
           <input type="hidden" name="id" value={p.id} />
-          <button className="btn btn-ghost btn-sm danger">{isIn ? "Больше не жду" : "Отменить платёж"}</button>
+          <button className="btn btn-ghost btn-sm danger">{p.kind === "salary" ? "Удалить ставку" : isIn ? "Больше не жду" : "Отменить платёж"}</button>
         </form>
       )}
     </div>

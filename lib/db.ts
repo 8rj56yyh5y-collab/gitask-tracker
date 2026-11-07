@@ -45,6 +45,15 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 
 -- Кассы (наличные): остаток = начальный остаток + все движения кассы.
+CREATE TABLE IF NOT EXISTS transits (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  amount INTEGER NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  done_at TEXT
+);
+
 CREATE TABLE IF NOT EXISTS cashboxes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -167,13 +176,40 @@ export function getDb(): DatabaseSync {
   if (!planCols.includes("direction")) db.exec("ALTER TABLE plans ADD COLUMN direction TEXT NOT NULL DEFAULT 'out'");
   // Ежемесячный платёж, созданный автоматически после оплаты предыдущего (чтобы отмена оплаты убрала его).
   if (!planCols.includes("prev_id")) db.exec("ALTER TABLE plans ADD COLUMN prev_id INTEGER");
+  // salary — регулярный доход («ставка»); auto — зачислять в день сам, не дожидаясь банка.
+  if (!planCols.includes("kind")) db.exec("ALTER TABLE plans ADD COLUMN kind TEXT NOT NULL DEFAULT ''");
+  if (!planCols.includes("auto")) db.exec("ALTER TABLE plans ADD COLUMN auto INTEGER NOT NULL DEFAULT 0");
   const txCols = (db.prepare("PRAGMA table_info(transactions)").all() as { name: string }[]).map((c) => c.name);
   // Движение кассы, оплата по плану, продажа товара.
   for (const col of ["cashbox_id", "plan_id", "sale_id"]) if (!txCols.includes(col)) db.exec(`ALTER TABLE transactions ADD COLUMN ${col} INTEGER`);
+  // Транзит: чужие деньги, которые прошли через меня (не доход и не расход).
+  if (!txCols.includes("transit_id")) db.exec("ALTER TABLE transactions ADD COLUMN transit_id INTEGER");
+  // Вид дохода: salary — ставка, other — прочий доход.
+  if (!txCols.includes("income_kind")) db.exec("ALTER TABLE transactions ADD COLUMN income_kind TEXT");
+  linkCashboxesByName(db);
   const count = db.prepare("SELECT COUNT(*) AS n FROM cost_centers").get() as { n: number };
   if (count.n === 0) {
     const ins = db.prepare("INSERT INTO cost_centers (name, color, is_internal) VALUES (?, ?, ?)");
     for (const [name, color, internal] of DEFAULT_CENTERS) ins.run(name, color, internal);
   }
   return db;
+}
+
+/**
+ * Касса и направление с одинаковым смыслом («Личная касса» и «Личные») — это одно и то же:
+ * привязываем кассу к направлению, чтобы не было двух отдельных сущностей. Один раз.
+ */
+function linkCashboxesByName(db: DatabaseSync) {
+  const done = db.prepare("SELECT value FROM settings WHERE key = 'boxes_linked'").get();
+  if (done) return;
+  const norm = (s: string) => s.toLowerCase().replace(/касс[аы]?/g, "").replace(/[^a-zа-яёіїєґ0-9]/gi, "").slice(0, 4);
+  const centers = db.prepare("SELECT id, name FROM cost_centers WHERE is_internal = 0 AND archived = 0").all() as { id: number; name: string }[];
+  const boxes = db.prepare("SELECT id, name FROM cashboxes WHERE center_id IS NULL AND archived = 0").all() as { id: number; name: string }[];
+  for (const b of boxes) {
+    const key = norm(b.name);
+    if (key.length < 3) continue;
+    const matches = centers.filter((c) => norm(c.name) === key);
+    if (matches.length === 1) db.prepare("UPDATE cashboxes SET center_id = ? WHERE id = ?").run(matches[0].id, b.id);
+  }
+  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('boxes_linked', '1')").run();
 }

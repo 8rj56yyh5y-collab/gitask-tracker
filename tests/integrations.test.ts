@@ -194,7 +194,7 @@ test("telegram: plan reminder once a day after 9:00, «✓ Оплачено» pa
   const ten = new Date(); ten.setHours(10, 0, 0, 0);
   assert.ok((await tg.sendPlanReminders(ten)) >= 1);
   const msg = calls.find((c) => c.path.endsWith("/sendMessage") && c.body.text.includes("Аренда пункта"))!;
-  assert.match(msg.body.text, /Просрочен/);
+  assert.match(msg.body.text, /просрочен/);
   assert.match(msg.body.text, /10[\s ]000/, "shows what is left");
   assert.equal(await tg.sendPlanReminders(ten), 0, "only once a day");
   await tg.handleUpdate({ callback_query: { id: "qp", data: `p:${id}`, message: { chat: { id: 42 }, message_id: 9 } } });
@@ -208,5 +208,5 @@ test("telegram: plan reminder once a day after 9:00, «✓ Оплачено» pa
   await tg.handleUpdate({ callback_query: { id: "qu", data: `u:${paidTx.id}`, message: { chat: { id: 42 }, message_id: 9 } } });
   assert.equal(plans.getPlan(id)!.status, "open");
   assert.equal(plans.getPlan(id)!.paid, 500_000);
-  assert.match(calls.find((c) => c.path.endsWith("/editMessageText"))!.body.text, /отменена/);
+  assert.match(calls.find((c) => c.path.endsWith("/editMessageText"))!.body.text, /Отменено/);
 });

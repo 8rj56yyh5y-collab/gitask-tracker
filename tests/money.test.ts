@@ -192,3 +192,75 @@ test("сигналы «Команд»: шаг Apple Pay отмечается и 
   assert.equal(setup.shortcutWorks(), true);
   assert.equal(setup.setupSteps().find((s) => s.id === "applepay")!.done, true);
 });
+
+test("ставка: ближайшая дата, автозачисление в кассу, следующий месяц, итог месяца", async () => {
+  const income = await import("../lib/income.ts");
+  assert.equal(income.nextPayday(1, new Date(2026, 10, 7, 12)), "2026-12-01");
+  assert.equal(income.nextPayday(7, new Date(2026, 10, 7, 12)), "2026-11-07");
+  assert.equal(income.nextPayday(31, new Date(2027, 1, 3, 12)), "2027-02-28");
+  const box = cash.createCashbox({ name: "Личная касса", opening: 0 });
+  const today = new Date();
+  const id = income.createSalary({ title: "Ставка", payer: "Работодатель", amountKop: 2_000_000, day: today.getDate(), cashboxId: box, auto: true }, today);
+  assert.ok(income.listSalaries().some((p) => p.id === id));
+  assert.ok(!plans.listPlans("open", 200, "in").filter((p) => p.kind !== "salary").some((p) => p.id === id), "ставка не в «Мне должны»");
+  const before = income.monthMoney();
+  assert.equal(income.creditDueSalaries(today), 1);
+  assert.equal(income.creditDueSalaries(today), 0, "второй раз не зачисляем");
+  assert.equal(plans.getPlan(id)!.status, "done");
+  assert.equal(cash.cashBalances().get(box), 2_000_000);
+  const next = income.listSalaries().find((p) => p.title === "Ставка")!;
+  assert.ok(next.due_date! > plans.ymd(today), "создана следующая ставка");
+  assert.equal(next.auto, 1);
+  const after = income.monthMoney();
+  assert.equal(after.salary - before.salary, 2_000_000);
+  assert.equal(after.net - before.net, 2_000_000);
+  // прочий доход не висит «без направления»
+  const unBefore = repo.unassignedSummary().count;
+  income.addOtherIncome({ amountKop: 300_000, title: "Мотивация" });
+  assert.equal(repo.unassignedSummary().count, unBefore);
+  assert.equal(income.monthMoney().other - after.other, 300_000);
+});
+
+test("ставка на Monobank не зачисляется сама — ждём банк, без дубля", async () => {
+  const income = await import("../lib/income.ts");
+  repo.createCard({ bank: "Monobank", last4: "5555", owner: "", kind: "personal", monthly_limit: 0, mono_account_id: "acc-test" });
+  const card = repo.findCard({ last4: "5555" })!.id;
+  const id = income.createSalary({ title: "Зарплата моно", amountKop: 1_500_000, day: new Date().getDate(), cardId: card, auto: true });
+  assert.equal(income.canAutoCredit(plans.getPlan(id)!), false);
+  income.creditDueSalaries();
+  assert.equal(plans.getPlan(id)!.status, "open");
+  const t = repo.insertTx({ amountKop: 1_500_000, cardId: card, source: "monobank" }).id;
+  assert.equal(plans.matchPlanForTx(t), id);
+  assert.equal(repo.getTx(t)!.income_kind, "salary");
+});
+
+test("транзит: чужие деньги заморожены и не считаются доходом/расходом", async () => {
+  const transit = await import("../lib/transit.ts");
+  const income = await import("../lib/income.ts");
+  const before = income.monthMoney();
+  const tr = transit.createTransit({ title: "Наличные для компании", amountKop: 20_000_000 });
+  assert.equal(transit.transitOpenSum(), 20_000_000);
+  const inTx = repo.insertTx({ amountKop: 20_000_000, source: "monobank" }).id;
+  const outTx = repo.insertTx({ amountKop: -20_000_000, source: "monobank" }).id;
+  transit.linkTxToTransit(inTx, tr);
+  transit.linkTxToTransit(outTx, tr);
+  const after = income.monthMoney();
+  assert.equal(after.income, before.income);
+  assert.equal(after.expense, before.expense);
+  assert.ok(!repo.listUnassigned().some((t) => t.id === inTx || t.id === outTx));
+  transit.finishTransit(tr);
+  assert.equal(transit.transitOpenSum(), 0);
+  transit.finishTransit(tr, false);
+  assert.equal(transit.transitOpenSum(), 20_000_000);
+  transit.deleteTransit(tr);
+  assert.equal(transit.transitOpenSum(), 0);
+});
+
+test("платёж из кассы направления без своего направления списывается в направление кассы", () => {
+  const personal = center("Личные");
+  const box = cash.createCashbox({ name: "Личная", centerId: personal, opening: 7_000_000 });
+  const id = plans.createPlan({ title: "Ремонт", total: 2_000_000, cashboxId: box });
+  const tx = plans.payPlan(id, 2_000_000, { cashboxId: box });
+  assert.equal(repo.getTx(tx)!.cost_center_id, personal);
+  assert.equal(cash.cashBalances().get(box), 5_000_000);
+});

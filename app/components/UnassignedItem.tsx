@@ -26,7 +26,7 @@ export function UnassignedItem({ tx, centers, next }: { tx: Tx; centers: Map<num
           </form>
         ))}
         <Link href={`/inbox/${tx.id}`} className="btn btn-sm btn-ghost">
-          {sugg.length ? "Другое…" : "Выбрать категорию…"}
+          {sugg.length ? "Другое…" : "Выбрать направление…"}
         </Link>
       </div>
     </div>

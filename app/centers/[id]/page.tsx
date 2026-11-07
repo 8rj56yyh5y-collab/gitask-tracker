@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { addCenter, updateCenterAction, updateCenterBudget } from "../../actions.ts";
+import { addCenter, createCenterCashboxAction, updateCenterAction, updateCenterBudget } from "../../actions.ts";
 import { BudgetLine } from "../../components/BudgetLine.tsx";
 import { TxRow } from "../../components/TxRow.tsx";
 import { centerStats, centerTransactions, centerTree, childStats, getCenter } from "@/lib/repo.ts";
@@ -26,7 +26,7 @@ export default async function CenterPage({ params }: { params: Promise<{ id: str
     <div className="grid grid-2">
       <div className="span-all">
         <div className="muted small">
-          <Link href="/centers">Категории</Link>
+          <Link href="/centers">Направления</Link>
           {parent && (
             <>
               {" › "}
@@ -61,29 +61,43 @@ export default async function CenterPage({ params }: { params: Promise<{ id: str
         </form>
       </section>
 
-      {(() => {
-        const boxes = listCashboxes().filter((b) => b.center_id === id);
-        if (!boxes.length) return null;
-        const bal = cashBalances();
-        return (
-          <section className="card">
-            <h2>Кассы этой категории</h2>
-            {boxes.map((b) => (
-              <Link key={b.id} href={`/cash/${b.id}`} className="row-between tree-row plain">
-                <span>
-                  <span className="dot" style={{ background: b.color }} />
-                  {b.name}
-                </span>
-                <strong>{formatMoney(bal.get(b.id) ?? 0)} ›</strong>
-              </Link>
-            ))}
-          </section>
-        );
-      })()}
+      {!center.is_internal &&
+        (() => {
+          const boxes = listCashboxes().filter((b) => b.center_id === id);
+          const bal = cashBalances();
+          return (
+            <section className="card">
+              <h2>Касса направления</h2>
+              {boxes.map((b) => (
+                <Link key={b.id} href={`/cash/${b.id}`} className="row-between tree-row plain">
+                  <span>
+                    <span className="dot" style={{ background: b.color }} />
+                    {b.name}
+                  </span>
+                  <strong>{formatMoney(bal.get(b.id) ?? 0)} ›</strong>
+                </Link>
+              ))}
+              {boxes.length === 0 && (
+                <form action={createCenterCashboxAction} className="form">
+                  <p className="muted small" style={{ margin: 0 }}>
+                    Если на это направление есть отдельные наличные — заведите кассу: будет виден остаток, а расходы из неё сразу попадут сюда.
+                  </p>
+                  <input type="hidden" name="centerId" value={id} />
+                  <input type="hidden" name="name" value={center.name} />
+                  <label>
+                    Сейчас наличных, ₴
+                    <input name="opening" inputMode="decimal" placeholder="0" />
+                  </label>
+                  <button className="btn btn-sm">Завести кассу</button>
+                </form>
+              )}
+            </section>
+          );
+        })()}
       <section className="card">
-        <h2>Внутри: {children.length ? "категории" : "пока ничего"}</h2>
+        <h2>Внутри: {children.length ? "вложенные направления" : "пока ничего"}</h2>
         {children.length === 0 && (
-          <p className="muted small">Добавьте категории, например «Продукты» или «Топливо», чтобы видеть прогноз по каждой.</p>
+          <p className="muted small">Можно разбить подробнее, например «Продукты» и «Топливо», — будет виден прогноз по каждому.</p>
         )}
         <ul className="bars">
           {children.map((c) => (
@@ -96,14 +110,14 @@ export default async function CenterPage({ params }: { params: Promise<{ id: str
           <input type="hidden" name="parentId" value={id} />
           <input type="hidden" name="color" value={center.color} />
           <input type="hidden" name="next" value={`/centers/${id}`} />
-          <input name="name" required placeholder="Новая категория" />
+          <input name="name" required placeholder="Новое направление" />
           <input name="budget" inputMode="decimal" placeholder="Лимит, ₴" className="input-short" />
           <button className="btn btn-sm">Добавить</button>
         </form>
       </section>
 
       <form action={updateCenterAction} className="card form">
-        <h2>Настройки категории</h2>
+        <h2>Настройки направления</h2>
         <input type="hidden" name="id" value={id} />
         <label>
           Название

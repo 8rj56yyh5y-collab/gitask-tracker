@@ -16,12 +16,12 @@ export default function History() {
   return (
     <div className="narrow-wide">
       <h1>История</h1>
-      <Hint>Все операции по датам. Нажмите на операцию, чтобы поменять категорию или удалить.</Hint>
+      <Hint>Все операции по датам. Нажмите на операцию, чтобы поменять направление или удалить.</Hint>
 
       {pending.length > 0 && (
         <section className="pending-block">
           <h2 className="danger">
-            Нужно записать · {pending.length} на {formatMoney(pendingSum)}
+            Без направления · {pending.length} на {formatMoney(pendingSum)}
           </h2>
           {pending.map((t) => (
             <UnassignedItem key={t.id} tx={t} centers={centers} next="/history" />
