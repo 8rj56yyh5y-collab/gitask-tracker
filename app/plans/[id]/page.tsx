@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cancelPlanAction, payPlanAction, restorePlanAction, undoPlanPaymentAction, updatePlanAction } from "../../actions.ts";
 import { AccountSelect } from "../../components/AccountSelect.tsx";
+import { AccountChips } from "../../components/Pickers.tsx";
 import { CenterSelect } from "../../components/CenterSelect.tsx";
 import { TxRow } from "../../components/TxRow.tsx";
 import { getDb } from "@/lib/db.ts";
@@ -58,28 +59,26 @@ export default async function PlanPage({ params, searchParams }: { params: Promi
       )}
 
       {p.status === "open" && (
-        <form action={payPlanAction} className="card form">
+        <form action={payPlanAction} className="card form form-big">
           <h2>{isIn ? "Деньги пришли" : "Оплатить"}</h2>
           <input type="hidden" name="id" value={p.id} />
           <input type="hidden" name="next" value={`/plans/${p.id}`} />
-          <label>
-            Сумма, ₴ — всё или часть
-            <input name="amount" inputMode="decimal" defaultValue={left / 100} required />
+          <label className="amount-field">
+            <input name="amount" inputMode="decimal" defaultValue={left / 100} required className="amount-input" aria-label="Сумма, ₴ — всё или часть" />
+            <span className="amount-cur" aria-hidden>₴</span>
           </label>
-          <label>
-            {isIn ? "Куда пришли" : "С какой карты или кассы"}
-            <AccountSelect defaultValue={acc} none="не указано" />
-          </label>
-          <label>
-            Дата
-            <input name="at" type="date" />
-          </label>
-          <button className="btn btn-primary">{isIn ? "Записать поступление" : "Записать оплату"}</button>
-          <p className="muted small" style={{ margin: 0 }}>
-            {isIn
-              ? `Если деньги придут на Monobank — можно ничего не нажимать: поступление на ${formatMoney(left)} около даты D&N отметит само.`
-              : `Если платите с Monobank или Apple Pay — можно ничего не нажимать: когда придёт операция на ${formatMoney(left)} около даты платежа, D&N отметит его сам.`}
-          </p>
+          <p className="muted small" style={{ margin: "-6px 0 0", textAlign: "center" }}>можно всю сумму или часть</p>
+          <AccountChips label={isIn ? "Куда пришли" : "Чем платили"} defaultValue={acc} none="Наличными / не важно" />
+          <details className="more-fields">
+            <summary>Другая дата</summary>
+            <div className="form">
+              <label>
+                Дата
+                <input name="at" type="date" />
+              </label>
+            </div>
+          </details>
+          <button className="btn btn-primary btn-big">{isIn ? "Записать поступление" : "Записать оплату"}</button>
         </form>
       )}
 
@@ -106,8 +105,9 @@ export default async function PlanPage({ params, searchParams }: { params: Promi
         )}
       </section>
 
-      <form action={updatePlanAction} className="card form">
-        <h2>Изменить</h2>
+      <details className="card settings-fold">
+      <summary>Изменить платёж</summary>
+      <form action={updatePlanAction} className="form" style={{ marginTop: 14 }}>
         <input type="hidden" name="id" value={p.id} />
         <input type="hidden" name="next" value={`/plans/${p.id}`} />
         <label>
@@ -153,6 +153,7 @@ export default async function PlanPage({ params, searchParams }: { params: Promi
         </label>
         <button className="btn">Сохранить</button>
       </form>
+      </details>
       {p.status === "open" && (
         <form action={cancelPlanAction}>
           <input type="hidden" name="id" value={p.id} />

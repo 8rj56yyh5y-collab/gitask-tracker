@@ -5,7 +5,7 @@ import { AccountSelect } from "../../components/AccountSelect.tsx";
 import { CenterSelect } from "../../components/CenterSelect.tsx";
 import { CenterChips, SegTabs } from "../../components/Pickers.tsx";
 import { TxRow } from "../../components/TxRow.tsx";
-import { cashBalances, getCashbox } from "@/lib/cash.ts";
+import { cashStats, getCashbox } from "@/lib/cash.ts";
 import { getDb } from "@/lib/db.ts";
 import { formatMoney } from "@/lib/money.ts";
 import { listPlans } from "@/lib/plans.ts";
@@ -30,7 +30,8 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
   const op = rawOp === "in" || rawOp === "move" ? rawOp : "out";
   const b = getCashbox(Number(raw));
   if (!b || b.archived) notFound();
-  const balance = cashBalances().get(b.id) ?? 0;
+  const st = cashStats(b.id);
+  const balance = st.balance;
   const center = b.center_id ? getCenter(b.center_id) : null;
   const { from, to } = monthBounds();
   const moves = getDb()
@@ -40,9 +41,9 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
        WHERE t.cashbox_id = ? ORDER BY t.occurred_at DESC LIMIT 300`,
     )
     .all(b.id) as unknown as Tx[];
-  const month = moves.filter((t) => t.occurred_at >= from && t.occurred_at < to);
-  const inM = month.filter((t) => t.amount > 0).reduce((a, t) => a + t.amount, 0);
-  const outM = month.filter((t) => t.amount < 0).reduce((a, t) => a - t.amount, 0);
+  void from;
+  void to;
+  const maxBar = Math.max(1, ...st.months.map((x) => Math.max(x.in, x.out)));
   const plans = listPlans("open", 200, "out");
   const base = `/cash/${b.id}`;
   const next = `${base}?op=${op}`;
@@ -61,7 +62,7 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
   return (
     <div className="narrow-wide">
       <div className="crumbs">
-        <Link href="/centers">Направления и кассы</Link>
+        <Link href="/cash">Кассы</Link>
         {center && (
           <>
             {" › "}
@@ -77,16 +78,68 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
         </div>
         <div className="cash-hero-label">В кассе сейчас</div>
         <div className="cash-hero-balance">{formatMoney(balance)}</div>
-        <div className="cash-hero-month">
-          <div>
-            <span>Пришло за {monthName}</span>
-            <strong>+{formatMoney(inM)}</strong>
+        {st.forecastEnd !== null && (
+          <div className="cash-hero-forecast">
+            К концу месяца будет ≈ <b>{formatMoney(st.forecastEnd)}</b>
           </div>
-          <div>
-            <span>Ушло за {monthName}</span>
-            <strong>−{formatMoney(outM)}</strong>
+        )}
+      </section>
+
+      <section className="card stats-card">
+        <h2>{monthName[0].toUpperCase() + monthName.slice(1)}</h2>
+        <div className="stat-tiles">
+          <div className="stat-tile">
+            <span>Приход</span>
+            <strong className="pos-text">+{formatMoney(st.monthIn)}</strong>
+          </div>
+          <div className="stat-tile">
+            <span>Расход</span>
+            <strong>−{formatMoney(st.monthOut)}</strong>
+          </div>
+          <div className="stat-tile">
+            <span>Итог</span>
+            <strong className={st.monthNet >= 0 ? "pos-text" : "danger"}>
+              {st.monthNet >= 0 ? "+" : "−"}
+              {formatMoney(Math.abs(st.monthNet))}
+            </strong>
           </div>
         </div>
+        <div className="forecast">
+          {st.dataDays === 0 ? (
+            <span>Прогноз появится, когда в кассе будут операции.</span>
+          ) : st.forecastEnd === null ? (
+            <span>Собираем данные для прогноза: ещё {7 - st.dataDays} дн. Точный прогноз — через {st.daysToAccurate} дн.</span>
+          ) : (
+            <>
+              <span>
+                В среднем за день: <b className={st.perDay >= 0 ? "pos-text" : undefined}>{st.perDay >= 0 ? "+" : "−"}{formatMoney(Math.abs(st.perDay))}</b>
+              </span>
+              <span>
+                К концу месяца в кассе будет ≈ <b>{formatMoney(st.forecastEnd)}</b>
+                {st.daysToAccurate > 0 && <em> · предварительно, по {st.dataDays} дн.; точнее — через {st.daysToAccurate} дн.</em>}
+              </span>
+            </>
+          )}
+        </div>
+        {st.months.some((x) => x.in || x.out) && (
+          <div className="mini-bars" aria-label="Приход и расход по месяцам">
+            {st.months.map((x) => (
+              <div key={x.key} className="mini-bar">
+                <div className="mini-bar-cols">
+                  <i className="in" style={{ height: `${(x.in / maxBar) * 100}%` }} title={`Приход ${formatMoney(x.in)}`} />
+                  <i className="out" style={{ height: `${(x.out / maxBar) * 100}%` }} title={`Расход ${formatMoney(x.out)}`} />
+                </div>
+                <span>{x.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {st.months.some((x) => x.in || x.out) && (
+          <div className="legend">
+            <span><i className="in" /> приход</span>
+            <span><i className="out" /> расход</span>
+          </div>
+        )}
       </section>
 
       <SegTabs

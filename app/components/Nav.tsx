@@ -28,7 +28,6 @@ export function TopNav() {
       window.removeEventListener("focus", onShow);
     };
   }, [router]);
-  const moreActive = ["/more", "/inbox", "/analytics", "/centers", "/settings", "/cash", "/norms", "/income", "/transit", "/help"].some((h) => isActive(path, h));
   return (
     <nav className="top-actions" aria-label="Дополнительно">
       <button type="button" className={`top-btn ${pending ? "is-spinning" : ""}`} onClick={reload} aria-label="Обновить" title="Обновить">
@@ -36,10 +35,6 @@ export function TopNav() {
       </button>
       <Link href="/history" className={`top-btn ${isActive(path, "/history") ? "is-active" : ""}`} aria-label="История">
         <Icon name="history" />
-      </Link>
-      <Link href="/more" className={`top-btn top-more ${moreActive ? "is-active" : ""}`}>
-        <Icon name="more" size={20} />
-        <span>Ещё</span>
       </Link>
     </nav>
   );
@@ -50,11 +45,12 @@ export function Nav({ pending }: { pending: number }) {
   const path = usePathname();
   const cls = (href: string) => `nav-item ${isActive(path, href) ? "is-active" : ""}`;
   const badge = pending > 0 ? <span className="badge">{pending > 99 ? "99+" : pending}</span> : null;
+  const moreActive = ["/more", "/inbox", "/analytics", "/centers", "/settings", "/norms", "/income", "/transit", "/help"].some((h) => isActive(path, h));
 
   return (
     <>
       {/* Телефон */}
-      <nav className="tabbar" aria-label="Меню">
+      <nav className="tabbar tabbar-7" aria-label="Меню">
         <Link href="/" className={cls("/")}>
           <span className="icon-wrap">
             <Icon name="home" />
@@ -66,6 +62,10 @@ export function Nav({ pending }: { pending: number }) {
           <Icon name="card" />
           <span>Карты</span>
         </Link>
+        <Link href="/cash" className={cls("/cash")}>
+          <Icon name="wallet" />
+          <span>Кассы</span>
+        </Link>
         <Link href="/new" className="nav-plus" aria-label="Новая операция">
           <Icon name="plus" size={28} />
         </Link>
@@ -76,6 +76,10 @@ export function Nav({ pending }: { pending: number }) {
         <Link href="/sales" className={cls("/sales")}>
           <Icon name="bag" />
           <span>Продажи</span>
+        </Link>
+        <Link href="/more" className={`nav-item ${moreActive ? "is-active" : ""}`}>
+          <Icon name="more" />
+          <span>Ещё</span>
         </Link>
       </nav>
 
@@ -108,8 +112,11 @@ export function Nav({ pending }: { pending: number }) {
         <Link href="/plans" className={cls("/plans")}>
           <Icon name="calendar" /> Платежи
         </Link>
+        <Link href="/cash" className={cls("/cash")}>
+          <Icon name="wallet" /> Кассы
+        </Link>
         <Link href="/income" className={cls("/income")}>
-          <Icon name="wallet" /> Доходы
+          <Icon name="income" /> Доходы
         </Link>
         <Link href="/transit" className={cls("/transit")}>
           <Icon name="swap" /> Транзит
