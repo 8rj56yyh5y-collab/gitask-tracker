@@ -81,12 +81,22 @@ test("telegram: connect, link chat by code, notify, assign by button", async () 
   const buttons = sent.body.reply_markup.inline_keyboard.flat();
   assert.ok(buttons.some((b: any) => b.callback_data === `m:${id}`));
 
-  // «Все категории…» показывает весь список
+  // «Все категории…» показывает категории верхнего уровня; с подкатегориями — открываются следующим шагом
+  repo.createCenter("Бензин", center("Личные").id, "#000000", 0, false);
   calls.length = 0;
   await tg.handleUpdate({ callback_query: { id: "q1", data: `m:${id}`, message: { chat: { id: 42 }, message_id: 7 } } });
   const kb = calls.find((c) => c.path.endsWith("/editMessageReplyMarkup"))!.body.reply_markup.inline_keyboard.flat();
   const sales = center("Отдел продаж");
-  assert.ok(kb.some((b: any) => b.callback_data === `a:${id}:${sales.id}`));
+  const personal = center("Личные");
+  assert.ok(kb.some((b: any) => b.callback_data === `a:${id}:${sales.id}`), "leaf category records at once");
+  assert.ok(kb.some((b: any) => b.callback_data === `c:${id}:${personal.id}` && b.text.endsWith("›")), "category with children opens them");
+  assert.ok(!kb.some((b: any) => b.text.startsWith("Бензин")), "subcategories are not in the first list");
+  calls.length = 0;
+  await tg.handleUpdate({ callback_query: { id: "q1b", data: `c:${id}:${personal.id}`, message: { chat: { id: 42 }, message_id: 7 } } });
+  const kb2 = calls.find((c) => c.path.endsWith("/editMessageReplyMarkup"))!.body.reply_markup.inline_keyboard.flat();
+  assert.ok(kb2.some((b: any) => b.callback_data === `a:${id}:${personal.id}` && b.text.includes("Личные")), "can record into the category itself");
+  assert.ok(kb2.some((b: any) => b.text === "Бензин" && b.callback_data === `a:${id}:${center("Бензин").id}`));
+  assert.ok(kb2.some((b: any) => b.callback_data === `m:${id}`), "back to the top level");
 
   // нажатие из чужого чата ничего не меняет
   await tg.handleUpdate({ callback_query: { id: "q2", data: `a:${id}:${sales.id}`, message: { chat: { id: 999 }, message_id: 7 } } });
