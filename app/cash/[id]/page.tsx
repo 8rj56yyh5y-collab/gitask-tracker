@@ -60,15 +60,15 @@ export default async function CashboxPage({ params }: { params: Promise<{ id: st
           <input name="amount" inputMode="decimal" required className="amount-input" placeholder="0" />
         </label>
         <label>
-          Кому / от кого
-          <input name="who" placeholder="например, СТО или руководитель" />
+          Название
+          <input name="who" placeholder="например, Продукты или Зарплата" />
         </label>
         <label>
-          За что
-          <input name="note" placeholder="например, аванс за бампер" />
+          Комментарий
+          <input name="note" placeholder="необязательно" />
         </label>
         <label>
-          Категория (для расхода)
+          Категория расхода
           <CenterSelect none="— разнести позже —" />
         </label>
         {plans.length > 0 && (

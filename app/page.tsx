@@ -6,6 +6,7 @@ import { BudgetLine } from "./components/BudgetLine.tsx";
 import { cashBalances, listCashboxes } from "@/lib/cash.ts";
 import { listPlans, ymd } from "@/lib/plans.ts";
 import { companyDebt } from "@/lib/sales.ts";
+import { normState } from "@/lib/norms.ts";
 
 export default function Home() {
   const un = unassignedSummary();
@@ -52,14 +53,16 @@ export default function Home() {
       {(() => {
         const today = ymd(new Date());
         const week = ymd(new Date(Date.now() + 7 * 864e5));
-        const soon = listPlans("open").filter((p) => p.due_date && p.due_date <= week);
+        const soon = listPlans("open", 200, "out").filter((p) => p.due_date && p.due_date <= week);
+        const owed = listPlans("open", 200, "in");
+        const norm = normState();
         const boxes = listCashboxes();
         const bal = cashBalances();
         const debt = companyDebt();
         return (
           <>
             {soon.length > 0 && (
-              <Link href="/plans" className="card alert-budget span-all">
+              <Link href="/plans?tab=out" className="card alert-budget span-all">
                 <h2>Скоро оплатить</h2>
                 {soon.slice(0, 4).map((p) => (
                   <div key={p.id} className="row-between small" style={{ padding: "3px 0" }}>
@@ -73,7 +76,13 @@ export default function Home() {
                 {soon.length > 4 && <div className="muted small">и ещё {soon.length - 4} ›</div>}
               </Link>
             )}
-            {(boxes.length > 0 || debt > 0) && (
+            {norm.ready && !norm.acceptedAt && (
+              <Link href="/norms" className="card alert-budget span-all plain">
+                <h2>Норма трат готова</h2>
+                <div className="muted small">За {norm.elapsed} дн. собрано, сколько уходит на каждую категорию. Посмотрите и примите — или соберите ещё 30 дней ›</div>
+              </Link>
+            )}
+            {(boxes.length > 0 || debt > 0 || owed.length > 0) && (
               <div className="card">
                 {boxes.length > 0 && (
                   <Link href="/cash" className="row-between plain" style={{ padding: "2px 0" }}>
@@ -81,8 +90,14 @@ export default function Home() {
                     <strong>{formatMoney(boxes.reduce((a, b) => a + (bal.get(b.id) ?? 0), 0))} ›</strong>
                   </Link>
                 )}
+                {owed.length > 0 && (
+                  <Link href="/plans?tab=in" className="row-between plain" style={{ padding: "2px 0" }}>
+                    <span>Мне должны</span>
+                    <strong className="pos-text">{formatMoney(owed.reduce((a, p) => a + p.total - p.paid, 0))} ›</strong>
+                  </Link>
+                )}
                 {debt > 0 && (
-                  <Link href="/sales" className="row-between plain" style={{ padding: "2px 0" }}>
+                  <Link href="/plans?tab=company" className="row-between plain" style={{ padding: "2px 0" }}>
                     <span>Долг компании за товар</span>
                     <strong>{formatMoney(debt)} ›</strong>
                   </Link>

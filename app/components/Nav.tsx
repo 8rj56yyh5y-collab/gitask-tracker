@@ -5,19 +5,38 @@ import { Icon } from "./Icon.tsx";
 
 const isActive = (path: string, href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(href + "/"));
 
+/** Кнопки в шапке на телефоне: История и «Ещё». */
+export function TopNav() {
+  const path = usePathname();
+  const moreActive = ["/more", "/inbox", "/analytics", "/centers", "/settings", "/cash", "/norms"].some((h) => isActive(path, h));
+  return (
+    <nav className="top-actions" aria-label="Дополнительно">
+      <Link href="/history" className={`top-btn ${isActive(path, "/history") ? "is-active" : ""}`} aria-label="История">
+        <Icon name="history" />
+      </Link>
+      <Link href="/more" className={`top-btn top-more ${moreActive ? "is-active" : ""}`}>
+        <Icon name="more" size={20} />
+        <span>Ещё</span>
+      </Link>
+    </nav>
+  );
+}
+
 /** Нижняя панель на телефоне и боковое меню на большом экране. */
 export function Nav({ pending }: { pending: number }) {
   const path = usePathname();
   const cls = (href: string) => `nav-item ${isActive(path, href) ? "is-active" : ""}`;
   const badge = pending > 0 ? <span className="badge">{pending > 99 ? "99+" : pending}</span> : null;
-  const moreActive = ["/more", "/inbox", "/analytics", "/centers", "/settings", "/plans", "/cash", "/sales"].some((h) => isActive(path, h));
 
   return (
     <>
       {/* Телефон */}
       <nav className="tabbar" aria-label="Меню">
         <Link href="/" className={cls("/")}>
-          <Icon name="home" />
+          <span className="icon-wrap">
+            <Icon name="home" />
+            {badge}
+          </span>
           <span>Главная</span>
         </Link>
         <Link href="/cards" className={cls("/cards")}>
@@ -27,16 +46,13 @@ export function Nav({ pending }: { pending: number }) {
         <Link href="/new" className="nav-plus" aria-label="Новая операция">
           <Icon name="plus" size={28} />
         </Link>
-        <Link href="/history" className={cls("/history")}>
-          <span className="icon-wrap">
-            <Icon name="history" />
-            {badge}
-          </span>
-          <span>История</span>
+        <Link href="/plans" className={cls("/plans")}>
+          <Icon name="calendar" />
+          <span>Платежи</span>
         </Link>
-        <Link href="/more" className={`nav-item ${moreActive ? "is-active" : ""}`}>
-          <Icon name="more" />
-          <span>Ещё</span>
+        <Link href="/sales" className={cls("/sales")}>
+          <Icon name="bag" />
+          <span>Продажи</span>
         </Link>
       </nav>
 
@@ -67,13 +83,16 @@ export function Nav({ pending }: { pending: number }) {
           <Icon name="tag" /> Категории
         </Link>
         <Link href="/plans" className={cls("/plans")}>
-          <Icon name="history" /> Платежи
+          <Icon name="calendar" /> Платежи
         </Link>
         <Link href="/cash" className={cls("/cash")}>
-          <Icon name="card" /> Кассы
+          <Icon name="wallet" /> Кассы
         </Link>
         <Link href="/sales" className={cls("/sales")}>
-          <Icon name="tag" /> Продажи
+          <Icon name="bag" /> Продажи
+        </Link>
+        <Link href="/norms" className={cls("/norms")}>
+          <Icon name="target" /> Норма трат
         </Link>
         <Link href="/settings" className={cls("/settings")}>
           <Icon name="settings" /> Настройки

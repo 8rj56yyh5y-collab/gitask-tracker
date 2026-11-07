@@ -29,7 +29,7 @@ export default function Centers() {
         <h2>Добавить категорию</h2>
         <label>
           Название
-          <input name="name" required placeholder="например, Пункт в Житомире" />
+          <input name="name" required placeholder="например, Продукты" />
         </label>
         <label>
           Входит в

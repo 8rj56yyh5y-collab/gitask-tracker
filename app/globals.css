@@ -347,3 +347,17 @@ input[readonly] { color: var(--muted); font-size: 14px; }
 .seg2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .seg2 label { flex-direction: row !important; align-items: center; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; color: var(--text) !important; font-size: 14px !important; }
 .seg2 label:has(input:checked) { border-color: var(--accent); outline: 1px solid var(--accent); }
+.ptabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
+.ptab { display: flex; flex-direction: column; gap: 2px; padding: 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); font-size: 13px; color: var(--muted); }
+.ptab strong { color: var(--text); font-size: 15px; font-variant-numeric: tabular-nums; }
+.ptab.is-on { border-color: var(--accent); outline: 1px solid var(--accent); color: var(--accent); }
+.pos-text { color: var(--green); }
+.form label.norm-row, .norm-row { display: grid; flex-direction: unset; color: var(--text); font-size: 14px; grid-template-columns: 1fr 120px; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.norm-row:last-of-type { border-bottom: 0; }
+.norm-name { display: flex; text-align: left; justify-content: flex-start; gap: 8px; align-items: flex-start; }
+.norm-name .dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; flex: none; }
+.norm-row input { text-align: right; }
+.row-gap { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+.top-actions { display: flex; gap: 6px; align-items: center; }
+.top-btn { display: inline-flex; align-items: center; gap: 4px; height: 38px; min-width: 38px; justify-content: center; padding: 0 10px; border-radius: 19px; background: var(--card); border: 1px solid var(--line); color: var(--text); font-size: 14px; font-weight: 600; }
+.top-btn.is-active { color: var(--accent); border-color: var(--accent); }

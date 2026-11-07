@@ -12,6 +12,7 @@ import { BANK_NAMES } from "@/lib/banks.ts";
 import { archiveCashbox, cashMove, createCashbox, parseAccount, transfer, updateCashbox } from "@/lib/cash.ts";
 import { cancelPlan, createPlan, payPlan, updatePlan } from "@/lib/plans.ts";
 import { archiveGroup, archiveProduct, createSale, deleteSale, payCompany, saveGroup, saveProduct, setSalesBase } from "@/lib/sales.ts";
+import { acceptNorms, extendNorm, restartNorm } from "@/lib/norms.ts";
 import { redirect } from "next/navigation";
 import { toKop, parseAmount } from "@/lib/money.ts";
 import {
@@ -329,9 +330,10 @@ export async function transferAction(f: FormData) {
 function planFields(f: FormData) {
   const acc = accountOf(f);
   return {
-    title: str(f, "title"), payee: str(f, "payee"), total: kop(f, "total"), dueDate: str(f, "due") || null,
+    title: str(f, "title"), payee: f.has("payee") ? str(f, "payee") : undefined, total: kop(f, "total"), dueDate: str(f, "due") || null,
     cardId: acc.cardId, cashboxId: acc.cashboxId, centerId: num(f, "centerId"), note: str(f, "note"),
     repeat: (str(f, "repeat") === "month" ? "month" : "none") as "month" | "none",
+    direction: (str(f, "direction") === "in" ? "in" : "out") as "in" | "out",
   };
 }
 
@@ -418,4 +420,28 @@ export async function payCompanyAction(f: FormData) {
   payCompany(kop(f, "amount"), accountOf(f), str(f, "note"), isoDate(f, "at"));
   refresh();
   back(f);
+}
+
+// ---------- Норма трат ----------
+export async function acceptNormsAction(f: FormData) {
+  const values = new Map<number, number>();
+  for (const [k, v] of f.entries()) {
+    const m = /^norm_(\d+)$/.exec(k);
+    if (m && typeof v === "string") values.set(Number(m[1]), toKop(parseAmount(v) ?? 0));
+  }
+  acceptNorms(values);
+  refresh();
+  redirect("/norms?ok=1");
+}
+
+export async function extendNormAction() {
+  extendNorm();
+  refresh();
+  redirect("/norms");
+}
+
+export async function restartNormAction() {
+  restartNorm();
+  refresh();
+  redirect("/norms");
 }

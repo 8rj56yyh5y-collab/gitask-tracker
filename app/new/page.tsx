@@ -50,7 +50,7 @@ export default function NewTx() {
         </label>
         <label>
           Для кого
-          <input name="forWhom" placeholder="для себя, для руководителя…" />
+          <input name="forWhom" placeholder="для себя, для семьи…" />
         </label>
         <label>
           Комментарий
