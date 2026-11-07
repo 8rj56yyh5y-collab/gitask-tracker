@@ -101,16 +101,35 @@ function suggestKeyboard(tx: Tx): Button[][] {
   return rows;
 }
 
-/** Полный список категорий, по две в ряд. */
-function allKeyboard(tx: Tx): Button[][] {
-  const tree = centerTree();
+/** Кнопки по две в ряд. */
+function pairs(buttons: Button[]): Button[][] {
   const rows: Button[][] = [];
-  for (let i = 0; i < tree.length; i += 2) {
-    rows.push(
-      tree.slice(i, i + 2).map((c) => ({ text: `${c.depth ? "· " : ""}${c.name}`.slice(0, 40), callback_data: `a:${tx.id}:${c.id}` })),
-    );
-  }
+  for (let i = 0; i < buttons.length; i += 2) rows.push(buttons.slice(i, i + 2));
+  return rows;
+}
+
+/** Кнопка категории: если внутри есть подкатегории — открывает их, иначе сразу записывает. */
+function catButton(txId: number, c: { id: number; name: string }, all: { id: number; parent_id: number | null }[]): Button {
+  const hasKids = all.some((x) => x.parent_id === c.id);
+  return { text: `${c.name}${hasKids ? " ›" : ""}`.slice(0, 40), callback_data: hasKids ? `c:${txId}:${c.id}` : `a:${txId}:${c.id}` };
+}
+
+/** Категории верхнего уровня. Те, у которых есть подкатегории, открываются следующим шагом. */
+function rootsKeyboard(tx: Tx): Button[][] {
+  const tree = centerTree();
+  const rows = pairs(tree.filter((c) => c.depth === 0).map((c) => catButton(tx.id, c, tree)));
   rows.push([{ text: "‹ Назад", callback_data: `b:${tx.id}` }]);
+  return rows;
+}
+
+/** Подкатегории: сначала «записать в саму категорию», затем подпункты. */
+function childKeyboard(tx: Tx, parentId: number): Button[][] {
+  const tree = centerTree();
+  const parent = tree.find((c) => c.id === parentId);
+  const rows: Button[][] = [];
+  if (parent) rows.push([{ text: `✓ Просто «${parent.name}»`.slice(0, 40), callback_data: `a:${tx.id}:${parent.id}` }]);
+  rows.push(...pairs(tree.filter((c) => c.parent_id === parentId).map((c) => catButton(tx.id, c, tree))));
+  rows.push([{ text: "‹ Назад", callback_data: parent?.parent_id ? `c:${tx.id}:${parent.parent_id}` : `m:${tx.id}` }]);
   return rows;
 }
 
@@ -195,11 +214,9 @@ export async function handleUpdate(update: Update): Promise<void> {
       text: `${txText(getTx(tx.id)!)}\n\n✓ Записано: <b>${esc(center.path)}</b>`,
       parse_mode: "HTML",
     });
-  } else if (action === "m" || action === "b") {
+  } else if (action === "m" || action === "b" || action === "c") {
     await call(token, "answerCallbackQuery", { callback_query_id: q.id });
-    await call(token, "editMessageReplyMarkup", {
-      ...target,
-      reply_markup: { inline_keyboard: action === "m" ? allKeyboard(tx) : suggestKeyboard(tx) },
-    });
+    const kb = action === "m" ? rootsKeyboard(tx) : action === "c" ? childKeyboard(tx, Number(centerRaw)) : suggestKeyboard(tx);
+    await call(token, "editMessageReplyMarkup", { ...target, reply_markup: { inline_keyboard: kb } });
   }
 }
