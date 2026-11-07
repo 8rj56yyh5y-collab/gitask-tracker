@@ -8,6 +8,7 @@ import { detectBank } from "@/lib/banks.ts";
 import { revalidatePath } from "next/cache";
 import { notifyNewTx } from "@/lib/telegram.ts";
 import { matchPlanForTx } from "@/lib/plans.ts";
+import { noteShortcutSignal } from "@/lib/setup.ts";
 
 // Приём операций из «Команд» iOS.
 //   Проще всего: POST https://<сайт>/api/ingest?key=<ключ> с телом «Форма»: amount, merchant, card
@@ -30,10 +31,16 @@ async function readBody(req: Request): Promise<Record<string, unknown> | null> {
 }
 
 export async function POST(req: Request) {
-  if (!ingestTokenOk(bearer(req))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!ingestTokenOk(bearer(req))) {
+    noteShortcutSignal("bad_key");
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
 
   const body = await readBody(req);
-  if (!body) return NextResponse.json({ error: "Не удалось прочитать данные: нужна форма или JSON" }, { status: 400 });
+  if (!body) {
+    noteShortcutSignal("no_data");
+    return NextResponse.json({ error: "Не удалось прочитать данные: нужна форма или JSON" }, { status: 400 });
+  }
   const s = (k: string) => (typeof body[k] === "string" ? (body[k] as string).trim() : "");
   const source = s("source") === "sms" || (!s("amount") && s("text")) ? "sms" : "applepay";
 
@@ -55,11 +62,15 @@ export async function POST(req: Request) {
     cardHint ||= p.bank ?? "";
   } else {
     amount = parseAmount(s("amount"));
-    if (!amount) return NextResponse.json({ error: "Не удалось разобрать сумму" }, { status: 422 });
+    if (!amount) {
+      noteShortcutSignal("no_amount", cardHint);
+      return NextResponse.json({ error: "Не удалось разобрать сумму" }, { status: 422 });
+    }
   }
 
   // Оплаты Monobank приходят от самого банка — из «Команд» их не записываем, иначе будет дубль.
   if (source === "applepay" && detectBank(cardHint) === "Monobank" && monobankConnected()) {
+    noteShortcutSignal("mono_skip", cardHint);
     return NextResponse.json({ ignored: true, reason: "Monobank присылает эту операцию сам" });
   }
   const card = findCard({ last4, hint: cardHint });
@@ -83,6 +94,7 @@ export async function POST(req: Request) {
     occurredAt: now.toISOString(),
   });
 
+  noteShortcutSignal("ok", cardHint);
   if (!duplicate) {
     // Это оплата запланированного платежа? Тогда он закроется сам и операция получит его категорию.
     matchPlanForTx(id);

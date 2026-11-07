@@ -69,7 +69,7 @@ export default async function CashboxPage({ params }: { params: Promise<{ id: st
         </label>
         <label>
           Категория расхода
-          <CenterSelect none="— разнести позже —" />
+          <CenterSelect defaultValue={b.center_id} none="— разнести позже —" />
         </label>
         {plans.length > 0 && (
           <label>
@@ -131,6 +131,10 @@ export default async function CashboxPage({ params }: { params: Promise<{ id: st
         <label>
           Чья
           <input name="owner" defaultValue={b.owner} />
+        </label>
+        <label>
+          Для какой категории касса
+          <CenterSelect defaultValue={b.center_id} none="— для разных —" />
         </label>
         <div className="grid-2-tight">
           <label>

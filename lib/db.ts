@@ -159,6 +159,9 @@ export function getDb(): DatabaseSync {
   if (!cardCols.includes("badge")) db.exec("ALTER TABLE cards ADD COLUMN badge TEXT");
   // Дополнительная карта входит в основную: у группы один лимит (например, все карты Monobank).
   if (!cardCols.includes("parent_id")) db.exec("ALTER TABLE cards ADD COLUMN parent_id INTEGER");
+  const boxCols = (db.prepare("PRAGMA table_info(cashboxes)").all() as { name: string }[]).map((c) => c.name);
+  // Категория кассы: расходы из неё по умолчанию записываются туда.
+  if (!boxCols.includes("center_id")) db.exec("ALTER TABLE cashboxes ADD COLUMN center_id INTEGER");
   const planCols = (db.prepare("PRAGMA table_info(plans)").all() as { name: string }[]).map((c) => c.name);
   // out — я плачу; in — мне должны (ожидаемое поступление).
   if (!planCols.includes("direction")) db.exec("ALTER TABLE plans ADD COLUMN direction TEXT NOT NULL DEFAULT 'out'");

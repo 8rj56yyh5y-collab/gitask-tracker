@@ -8,6 +8,7 @@ import { MAX_BACKFILL_DAYS } from "@/lib/monobank.ts";
 import { publicBase } from "@/lib/url.ts";
 import { cookies } from "next/headers";
 import { THEMES, THEME_COOKIE, normalizeTheme } from "@/lib/theme.ts";
+import { SIGNAL_TEXT, lastShortcutSignal, shortcutWorks } from "@/lib/setup.ts";
 
 const DOCS = "https://github.com/8rj56yyh5y-collab/gitask-tracker/blob/main/docs";
 
@@ -128,6 +129,28 @@ export default async function Settings({
 
       <section className="card form" id="shortcuts">
         <h2>Оплаты Apple Pay — с любой карты</h2>
+        {(() => {
+          const sig = lastShortcutSignal();
+          const works = shortcutWorks();
+          const good = sig ? sig.result === "ok" || sig.result === "mono_skip" : works;
+          return (
+            <div className={`card ${good ? "alert-ok" : sig ? "alert-on" : ""}`} style={{ margin: 0 }}>
+              <strong>{good ? "Работает ✓" : sig ? "Есть проблема" : "Ещё не было ни одной оплаты через «Команды»"}</strong>
+              <div className="small">
+                {sig ? (
+                  <>
+                    Последний сигнал: {new Date(sig.at).toLocaleString("ru-RU", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}
+                    {sig.card && ` · ${sig.card}`} — {SIGNAL_TEXT[sig.result]}
+                  </>
+                ) : works ? (
+                  "Операции Apple Pay уже приходили."
+                ) : (
+                  "Если вы уже настроили — оплатите что-нибудь телефоном. Если и после этого здесь пусто, значит запрос до D&N не дошёл: проверьте ссылку в шаге 2. Если iPhone пишет «Сбой автоматизации» — пришлите текст ошибки."
+                )}
+              </div>
+            </div>
+          );
+        })()}
         <p className="small" style={{ margin: 0 }}>
           После оплаты телефоном iPhone сам отправит в D&amp;N сумму, магазин и карту. Карту D&amp;N узнает по названию банка.
           {tg.linked ? " Сразу придёт сообщение в Telegram с выбором категории." : " Подключите Telegram выше — тогда сразу придёт сообщение с выбором категории."}

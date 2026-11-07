@@ -1,5 +1,5 @@
 import { getDb } from "./db.ts";
-import { getSetting } from "./settings.ts";
+import { getSetting, setSetting } from "./settings.ts";
 import { monobankConnected } from "./repo.ts";
 
 // Шаги настройки для нового человека: что уже сделано и куда нажать дальше.
@@ -34,9 +34,9 @@ export function setupSteps(): SetupStep[] {
     {
       id: "applepay",
       title: "Настройте оплаты Apple Pay",
-      why: "Один раз в приложении «Команды» — и каждая оплата телефоном записывается сама.",
+      why: "Один раз в приложении «Команды» — и каждая оплата телефоном записывается сама. Уже настроили? Оплатите что-нибудь телефоном — шаг отметится сам.",
       href: "/settings#shortcuts",
-      done: has("SELECT 1 FROM transactions WHERE source IN ('applepay', 'sms') LIMIT 1"),
+      done: shortcutWorks(),
     },
     {
       id: "monobank",
@@ -59,3 +59,44 @@ export function setupSteps(): SetupStep[] {
 export function setupHidden(): boolean {
   return getSetting("setup_hidden") === "1";
 }
+
+// ---------- Сигналы от «Команд» (Apple Pay) ----------
+
+export type SignalResult = "ok" | "mono_skip" | "bad_key" | "no_data" | "no_amount";
+
+export interface ShortcutSignal {
+  at: string;
+  result: SignalResult;
+  card: string;
+}
+
+/** Запомнить последний запрос от «Команд» — чтобы видеть, что настройка работает (или почему нет). */
+export function noteShortcutSignal(result: SignalResult, card = "") {
+  try {
+    setSetting("shortcut_last", JSON.stringify({ at: new Date().toISOString(), result, card: card.slice(0, 60) }));
+    if (result === "ok" || result === "mono_skip") setSetting("shortcut_ok_at", new Date().toISOString());
+  } catch {
+    // не мешаем записи операции
+  }
+}
+
+export function lastShortcutSignal(): ShortcutSignal | null {
+  try {
+    return JSON.parse(getSetting("shortcut_last") ?? "null") as ShortcutSignal | null;
+  } catch {
+    return null;
+  }
+}
+
+/** «Команды» хоть раз успешно достучались (или операция Apple Pay/SMS уже есть). */
+export function shortcutWorks(): boolean {
+  return Boolean(getSetting("shortcut_ok_at")) || has("SELECT 1 FROM transactions WHERE source IN ('applepay', 'sms') LIMIT 1");
+}
+
+export const SIGNAL_TEXT: Record<SignalResult, string> = {
+  ok: "операция записана ✓",
+  mono_skip: "оплата Monobank — её присылает сам банк, всё в порядке ✓",
+  bad_key: "неверный ключ — в «Командах» ссылка скопирована не полностью или устарела",
+  no_data: "пришёл пустой запрос — в «Командах» не добавлены поля amount / merchant / card",
+  no_amount: "не удалось прочитать сумму — проверьте поле amount (должно быть «Сумма» из входящих данных)",
+};

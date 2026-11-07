@@ -167,3 +167,28 @@ test("отмена оплаты: ручная удаляется, банковс
   plans.restorePlan(id);
   assert.equal(plans.getPlan(id)!.status, "open");
 });
+
+test("касса привязана к категории: расход без выбора идёт в категорию кассы", () => {
+  const sales = center("Отдел продаж");
+  const box = cash.createCashbox({ name: "Касса отдела", centerId: sales });
+  assert.equal(cash.getCashbox(box)!.center_id, sales);
+  const a = cash.cashMove(box, { amountKop: -50_000, note: "канцелярия" });
+  assert.equal(repo.getTx(a)!.cost_center_id, sales);
+  const b = cash.cashMove(box, { amountKop: -20_000, centerId: center("Личные") });
+  assert.equal(repo.getTx(b)!.cost_center_id, center("Личные"), "выбранная вручную категория важнее");
+  const c = cash.cashMove(box, { amountKop: 100_000 });
+  assert.equal(repo.getTx(c)!.cost_center_id, null, "приход не трогаем");
+  cash.updateCashbox(box, { name: "Касса отдела", owner: "", color: "#16a34a", opening: 0, centerId: null });
+  assert.equal(cash.getCashbox(box)!.center_id, null);
+});
+
+test("сигналы «Команд»: шаг Apple Pay отмечается и при оплате Monobank", async () => {
+  const setup = await import("../lib/setup.ts");
+  assert.equal(setup.shortcutWorks(), false);
+  setup.noteShortcutSignal("bad_key");
+  assert.equal(setup.shortcutWorks(), false);
+  assert.equal(setup.lastShortcutSignal()!.result, "bad_key");
+  setup.noteShortcutSignal("mono_skip", "Monobank Black");
+  assert.equal(setup.shortcutWorks(), true);
+  assert.equal(setup.setupSteps().find((s) => s.id === "applepay")!.done, true);
+});

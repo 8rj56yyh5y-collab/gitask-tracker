@@ -10,6 +10,8 @@ export interface Cashbox {
   color: string;
   opening: number;
   archived: number;
+  /** Категория по умолчанию для расходов из кассы. */
+  center_id: number | null;
 }
 
 type Row = Record<string, unknown>;
@@ -22,15 +24,17 @@ export function getCashbox(id: number): Cashbox | null {
   return (getDb().prepare("SELECT * FROM cashboxes WHERE id = ?").get(id) as unknown as Cashbox) ?? null;
 }
 
-export function createCashbox(c: { name: string; owner?: string; color?: string; opening?: number }): number {
+export function createCashbox(c: { name: string; owner?: string; color?: string; opening?: number; centerId?: number | null }): number {
   const r = getDb()
-    .prepare("INSERT INTO cashboxes (name, owner, color, opening) VALUES (?, ?, ?, ?)")
-    .run(c.name, c.owner ?? "", c.color ?? "#16a34a", c.opening ?? 0);
+    .prepare("INSERT INTO cashboxes (name, owner, color, opening, center_id) VALUES (?, ?, ?, ?, ?)")
+    .run(c.name, c.owner ?? "", c.color ?? "#16a34a", c.opening ?? 0, c.centerId ?? null);
   return Number(r.lastInsertRowid);
 }
 
-export function updateCashbox(id: number, c: { name: string; owner: string; color: string; opening: number }) {
-  getDb().prepare("UPDATE cashboxes SET name = ?, owner = ?, color = ?, opening = ? WHERE id = ?").run(c.name, c.owner, c.color, c.opening, id);
+export function updateCashbox(id: number, c: { name: string; owner: string; color: string; opening: number; centerId?: number | null }) {
+  getDb()
+    .prepare("UPDATE cashboxes SET name = ?, owner = ?, color = ?, opening = ?, center_id = ? WHERE id = ?")
+    .run(c.name, c.owner, c.color, c.opening, c.centerId ?? null, id);
 }
 
 export function archiveCashbox(id: number) {
@@ -54,12 +58,16 @@ export interface CashMove {
   planId?: number | null;
 }
 
-/** Приход или расход кассы. Расход без категории попадёт в «Нужно записать», как любая операция. */
+/**
+ * Приход или расход кассы. Расход без выбранной категории идёт в категорию кассы;
+ * если и у кассы её нет — попадёт в «Нужно записать», как любая операция.
+ */
 export function cashMove(cashboxId: number, m: CashMove): number {
+  const boxCenter = m.amountKop < 0 && m.centerId == null ? (getCashbox(cashboxId)?.center_id ?? null) : null;
   return insertTx({
     amountKop: m.amountKop,
     cashboxId,
-    costCenterId: m.centerId ?? null,
+    costCenterId: m.centerId ?? boxCenter,
     counterparty: m.counterparty ?? "",
     description: m.note ?? "",
     occurredAt: m.at,
