@@ -80,12 +80,12 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
       </section>
 
       <section className="card">
-        <h2>По категориям: этот месяц и прошлый</h2>
+        <h2>По направлениям: этот месяц и прошлый</h2>
         {cats.length === 0 && <p className="muted small">В этом месяце расходов нет.</p>}
         <table className="compare">
           <thead>
             <tr>
-              <th>Категория</th>
+              <th>Направление</th>
               <th>Сейчас</th>
               <th>Было</th>
               <th>Изменение</th>
@@ -111,12 +111,12 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
               <tr>
                 <td>
                   <Link href="/history" className="plain danger">
-                    Без категории
+                    Без направления
                   </Link>
                 </td>
                 <td>{formatMoney(uncategorized)}</td>
                 <td className="muted">—</td>
-                <td className="muted">разнести</td>
+                <td className="muted">указать</td>
               </tr>
             )}
           </tbody>

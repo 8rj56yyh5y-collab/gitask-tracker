@@ -17,6 +17,10 @@ export interface Plan {
   note: string;
   repeat: "none" | "month";
   direction: "out" | "in";
+  /** salary — регулярный доход (ставка). */
+  kind: "" | "salary";
+  /** 1 — зачислять в день доходa автоматически. */
+  auto: number;
   status: "open" | "done" | "cancelled";
   reminded_on: string | null;
   created_at: string;
@@ -52,21 +56,29 @@ export interface NewPlan {
   note?: string;
   repeat?: "none" | "month";
   direction?: "out" | "in";
+  kind?: "" | "salary";
+  auto?: boolean;
 }
 
 export function createPlan(p: NewPlan): number {
   if (!p.title.trim()) throw new Error("Напишите название");
   if (!(p.total > 0)) throw new Error("Укажите сумму");
   const r = getDb()
-    .prepare("INSERT INTO plans (title, payee, total, due_date, card_id, cashbox_id, cost_center_id, note, repeat, direction) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-    .run(p.title.trim(), p.payee ?? "", p.total, p.dueDate || null, p.cardId ?? null, p.cashboxId ?? null, p.centerId ?? null, p.note ?? "", p.repeat ?? "none", p.direction ?? "out");
+    .prepare("INSERT INTO plans (title, payee, total, due_date, card_id, cashbox_id, cost_center_id, note, repeat, direction, kind, auto) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    .run(
+      p.title.trim(), p.payee ?? "", p.total, p.dueDate || null, p.cardId ?? null, p.cashboxId ?? null, p.centerId ?? null, p.note ?? "",
+      p.repeat ?? "none", p.kind === "salary" ? "in" : (p.direction ?? "out"), p.kind ?? "", p.auto ? 1 : 0,
+    );
   return Number(r.lastInsertRowid);
 }
 
 export function updatePlan(id: number, p: NewPlan) {
   getDb()
-    .prepare("UPDATE plans SET title = ?, payee = COALESCE(?, payee), total = ?, due_date = ?, card_id = ?, cashbox_id = ?, cost_center_id = ?, note = ?, repeat = ? WHERE id = ?")
-    .run(p.title.trim(), p.payee ?? null, p.total, p.dueDate || null, p.cardId ?? null, p.cashboxId ?? null, p.centerId ?? null, p.note ?? "", p.repeat ?? "none", id);
+    .prepare("UPDATE plans SET title = ?, payee = COALESCE(?, payee), total = ?, due_date = ?, card_id = ?, cashbox_id = ?, cost_center_id = ?, note = ?, repeat = ?, auto = COALESCE(?, auto) WHERE id = ?")
+    .run(
+      p.title.trim(), p.payee ?? null, p.total, p.dueDate || null, p.cardId ?? null, p.cashboxId ?? null, p.centerId ?? null, p.note ?? "",
+      p.repeat ?? "none", p.auto === undefined ? null : p.auto ? 1 : 0, id,
+    );
   refreshStatus(id);
 }
 
@@ -131,11 +143,16 @@ function refreshStatus(id: number): Plan | null {
   if (p.repeat === "month") {
     const next = createPlan({
       title: p.title, payee: p.payee, total: p.total, dueDate: p.due_date ? nextMonth(p.due_date) : null,
-      cardId: p.card_id, cashboxId: p.cashbox_id, centerId: p.cost_center_id, note: p.note, repeat: "month", direction: p.direction,
+      cardId: p.card_id, cashboxId: p.cashbox_id, centerId: p.cost_center_id, note: p.note, repeat: "month", direction: p.direction, kind: p.kind, auto: Boolean(p.auto),
     });
     getDb().prepare("UPDATE plans SET prev_id = ? WHERE id = ?").run(id, next);
   }
   return getPlan(id);
+}
+
+function cashboxCenter(id: number): number | null {
+  const r = getDb().prepare("SELECT center_id FROM cashboxes WHERE id = ?").get(id) as { center_id: number | null } | undefined;
+  return r?.center_id ?? null;
 }
 
 /** Оплатить платёж (целиком или часть): записывает расход с карты или из кассы. */
@@ -147,13 +164,15 @@ export function payPlan(id: number, amountKop: number, from: { cardId?: number |
     amountKop: p.direction === "in" ? amountKop : -amountKop,
     cardId: from.cardId ?? null,
     cashboxId: from.cashboxId ?? null,
-    costCenterId: p.cost_center_id,
+    // Без направления у платежа — берём направление кассы, из которой платим.
+    costCenterId: p.cost_center_id ?? (p.direction === "out" && from.cashboxId ? cashboxCenter(from.cashboxId) : null),
     counterparty: p.payee || p.title,
     description: p.payee ? p.title : "",
     occurredAt: from.at,
     planId: id,
     source: "manual",
   });
+  if (p.kind === "salary") getDb().prepare("UPDATE transactions SET income_kind = 'salary' WHERE id = ?").run(tx.id);
   refreshStatus(id);
   return tx.id;
 }
@@ -183,6 +202,7 @@ export function matchPlanForTx(txId: number): number | null {
   db.prepare("UPDATE transactions SET plan_id = ?, cost_center_id = COALESCE(cost_center_id, ?), assigned_at = COALESCE(assigned_at, ?) WHERE id = ?").run(
     p.id, p.cost_center_id, p.cost_center_id ? new Date().toISOString() : null, txId,
   );
+  if (p.kind === "salary") db.prepare("UPDATE transactions SET income_kind = 'salary' WHERE id = ?").run(txId);
   refreshStatus(p.id);
   return p.id;
 }
@@ -190,7 +210,8 @@ export function matchPlanForTx(txId: number): number | null {
 /** Платежи, о которых пора напомнить сегодня (срок наступил, сегодня ещё не напоминали). */
 export function plansToRemind(today = new Date()): Plan[] {
   const d = ymd(today);
-  return listPlans("open", 500, "out").filter((p) => p.due_date && p.due_date <= d && p.reminded_on !== d);
+  // «Я плачу» и ставки (спросим «пришла?»); долги мне не напоминаем — это не моё действие.
+  return listPlans("open", 500).filter((p) => (p.direction === "out" || p.kind === "salary") && p.due_date && p.due_date <= d && p.reminded_on !== d);
 }
 
 export function markReminded(id: number, today = new Date()) {

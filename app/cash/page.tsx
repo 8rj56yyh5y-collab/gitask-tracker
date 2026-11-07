@@ -29,7 +29,7 @@ export default function Cash() {
           </div>
           <div className="big">{formatMoney(bal.get(b.id) ?? 0)}</div>
           <div className="small" style={{ opacity: 0.85 }}>
-            {b.center_id && centerName.has(b.center_id) ? `категория: ${centerName.get(b.center_id)} · ` : ""}нажмите, чтобы внести приход или расход
+            {b.center_id && centerName.has(b.center_id) ? `${centerName.get(b.center_id)} · ` : ""}нажмите, чтобы внести приход или расход
           </div>
         </Link>
       ))}
@@ -88,11 +88,11 @@ export default function Cash() {
           </label>
         </div>
         <label>
-          Для какой категории касса
+          Направление кассы
           <CenterSelect none="— для разных —" />
         </label>
         <p className="muted small" style={{ margin: 0 }}>
-          Например, касса отдела продаж — категория «Отдел продаж»: расходы из неё сразу записываются туда. Для отдельной траты категорию можно
+          Например, касса отдела продаж — направление «Отдел продаж»: расходы из неё сразу записываются туда. Для отдельной траты его можно
           поменять.
         </p>
         <button className="btn btn-primary">Создать кассу</button>

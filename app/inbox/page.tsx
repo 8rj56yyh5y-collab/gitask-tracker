@@ -9,9 +9,9 @@ export default function Inbox() {
 
   return (
     <div className="grid grid-auto">
-      <h1>Не разнесено</h1>
+      <h1>Без направления</h1>
       {items.length === 0 ? (
-        <div className="card alert alert-ok big span-all">Всё разнесено ✓</div>
+        <div className="card alert alert-ok big span-all">Все операции записаны ✓</div>
       ) : (
         <p className="muted">
           {items.length} операций на {formatMoney(total)}. Выберите, куда ушли деньги.

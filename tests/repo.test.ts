@@ -94,7 +94,7 @@ test("categories can be renamed, moved and restored; no cycles", () => {
   const auto = center("Авто").id, tyres = center("Шины").id;
   repo.updateCenter(auto, { name: "Машина", color: "#222222", parentId: null, internal: false });
   assert.equal(repo.getCenter(auto)!.name, "Машина");
-  assert.throws(() => repo.updateCenter(auto, { name: "Машина", color: "#222222", parentId: tyres, internal: false }), /саму в себя/);
+  assert.throws(() => repo.updateCenter(auto, { name: "Машина", color: "#222222", parentId: tyres, internal: false }), /само в себя/);
   repo.updateCenter(tyres, { name: "Шины", color: "#111111", parentId: center("Личные").id, internal: false });
   assert.equal(repo.getCenter(tyres)!.parent_id, center("Личные").id);
   repo.archiveCenter(auto);

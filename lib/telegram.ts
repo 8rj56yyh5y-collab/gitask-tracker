@@ -2,6 +2,9 @@ import { randomBytes, randomInt } from "node:crypto";
 import { formatMoney } from "./money.ts";
 import { assignTx, centerTree, getTx, suggestCenters, type Tx } from "./repo.ts";
 import { getSetting, setSetting } from "./settings.ts";
+import { canAutoCredit } from "./income.ts";
+import { createTransit, linkTxToTransit, listTransits } from "./transit.ts";
+import { getDb } from "./db.ts";
 import { getPlan, markReminded, payPlan, plansToRemind, undoPlanPayment, type Plan } from "./plans.ts";
 
 // Уведомления в Telegram: после каждой новой операции бот присылает сообщение
@@ -95,7 +98,9 @@ function suggestKeyboard(tx: Tx): Button[][] {
   for (let i = 0; i < sugg.length; i += 2) {
     rows.push(sugg.slice(i, i + 2).map((c) => ({ text: c.name, callback_data: `a:${tx.id}:${c.id}` })));
   }
-  const last: Button[] = [{ text: "Все категории…", callback_data: `m:${tx.id}` }];
+  if (tx.amount > 0) rows.push([{ text: "💰 Ставка", callback_data: `i:${tx.id}:s` }, { text: "💰 Другой доход", callback_data: `i:${tx.id}:o` }]);
+  rows.push([{ text: "↔ Чужие деньги (транзит)", callback_data: `t:${tx.id}` }]);
+  const last: Button[] = [{ text: "Все направления…", callback_data: `m:${tx.id}` }];
   const url = publicUrl();
   if (url) last.push({ text: "Открыть форму", url: `${url}/inbox/${tx.id}` });
   rows.push(last);
@@ -161,13 +166,20 @@ export async function remindPlan(p: Plan): Promise<boolean> {
   const left = p.total - p.paid;
   const today = new Date();
   const overdue = p.due_date && p.due_date < `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  const buttons: Button[][] = [[{ text: "✓ Оплачено", callback_data: `p:${p.id}` }]];
+  const isIn = p.direction === "in";
+  const buttons: Button[][] = [[{ text: isIn ? "✓ Пришли" : "✓ Оплачено", callback_data: `p:${p.id}` }]];
   const url = publicUrl();
   if (url) buttons[0].push({ text: "Открыть", url: `${url}/plans/${p.id}` });
+  const head = isIn
+    ? `💰 ${overdue ? "Ещё не пришла" : "Сегодня ждём"}: <b>${esc(p.title)}</b>`
+    : `${overdue ? "⚠️ Платёж просрочен" : "📅 Сегодня оплатить"}: <b>${esc(p.title)}</b>`;
+  const tail = isIn
+    ? "Если деньги придут на Monobank — D&N отметит сам. Пришли иначе — нажмите «✓ Пришли»."
+    : "Платите с Monobank или Apple Pay — нажимать ничего не нужно, D&N отметит сам.";
   await call(token, "sendMessage", {
     chat_id: chat,
     parse_mode: "HTML",
-    text: `${overdue ? "⚠️ Просрочен платёж" : "📅 Сегодня оплатить"}: <b>${esc(p.title)}</b>\n${esc(formatMoney(left))}${p.payee ? ` · ${esc(p.payee)}` : ""}${p.paid ? `\nуже оплачено ${esc(formatMoney(p.paid))} из ${esc(formatMoney(p.total))}` : ""}\n\nПлатите с Monobank или Apple Pay — нажимать не нужно, D&N отметит сам.`,
+    text: `${head}\n${esc(formatMoney(left))}${p.payee ? ` · ${esc(p.payee)}` : ""}${p.paid ? `\nуже ${isIn ? "получено" : "оплачено"} ${esc(formatMoney(p.paid))} из ${esc(formatMoney(p.total))}` : ""}\n\n${tail}`,
     reply_markup: { inline_keyboard: buttons },
   });
   return true;
@@ -178,6 +190,8 @@ export async function sendPlanReminders(now = new Date()): Promise<number> {
   if (now.getHours() < 9 || !getSetting("tg_chat_id")) return 0;
   let n = 0;
   for (const p of plansToRemind(now)) {
+    // Ставку, которая зачислится сама, не спрашиваем.
+    if (p.kind === "salary" && p.auto && canAutoCredit(p)) continue;
     try {
       if (await remindPlan(p)) { markReminded(p.id, now); n++; }
     } catch (e) {
@@ -211,7 +225,7 @@ export async function handleUpdate(update: Update): Promise<void> {
       setSetting("tg_link_code", null);
       await call(token, "sendMessage", {
         chat_id: chatId,
-        text: "Готово ✓ Теперь после каждой операции я пришлю сообщение — выберите категорию кнопкой.",
+        text: "Готово ✓ Теперь после каждой операции я пришлю сообщение — выберите направление кнопкой.",
       });
     } else if (chatId !== boundChat) {
       await call(token, "sendMessage", {
@@ -237,12 +251,13 @@ export async function handleUpdate(update: Update): Promise<void> {
       await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: "Платёж уже закрыт" });
       return;
     }
+    const isIn = p.direction === "in";
     const txId = payPlan(p.id, p.total - p.paid, { cardId: p.card_id, cashboxId: p.cashbox_id });
-    await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: "Записано: оплачено" });
+    await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: isIn ? "Записано: деньги пришли" : "Записано: оплачено" });
     await call(token, "editMessageText", {
       chat_id: chatId,
       message_id: q.message.message_id,
-      text: `✓ Оплачено: <b>${esc(p.title)}</b> · ${esc(formatMoney(p.total - p.paid))}`,
+      text: `${isIn ? "✓ Пришли" : "✓ Оплачено"}: <b>${esc(p.title)}</b> · ${esc(formatMoney(p.total - p.paid))}`,
       parse_mode: "HTML",
       reply_markup: { inline_keyboard: [[{ text: "↩ Отменить", callback_data: `u:${txId}` }]] },
     });
@@ -260,9 +275,9 @@ export async function handleUpdate(update: Update): Promise<void> {
     await call(token, "editMessageText", {
       chat_id: chatId,
       message_id: q.message.message_id,
-      text: `↩ Оплата отменена: <b>${esc(p.title)}</b> снова ждёт оплаты · ${esc(formatMoney(p.total - p.paid))}`,
+      text: `↩ Отменено: <b>${esc(p.title)}</b> · ${esc(formatMoney(p.total - p.paid))} — снова ${p.direction === "in" ? "ждём" : "ждёт оплаты"}`,
       parse_mode: "HTML",
-      reply_markup: { inline_keyboard: [[{ text: "✓ Оплачено", callback_data: `p:${p.id}` }]] },
+      reply_markup: { inline_keyboard: [[{ text: p.direction === "in" ? "✓ Пришли" : "✓ Оплачено", callback_data: `p:${p.id}` }]] },
     });
     return;
   }
@@ -272,10 +287,32 @@ export async function handleUpdate(update: Update): Promise<void> {
     await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: "Операция не найдена (удалена?)" });
     return;
   }
+  if (action === "i") {
+    getDb()
+      .prepare("UPDATE transactions SET income_kind = ?, kind = 'income', assigned_at = COALESCE(assigned_at, ?) WHERE id = ?")
+      .run(centerRaw === "s" ? "salary" : "other", new Date().toISOString(), tx.id);
+    await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: "Записано в доходы" });
+    await call(token, "editMessageReplyMarkup", { ...target, reply_markup: { inline_keyboard: [] } });
+    await call(token, "sendMessage", { chat_id: chatId, text: `✓ ${formatMoney(tx.amount)} — ${centerRaw === "s" ? "ставка" : "доход"}` });
+    return;
+  }
+  if (action === "t") {
+    const amount = Math.abs(tx.amount);
+    const same = listTransits(true).find((t) => t.amount === amount);
+    const transitId = same?.id ?? createTransit({ title: tx.counterparty || "Чужие деньги", amountKop: amount });
+    linkTxToTransit(tx.id, transitId);
+    await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: "Заморожено как транзит" });
+    await call(token, "editMessageReplyMarkup", { ...target, reply_markup: { inline_keyboard: [] } });
+    await call(token, "sendMessage", {
+      chat_id: chatId,
+      text: `↔ ${formatMoney(amount)} — чужие деньги (транзит). Не считаются вашими доходами и расходами. Когда отдадите — отметьте «Отдал» в D&N → Ещё → Транзит.`,
+    });
+    return;
+  }
   if (action === "a") {
     const center = centerTree().find((c) => c.id === Number(centerRaw));
     if (!center) {
-      await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: "Категория не найдена" });
+      await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: "Направление не найдено" });
       return;
     }
     assignTx(tx.id, center.id);

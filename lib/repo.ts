@@ -46,6 +46,8 @@ export interface Tx {
   cashbox_name?: string | null;
   plan_id?: number | null;
   sale_id?: number | null;
+  transit_id?: number | null;
+  income_kind?: string | null;
   center_name?: string | null;
   center_color?: string | null;
 }
@@ -82,10 +84,11 @@ export function centerTree(): (CostCenter & { depth: number; path: string })[] {
   return out;
 }
 
-export function createCenter(name: string, parentId: number | null, color: string, budgetKop: number, internal: boolean) {
-  getDb()
+export function createCenter(name: string, parentId: number | null, color: string, budgetKop: number, internal: boolean): number {
+  const r = getDb()
     .prepare("INSERT INTO cost_centers (name, parent_id, color, monthly_budget, is_internal) VALUES (?, ?, ?, ?, ?)")
     .run(name, parentId, color, budgetKop, internal ? 1 : 0);
+  return Number(r.lastInsertRowid);
 }
 
 /** Переименовать, перекрасить, перенести категорию. Нельзя вложить её саму в себя или в свою подкатегорию. */
@@ -95,7 +98,7 @@ export function updateCenter(id: number, c: { name: string; color: string; paren
     let p: number | null = c.parentId;
     const seen = new Set<number>();
     while (p !== null && !seen.has(p)) {
-      if (p === id) throw new Error("Нельзя вложить категорию саму в себя");
+      if (p === id) throw new Error("Нельзя вложить направление само в себя");
       seen.add(p);
       const r = db.prepare("SELECT parent_id FROM cost_centers WHERE id = ?").get(p) as { parent_id: number | null } | undefined;
       p = r?.parent_id ?? null;
@@ -340,7 +343,7 @@ export function getTx(id: number): Tx | null {
 export function listUnassigned(): Tx[] {
   return rows<Tx>(
     getDb()
-      .prepare(`${TX_SELECT} WHERE t.cost_center_id IS NULL AND t.kind != 'internal' ORDER BY t.occurred_at DESC`)
+      .prepare(`${TX_SELECT} WHERE t.cost_center_id IS NULL AND t.kind != 'internal' AND t.income_kind IS NULL ORDER BY t.occurred_at DESC`)
       .all(),
   );
 }
@@ -349,7 +352,7 @@ export function unassignedSummary(): { count: number; sum: number } {
   const r = getDb()
     .prepare(
       `SELECT COUNT(*) AS n, COALESCE(SUM(ABS(amount)), 0) AS s FROM transactions
-       WHERE cost_center_id IS NULL AND kind != 'internal'`,
+       WHERE cost_center_id IS NULL AND kind != 'internal' AND income_kind IS NULL`,
     )
     .get() as Row;
   return { count: Number(r.n), sum: Number(r.s) };
@@ -362,7 +365,7 @@ export function listRecent(limit = 50): Tx[] {
 export function assignTx(id: number, centerId: number, forWhom?: string, description?: string) {
   const db = getDb();
   const center = db.prepare("SELECT is_internal FROM cost_centers WHERE id = ?").get(centerId) as Row | undefined;
-  if (!center) throw new Error("Категория не найдена");
+  if (!center) throw new Error("Направление не найдено");
   const tx = db.prepare("SELECT amount, kind FROM transactions WHERE id = ?").get(id) as Row | undefined;
   if (!tx) throw new Error("Операция не найдена");
   const kind = Number(center.is_internal) ? "internal" : Number(tx.amount) >= 0 ? "income" : "expense";

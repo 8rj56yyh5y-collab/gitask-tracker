@@ -3,26 +3,30 @@ import { Icon } from "../components/Icon.tsx";
 import { toggleSetupAction } from "../actions.ts";
 import { unassignedSummary } from "@/lib/repo.ts";
 import { setupHidden } from "@/lib/setup.ts";
+import { transitOpenSum } from "@/lib/transit.ts";
+import { formatMoney } from "@/lib/money.ts";
 
 type Item = { href: string; icon: string; title: string; note: string };
 
 export default function More() {
   const { count } = unassignedSummary();
+  const transit = transitOpenSum();
   const groups: [string, Item[]][] = [
     [
       "Каждый день",
       [
-        { href: "/inbox", icon: "inbox", title: "Разнести", note: count ? `${count} ждут категорию` : "Всё записано" },
+        { href: "/inbox", icon: "inbox", title: "Без направления", note: count ? `${count} — укажите, на что ушли деньги` : "Все операции записаны" },
         { href: "/history", icon: "history", title: "История", note: "Все операции по датам" },
-        { href: "/cash", icon: "wallet", title: "Кассы", note: "Наличные: остатки, приход, расход" },
+        { href: "/transit", icon: "swap", title: "Транзит денег", note: transit ? `Сейчас чужих денег: ${formatMoney(transit)}` : "Чужие деньги, которые нужно передать" },
       ],
     ],
     [
-      "Анализ",
+      "Деньги",
       [
+        { href: "/income", icon: "wallet", title: "Доходы", note: "Ставка, премии и итог месяца" },
+        { href: "/centers", icon: "tag", title: "Направления и кассы", note: "На что уходят деньги, лимиты, наличные" },
+        { href: "/norms", icon: "target", title: "Норма трат", note: "Сколько тратить в месяц на каждое направление" },
         { href: "/analytics", icon: "chart", title: "Аналитика", note: "Куда ушли деньги по месяцам" },
-        { href: "/norms", icon: "target", title: "Норма трат", note: "Сколько тратить в месяц на каждую категорию" },
-        { href: "/centers", icon: "tag", title: "Категории", note: "Список категорий и лимиты" },
       ],
     ],
     [

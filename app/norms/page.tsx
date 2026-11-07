@@ -29,14 +29,14 @@ export default async function Norms({ searchParams }: { searchParams: Promise<{ 
         <p className="muted small" style={{ margin: 0 }}>
           {s.ready
             ? `Посчитано по вашим тратам с ${startText} (${s.elapsed} дн.) и приведено к месяцу. Примите как есть, поправьте суммы или соберите ещё ${30} дней — норма станет точнее.`
-            : `С ${startText} D&N смотрит, сколько уходит на каждую категорию. Через ${s.daysLeft} дн. предложит норму на месяц — её можно будет принять, изменить или собирать дальше.`}
+            : `С ${startText} D&N смотрит, сколько уходит на каждое направление. Через ${s.daysLeft} дн. предложит норму на месяц — её можно будет принять, изменить или собирать дальше.`}
         </p>
-        {ok && <p className="small pos-text">Сохранено: нормы стали лимитами категорий.</p>}
+        {ok && <p className="small pos-text">Готово: нормы стали лимитами направлений.</p>}
       </section>
 
       <form action={acceptNormsAction} className="card form">
         <h2>{s.ready ? "Предложенная норма на месяц" : "Пока по текущим данным"}</h2>
-        {s.rows.length === 0 && <p className="muted small">Категорий пока нет.</p>}
+        {s.rows.length === 0 && <p className="muted small">Направлений пока нет.</p>}
         {s.rows.map((r) => (
           <label key={r.id} className="norm-row">
             <span className="norm-name">
@@ -64,7 +64,7 @@ export default async function Norms({ searchParams }: { searchParams: Promise<{ 
               {s.ready ? "Принять норму" : "Принять сейчас"}
             </button>
             <p className="muted small" style={{ margin: 0 }}>
-              Норма станет месячным лимитом категории: на главной будет видно, укладываетесь ли вы. Пустое поле — без нормы.
+              Норма станет месячным лимитом направления — на главной будет видно, укладываетесь ли вы. Пустое поле — без нормы.
             </p>
           </>
         )}
@@ -81,7 +81,7 @@ export default async function Norms({ searchParams }: { searchParams: Promise<{ 
         </form>
       </div>
       <p className="muted small">
-        Лимиты можно поменять и позже в <Link href="/centers" className="link">Категориях</Link>.
+        Лимиты можно поменять и позже в <Link href="/centers" className="link">Направлениях</Link>.
       </p>
     </div>
   );

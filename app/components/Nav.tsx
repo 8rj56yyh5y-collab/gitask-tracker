@@ -1,16 +1,39 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useTransition } from "react";
 import { Icon } from "./Icon.tsx";
 
 const isActive = (path: string, href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(href + "/"));
 
-/** Кнопки в шапке на телефоне: История и «Ещё». */
+/** Кнопки в шапке на телефоне: Обновить, История и «Ещё». */
 export function TopNav() {
   const path = usePathname();
-  const moreActive = ["/more", "/inbox", "/analytics", "/centers", "/settings", "/cash", "/norms"].some((h) => isActive(path, h));
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const reload = () => start(() => router.refresh());
+  // Вернулись в приложение (с экрана iPhone или из Telegram) — показываем свежие данные.
+  useEffect(() => {
+    let last = Date.now();
+    const onShow = () => {
+      if (document.visibilityState === "visible" && Date.now() - last > 5000) {
+        last = Date.now();
+        start(() => router.refresh());
+      }
+    };
+    document.addEventListener("visibilitychange", onShow);
+    window.addEventListener("focus", onShow);
+    return () => {
+      document.removeEventListener("visibilitychange", onShow);
+      window.removeEventListener("focus", onShow);
+    };
+  }, [router]);
+  const moreActive = ["/more", "/inbox", "/analytics", "/centers", "/settings", "/cash", "/norms", "/income", "/transit", "/help"].some((h) => isActive(path, h));
   return (
     <nav className="top-actions" aria-label="Дополнительно">
+      <button type="button" className={`top-btn ${pending ? "is-spinning" : ""}`} onClick={reload} aria-label="Обновить" title="Обновить">
+        <Icon name="refresh" />
+      </button>
       <Link href="/history" className={`top-btn ${isActive(path, "/history") ? "is-active" : ""}`} aria-label="История">
         <Icon name="history" />
       </Link>
@@ -68,7 +91,7 @@ export function Nav({ pending }: { pending: number }) {
           <Icon name="home" /> Главная
         </Link>
         <Link href="/inbox" className={cls("/inbox")}>
-          <Icon name="inbox" /> Разнести {badge}
+          <Icon name="inbox" /> Без направления {badge}
         </Link>
         <Link href="/history" className={cls("/history")}>
           <Icon name="history" /> История
@@ -80,13 +103,16 @@ export function Nav({ pending }: { pending: number }) {
           <Icon name="card" /> Карты
         </Link>
         <Link href="/centers" className={cls("/centers")}>
-          <Icon name="tag" /> Категории
+          <Icon name="tag" /> Направления
         </Link>
         <Link href="/plans" className={cls("/plans")}>
           <Icon name="calendar" /> Платежи
         </Link>
-        <Link href="/cash" className={cls("/cash")}>
-          <Icon name="wallet" /> Кассы
+        <Link href="/income" className={cls("/income")}>
+          <Icon name="wallet" /> Доходы
+        </Link>
+        <Link href="/transit" className={cls("/transit")}>
+          <Icon name="swap" /> Транзит
         </Link>
         <Link href="/sales" className={cls("/sales")}>
           <Icon name="bag" /> Продажи

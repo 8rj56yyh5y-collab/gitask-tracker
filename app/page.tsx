@@ -8,6 +8,8 @@ import { listPlans, ymd } from "@/lib/plans.ts";
 import { companyDebt } from "@/lib/sales.ts";
 import { normState } from "@/lib/norms.ts";
 import { SetupCard } from "./components/SetupCard.tsx";
+import { MonthMoneyCard } from "./components/MonthMoneyCard.tsx";
+import { transitOpenSum } from "@/lib/transit.ts";
 
 export default function Home() {
   const un = unassignedSummary();
@@ -30,17 +32,19 @@ export default function Home() {
       <Link href="/inbox" className={`card alert span-all ${un.count ? "alert-on" : "alert-ok"}`}>
         {un.count ? (
           <>
-            <div className="big">{un.count} не разнесено</div>
-            <div>на сумму {formatMoney(un.sum)} — нажмите, чтобы записать, куда ушли деньги</div>
+            <div className="big">{un.count} без направления</div>
+            <div>на {formatMoney(un.sum)} — нажмите и укажите, на что ушли деньги</div>
           </>
         ) : (
-          <div className="big">Всё разнесено ✓</div>
+          <div className="big">Все операции записаны ✓</div>
         )}
       </Link>
 
+      <MonthMoneyCard link />
+
       {alerts.length > 0 && (
         <section className="card span-all alert-budget">
-          <h2>Сигналы по лимитам</h2>
+          <h2>Внимание: лимиты</h2>
           {alerts.map((a) => (
             <Link key={a.id} href={`/centers/${a.id}`} className={`pill pill-${a.status === "over" ? "red" : "orange"} plain`}>
               {a.name}:{" "}
@@ -56,11 +60,12 @@ export default function Home() {
         const today = ymd(new Date());
         const week = ymd(new Date(Date.now() + 7 * 864e5));
         const soon = listPlans("open", 200, "out").filter((p) => p.due_date && p.due_date <= week);
-        const owed = listPlans("open", 200, "in");
+        const owed = listPlans("open", 200, "in").filter((p) => p.kind !== "salary");
         const norm = normState();
         const boxes = listCashboxes();
         const bal = cashBalances();
         const debt = companyDebt();
+        const transit = transitOpenSum();
         return (
           <>
             {soon.length > 0 && (
@@ -81,15 +86,21 @@ export default function Home() {
             {norm.ready && !norm.acceptedAt && (
               <Link href="/norms" className="card alert-budget span-all plain">
                 <h2>Норма трат готова</h2>
-                <div className="muted small">За {norm.elapsed} дн. собрано, сколько уходит на каждую категорию. Посмотрите и примите — или соберите ещё 30 дней ›</div>
+                <div className="muted small">За {norm.elapsed} дн. собрано, сколько уходит на каждое направление. Посмотрите и примите — или соберите ещё 30 дней ›</div>
               </Link>
             )}
-            {(boxes.length > 0 || debt > 0 || owed.length > 0) && (
+            {(boxes.length > 0 || debt > 0 || owed.length > 0 || transit > 0) && (
               <div className="card">
                 {boxes.length > 0 && (
                   <Link href="/cash" className="row-between plain" style={{ padding: "2px 0" }}>
                     <span>Наличные в кассах</span>
                     <strong>{formatMoney(boxes.reduce((a, b) => a + (bal.get(b.id) ?? 0), 0))} ›</strong>
+                  </Link>
+                )}
+                {transit > 0 && (
+                  <Link href="/transit" className="row-between plain" style={{ padding: "2px 0" }}>
+                    <span>Чужие деньги (транзит)</span>
+                    <strong>{formatMoney(transit)} ›</strong>
                   </Link>
                 )}
                 {owed.length > 0 && (

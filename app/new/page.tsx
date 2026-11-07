@@ -8,10 +8,12 @@ export default function NewTx() {
   return (
     <div className="narrow">
       <h1>Новая операция</h1>
-      <div className="inline" style={{ marginBottom: 12 }}>
-        <Link href="/sales/new" className="btn btn-sm">Продажа товара ›</Link>
+      <div className="inline" style={{ marginBottom: 12, flexWrap: "wrap" }}>
+        <Link href="/income" className="btn btn-sm">Доход ›</Link>
         <Link href="/plans#new" className="btn btn-sm">Запланировать платёж ›</Link>
-        <Link href="/cash" className="btn btn-sm">Касса ›</Link>
+        <Link href="/sales/new" className="btn btn-sm">Продажа товара ›</Link>
+        <Link href="/transit" className="btn btn-sm">Чужие деньги ›</Link>
+        <Link href="/centers" className="btn btn-sm">Касса ›</Link>
       </div>
       <form action={addTransaction} className="card form">
         <div className="seg">
@@ -19,7 +21,7 @@ export default function NewTx() {
             <input type="radio" name="direction" value="out" defaultChecked /> Расход
           </label>
           <label>
-            <input type="radio" name="direction" value="in" /> Поступление
+            <input type="radio" name="direction" value="in" /> Доход
           </label>
         </div>
         <label>
@@ -27,7 +29,7 @@ export default function NewTx() {
           <input name="amount" inputMode="decimal" required autoFocus placeholder="0" className="amount-input" />
         </label>
         <label>
-          Категория
+          Направление
           <select name="centerId" required defaultValue="">
             <option value="" disabled>
               — выберите —
@@ -41,12 +43,12 @@ export default function NewTx() {
           </select>
         </label>
         <label>
-          Карта / касса
-          <AccountSelect none="наличные / не указано" />
+          Карта или касса
+          <AccountSelect none="не указано" />
         </label>
         <label>
-          Кому / где
-          <input name="counterparty" placeholder="магазин или получатель" />
+          Где или кому
+          <input name="counterparty" placeholder="например, магазин" />
         </label>
         <label>
           Для кого

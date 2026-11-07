@@ -27,7 +27,7 @@ export function setupSteps(): SetupStep[] {
     {
       id: "telegram",
       title: "Подключите Telegram",
-      why: "После каждой оплаты придёт сообщение с кнопками — выбрали категорию, и готово.",
+      why: "После каждой оплаты придёт сообщение с кнопками — выбрали направление, и готово.",
       href: "/settings#telegram",
       done: Boolean(getSetting("tg_chat_id")),
     },
@@ -49,7 +49,7 @@ export function setupSteps(): SetupStep[] {
     {
       id: "assign",
       title: "Запишите первую операцию",
-      why: "Нажмите «＋» внизу или выберите категорию в Telegram.",
+      why: "Нажмите «＋» внизу или выберите направление в Telegram.",
       href: "/new",
       done: has("SELECT 1 FROM transactions WHERE cost_center_id IS NOT NULL LIMIT 1"),
     },
