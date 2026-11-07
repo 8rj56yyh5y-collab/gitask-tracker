@@ -75,3 +75,81 @@ export async function analyzeMonth(d: Date): Promise<string> {
   if (!text) throw new Error("ИИ вернул пустой ответ. Попробуйте ещё раз.");
   return text;
 }
+
+// ---------- Подсказка категории для операции ----------
+
+const SUGGEST_SYSTEM = `Ты помогаешь вести учёт расходов (Украина, гривны).
+По одной операции из банка (магазин или получатель, сумма, карта, время) выбери самую подходящую категорию из списка
+и предложи короткий комментарий на русском — 2–5 слов, что это скорее всего было (например: «продукты домой», «бензин»).
+Если по названию ничего не понятно — выбери категорию «Другое» (если она есть в списке) и оставь комментарий пустым.
+Не придумывай подробностей, которых нельзя понять из названия.`;
+
+export interface CategorySuggestion {
+  categoryId: number;
+  note: string;
+}
+
+/**
+ * ИИ подбирает категорию и комментарий. Возвращает null, если ИИ не подключён, данных нет или запрос не удался —
+ * запись операции от этого не зависит.
+ */
+export async function suggestCategory(
+  tx: { counterparty: string; description: string; amount: number; card_label?: string | null; occurred_at: string },
+  categories: { id: number; name: string }[],
+): Promise<CategorySuggestion | null> {
+  if (!aiConfigured() || categories.length === 0) return null;
+  const merchant = (tx.counterparty || tx.description || "").trim();
+  if (!merchant) return null;
+  const client = new Anthropic({ timeout: 20_000, maxRetries: 1 });
+  try {
+    const response = await client.beta.messages.create({
+      model: MODEL,
+      max_tokens: 2000,
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      system: SUGGEST_SYSTEM,
+      output_config: {
+        effort: "low",
+        format: {
+          type: "json_schema",
+          schema: {
+            type: "object",
+            properties: {
+              category_id: { type: "integer", enum: categories.map((c) => c.id) },
+              note: { type: "string" },
+            },
+            required: ["category_id", "note"],
+            additionalProperties: false,
+          },
+        },
+      },
+      messages: [
+        {
+          role: "user",
+          content: JSON.stringify({
+            операция: {
+              где: merchant,
+              сумма: `${Math.abs(tx.amount) / 100} ₴`,
+              тип: tx.amount < 0 ? "расход" : "поступление",
+              карта: tx.card_label ?? null,
+              время: tx.occurred_at,
+            },
+            категории: categories.map((c) => ({ id: c.id, название: c.name })),
+          }),
+        },
+      ],
+    });
+    if (response.stop_reason === "refusal") return null;
+    const text = response.content
+      .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("")
+      .trim();
+    const data = JSON.parse(text) as { category_id: number; note: string };
+    if (!categories.some((c) => c.id === data.category_id)) return null;
+    return { categoryId: data.category_id, note: String(data.note ?? "").trim().slice(0, 80) };
+  } catch (e) {
+    console.error("AI category suggestion failed:", e instanceof Error ? e.message : e);
+    return null;
+  }
+}

@@ -40,6 +40,8 @@ export function TxRow({ tx, children, hidePending }: { tx: Tx; children?: React.
           {src && <> · {src}</>}
           {tx.for_whom && <> · для: {tx.for_whom}</>}
         </div>
+        {tx.assigned_at && tx.counterparty && tx.description && tx.description !== tx.counterparty && !tx.needs_note && <div className="tx-note">💬 {tx.description}</div>}
+        {tx.category_name && <span className="chip">{tx.category_emoji} {tx.category_name}</span>}
         {tx.center_name && (
           <span className="chip" style={{ borderColor: tx.center_color ?? undefined, color: tx.center_color ?? undefined }}>
             {tx.center_name}

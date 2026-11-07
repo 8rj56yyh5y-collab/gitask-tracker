@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { removeCard, setCardParentAction, updateCardAction } from "../../actions.ts";
+import { deleteCardAction, removeCard, setCardParentAction, updateCardAction } from "../../actions.ts";
 import { CardTile } from "../../components/CardTile.tsx";
 import { TxRow } from "../../components/TxRow.tsx";
 import { BANK_NAMES, BANK_STYLE, cardStyle } from "@/lib/banks.ts";
@@ -153,11 +153,24 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
         </form>
       )}
 
-      <form action={removeCard}>
-        <input type="hidden" name="id" value={card.id} />
-        <input type="hidden" name="next" value="/cards" />
-        <button className="btn btn-ghost btn-sm danger">Скрыть карту</button>
-      </form>
+      <details className="card settings-fold danger-fold">
+        <summary>Убрать карту</summary>
+        <p className="small">
+          <b>Скрыть</b> — карта пропадёт из списков, но её можно будет вернуть. <b>Удалить</b> — карта удаляется совсем; её операции
+          останутся в истории, но без привязки к карте.
+        </p>
+        <div className="row-gap">
+          <form action={removeCard}>
+            <input type="hidden" name="id" value={card.id} />
+            <input type="hidden" name="next" value="/cards" />
+            <button className="btn btn-sm">Скрыть карту</button>
+          </form>
+          <form action={deleteCardAction}>
+            <input type="hidden" name="id" value={card.id} />
+            <button className="btn btn-sm danger-btn">Удалить карту навсегда</button>
+          </form>
+        </div>
+      </details>
       <p className="muted small">Списано за месяц: {formatMoney(used)}.</p>
     </div>
   );

@@ -24,7 +24,8 @@ export default function More() {
       "Деньги и планы",
       [
         { href: "/income", icon: "income", title: "Доходы", note: "Ставка, премии и ваш итог за месяц" },
-        { href: "/centers", icon: "tag", title: "Направления", note: "Личные, работа, семья — и лимиты на месяц" },
+        { href: "/centers", icon: "tag", title: "Направления", note: "Чьи деньги: личные, работа, семья — и лимиты" },
+        { href: "/categories", icon: "grid", title: "Категории", note: "На что именно: продукты, такси, аренда…" },
         { href: "/norms", icon: "target", title: "Норма трат", note: "Сколько обычно уходит в месяц — подскажет D&N" },
         { href: "/analytics", icon: "chart", title: "Аналитика", note: "Куда уходят деньги: месяцы и сравнение" },
       ],

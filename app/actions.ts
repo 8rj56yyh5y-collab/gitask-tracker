@@ -8,12 +8,14 @@ import { connectTelegram, disconnectTelegram } from "@/lib/telegram.ts";
 import { publicBase } from "@/lib/url.ts";
 import { cookies } from "next/headers";
 import { THEME_COOKIE, normalizeTheme } from "@/lib/theme.ts";
+import { NAV_COOKIE, NAV_ITEMS, parseNav } from "@/lib/nav.ts";
 import { BANK_NAMES } from "@/lib/banks.ts";
 import { archiveCashbox, cashMove, createCashbox, parseAccount, transfer, updateCashbox } from "@/lib/cash.ts";
 import { afterTxDeleted, cancelPlan, createPlan, payPlan, restorePlan, undoPlanPayment, updatePlan } from "@/lib/plans.ts";
 import { archiveGroup, archiveProduct, createSale, deleteSale, payCompany, saveGroup, saveProduct, setSalesBase } from "@/lib/sales.ts";
 import { acceptNorms, extendNorm, restartNorm } from "@/lib/norms.ts";
 import { setSetting } from "@/lib/settings.ts";
+import { addCategory, renameCategory, setCategoryEnabled, setTxDetails } from "@/lib/categories.ts";
 import { addOtherIncome, createSalary, creditDueSalaries } from "@/lib/income.ts";
 import { createTransit, deleteTransit, finishTransit, linkTxToTransit } from "@/lib/transit.ts";
 import { getDb } from "@/lib/db.ts";
@@ -21,6 +23,7 @@ import { redirect } from "next/navigation";
 import { toKop, parseAmount } from "@/lib/money.ts";
 import {
   archiveCard,
+  deleteCard,
   archiveCenter,
   assignTx,
   createCard,
@@ -64,16 +67,19 @@ export async function addTransaction(f: FormData) {
   if (!amount) throw new Error("Укажите сумму");
   const direction = str(f, "direction") === "in" ? 1 : -1;
   const date = str(f, "date");
-  insertTx({
+  const note = str(f, "description");
+  if (direction < 0 && !note) throw new Error("Напишите комментарий: на что именно");
+  const created = insertTx({
     amountKop: direction * toKop(amount),
     occurredAt: date ? new Date(date).toISOString() : undefined,
     ...accountOf(f),
     costCenterId: num(f, "centerId"),
     forWhom: str(f, "forWhom"),
     counterparty: str(f, "counterparty"),
-    description: str(f, "description"),
+    description: note,
     source: "manual",
   });
+  setTxDetails(created.id, { categoryId: num(f, "categoryId") });
   refresh();
   redirect(str(f, "next") || "/");
 }
@@ -82,7 +88,12 @@ export async function assignTransaction(f: FormData) {
   const id = num(f, "id");
   const centerId = num(f, "centerId");
   if (!id || !centerId) throw new Error("Выберите направление");
-  assignTx(id, centerId, str(f, "forWhom"), str(f, "description"));
+  const tx = getTx(id);
+  const note = str(f, "description");
+  if (!note) throw new Error("Напишите комментарий: на что именно ушли деньги");
+  if (tx && tx.amount < 0 && !num(f, "categoryId")) throw new Error("Выберите категорию");
+  assignTx(id, centerId, str(f, "forWhom"), note);
+  setTxDetails(id, { categoryId: num(f, "categoryId"), note });
   refresh();
   back(f);
 }
@@ -132,7 +143,7 @@ export async function addCenter(f: FormData) {
   const id = createCenter(name, num(f, "parentId"), color, toKop(parseAmount(str(f, "budget")) ?? 0), f.get("internal") === "on");
   if (f.get("personal") === "on") getDb().prepare("UPDATE cost_centers SET is_personal = 1 WHERE id = ?").run(id);
   // Своя касса (наличные) у направления — сразу.
-  if (f.get("withCash") === "on") createCashbox({ name, centerId: id, color, opening: kop(f, "opening") });
+  if (f.get("withCash") === "on") createCashbox({ name, centerId: id, opening: kop(f, "opening") });
   refresh();
   back(f);
 }
@@ -266,6 +277,15 @@ export async function setThemeAction(f: FormData) {
   refresh();
 }
 
+export async function setNavAction(f: FormData) {
+  const picked = f.getAll("nav").map(String);
+  const order = NAV_ITEMS.map((i) => i.id as string).filter((id) => picked.includes(id));
+  const value = parseNav(str(f, "reset") ? "" : order.join(","));
+  (await cookies()).set(NAV_COOKIE, value.join(","), { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
+  refresh();
+  redirect("/settings?nav_ok=1#nav");
+}
+
 export async function mergeCardsAction(f: FormData) {
   const id = num(f, "mainId");
   if (id) mergeBankCards(id);
@@ -299,7 +319,7 @@ const pct = (f: FormData, k: string) => {
 export async function createCashboxAction(f: FormData) {
   const name = str(f, "name");
   if (!name) throw new Error("Назовите кассу");
-  const id = createCashbox({ name, owner: str(f, "owner"), color: hexColor(str(f, "color")) ?? "#16a34a", opening: kop(f, "opening"), centerId: num(f, "centerId") });
+  const id = createCashbox({ name, owner: str(f, "owner"), color: hexColor(str(f, "color")) ?? undefined, opening: kop(f, "opening"), centerId: num(f, "centerId") });
   refresh();
   redirect(`/cash/${id}`);
 }
@@ -324,7 +344,8 @@ export async function cashMoveAction(f: FormData) {
   const amount = kop(f, "amount");
   if (!id || !amount) throw new Error("Укажите сумму");
   const sign = str(f, "dir") === "in" ? 1 : -1;
-  cashMove(id, { amountKop: sign * amount, counterparty: str(f, "who"), note: str(f, "note"), centerId: num(f, "centerId"), at: isoDate(f, "at"), planId: num(f, "planId") });
+  const txId = cashMove(id, { amountKop: sign * amount, counterparty: str(f, "who"), note: str(f, "note"), centerId: num(f, "centerId"), at: isoDate(f, "at"), planId: num(f, "planId") });
+  if (num(f, "categoryId")) setTxDetails(txId, { categoryId: num(f, "categoryId") });
   refresh();
   back(f);
 }
@@ -576,4 +597,33 @@ export async function createCenterCashboxAction(f: FormData) {
   const id = createCashbox({ name, centerId, opening: kop(f, "opening") });
   refresh();
   redirect(`/cash/${id}`);
+}
+
+// ---------- Категории ----------
+export async function toggleCategoryAction(f: FormData) {
+  const id = num(f, "id");
+  if (id) setCategoryEnabled(id, str(f, "on") === "1");
+  refresh();
+  back(f);
+}
+
+export async function addCategoryAction(f: FormData) {
+  addCategory(str(f, "name"), str(f, "emoji"));
+  refresh();
+  back(f);
+}
+
+export async function renameCategoryAction(f: FormData) {
+  const id = num(f, "id");
+  if (id) renameCategory(id, str(f, "name"), str(f, "emoji"));
+  refresh();
+  back(f);
+}
+
+/** Удалить карту совсем. Операции остаются в истории, но без привязки к карте. */
+export async function deleteCardAction(f: FormData) {
+  const id = num(f, "id");
+  if (id) deleteCard(id);
+  refresh();
+  redirect("/cards?deleted=1");
 }

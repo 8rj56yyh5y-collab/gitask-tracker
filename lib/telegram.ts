@@ -3,6 +3,7 @@ import { formatMoney } from "./money.ts";
 import { assignTx, centerTree, getTx, suggestCenters, type Tx } from "./repo.ts";
 import { getSetting, setSetting } from "./settings.ts";
 import { canAutoCredit } from "./income.ts";
+import { getCategory, label, listCategories, markNeedsNote, setTxDetails, suggestedCategories } from "./categories.ts";
 import { createTransit, linkTxToTransit, listTransits } from "./transit.ts";
 import { getDb } from "./db.ts";
 import { getPlan, markReminded, payPlan, plansToRemind, undoPlanPayment, type Plan } from "./plans.ts";
@@ -139,6 +140,65 @@ function childKeyboard(tx: Tx, parentId: number): Button[][] {
   return rows;
 }
 
+/** Строка с подсказкой ИИ (или по истории): «✨ Похоже на: 🛒 Продукты — продукты домой». */
+function aiHint(tx: Tx): string {
+  const c = getCategory(tx.ai_category_id);
+  if (!c || tx.amount >= 0) return "";
+  return `\n✨ Похоже на: <b>${esc(label(c))}</b>${tx.ai_note ? ` — ${esc(tx.ai_note)}` : ""}`;
+}
+
+/** Шаг 2: категории — подсказанная первой (со звёздочкой), затем частые. */
+function categoryKeyboard(tx: Tx): Button[][] {
+  const all = new Map(listCategories().map((c) => [c.id, c]));
+  const ids = suggestedCategories(tx, 8);
+  const btn = (id: number): Button => {
+    const c = all.get(id)!;
+    return { text: `${id === tx.ai_category_id ? "✨ " : ""}${label(c)}`.slice(0, 40), callback_data: `k:${tx.id}:${id}` };
+  };
+  const rows = pairs(ids.filter((id) => all.has(id)).map(btn));
+  rows.push([{ text: "Все категории…", callback_data: `K:${tx.id}:0` }]);
+  return rows;
+}
+
+/** Все включённые категории, по 10 на страницу. */
+function allCategoriesKeyboard(tx: Tx, page: number): Button[][] {
+  const list = listCategories();
+  const per = 10;
+  const pages = Math.max(1, Math.ceil(list.length / per));
+  const p = Math.min(Math.max(0, page), pages - 1);
+  const rows = pairs(list.slice(p * per, p * per + per).map((c) => ({ text: label(c).slice(0, 40), callback_data: `k:${tx.id}:${c.id}` })));
+  const nav: Button[] = [];
+  if (p > 0) nav.push({ text: "‹", callback_data: `K:${tx.id}:${p - 1}` });
+  nav.push({ text: `${p + 1} / ${pages}`, callback_data: `K:${tx.id}:${p}` });
+  if (p < pages - 1) nav.push({ text: "›", callback_data: `K:${tx.id}:${p + 1}` });
+  rows.push(nav);
+  return rows;
+}
+
+/** Шаг 3: попросить комментарий. Без него операция остаётся в «Без направления» с пометкой. */
+async function askNote(token: string, chatId: string, target: { chat_id: string; message_id: number }, tx: Tx) {
+  setSetting("tg_pending_note", `${tx.id}:${target.message_id}`);
+  const buttons: Button[][] = [];
+  if (tx.ai_note) buttons.push([{ text: `✓ «${tx.ai_note}»`.slice(0, 60), callback_data: `n:${tx.id}` }]);
+  const cat = getCategory(tx.category_id);
+  await call(token, "editMessageText", {
+    ...target,
+    text:
+      `${txText(tx)}\n\n✓ ${esc(tx.center_name ?? "")}${cat ? ` · ${esc(label(cat))}` : ""}\n` +
+      `<b>${tx.amount < 0 ? "3 из 3" : "2 из 2"}.</b> Напишите сообщением, на что именно${tx.amount < 0 ? " (например: продукты на неделю)" : ""}.` +
+      (tx.ai_note ? " Или нажмите кнопку с подсказкой." : ""),
+    parse_mode: "HTML",
+    reply_markup: { inline_keyboard: buttons },
+  });
+  void chatId;
+}
+
+/** Итог после всех шагов. */
+function doneText(tx: Tx): string {
+  const cat = getCategory(tx.category_id);
+  return `${txText(tx)}\n\n✓ Записано: <b>${esc(tx.center_name ?? "")}</b>${cat ? ` · ${esc(label(cat))}` : ""}${tx.description ? `\n💬 ${esc(tx.description)}` : ""}`;
+}
+
 /** Уведомление о новой неразнесённой операции. Ошибки не мешают приёму операции. */
 export async function notifyNewTx(txId: number): Promise<void> {
   const token = getSetting("tg_token");
@@ -147,9 +207,10 @@ export async function notifyNewTx(txId: number): Promise<void> {
   const tx = getTx(txId);
   if (!tx || tx.cost_center_id !== null || tx.kind === "internal") return;
   try {
+    const hint = aiHint(tx);
     await call(token, "sendMessage", {
       chat_id: chat,
-      text: `${txText(tx)}\n\nКуда ушли деньги?`,
+      text: `${txText(tx)}${hint}\n\n<b>1 из 3.</b> Чьи это деньги?`,
       parse_mode: "HTML",
       reply_markup: { inline_keyboard: suggestKeyboard(tx) },
     });
@@ -232,6 +293,21 @@ export async function handleUpdate(update: Update): Promise<void> {
         chat_id: chatId,
         text: "Этот чат не привязан к D&N. Откройте «Настройки» в D&N и нажмите ссылку для привязки.",
       });
+    } else if (text && !text.startsWith("/")) {
+      // Комментарий к операции, которая ждёт его (шаг 3).
+      const [txRaw, msgRaw] = (getSetting("tg_pending_note") ?? "").split(":");
+      const pending = txRaw ? getTx(Number(txRaw)) : null;
+      if (!pending) {
+        await call(token, "sendMessage", { chat_id: chatId, text: "Сейчас нет операции, которая ждёт комментарий. Новые оплаты придут сюда сами." });
+        return;
+      }
+      setTxDetails(pending.id, { note: text });
+      setSetting("tg_pending_note", null);
+      const done = getTx(pending.id)!;
+      if (msgRaw) {
+        await call(token, "editMessageText", { chat_id: chatId, message_id: Number(msgRaw), text: doneText(done), parse_mode: "HTML" }).catch(() => {});
+      }
+      await call(token, "sendMessage", { chat_id: chatId, text: `✓ Записано: ${formatMoney(Math.abs(done.amount))} — ${text}` });
     }
     return;
   }
@@ -309,6 +385,36 @@ export async function handleUpdate(update: Update): Promise<void> {
     });
     return;
   }
+  if (action === "k") {
+    // Выбрана категория → шаг 3: комментарий.
+    const cat = getCategory(Number(centerRaw));
+    if (!cat) {
+      await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: "Категория не найдена" });
+      return;
+    }
+    setTxDetails(tx.id, { categoryId: cat.id });
+    await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: label(cat) });
+    await askNote(token, chatId, target, getTx(tx.id)!);
+    return;
+  }
+  if (action === "K") {
+    // Все категории, по страницам.
+    await call(token, "answerCallbackQuery", { callback_query_id: q.id });
+    await call(token, "editMessageReplyMarkup", { ...target, reply_markup: { inline_keyboard: allCategoriesKeyboard(tx, Number(centerRaw) || 0) } });
+    return;
+  }
+  if (action === "n") {
+    // Принять комментарий, предложенный ИИ.
+    if (!tx.ai_note) {
+      await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: "Напишите комментарий сообщением" });
+      return;
+    }
+    setTxDetails(tx.id, { note: tx.ai_note });
+    setSetting("tg_pending_note", null);
+    await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: "Записано ✓" });
+    await call(token, "editMessageText", { ...target, text: doneText(getTx(tx.id)!), parse_mode: "HTML" });
+    return;
+  }
   if (action === "a") {
     const center = centerTree().find((c) => c.id === Number(centerRaw));
     if (!center) {
@@ -316,12 +422,19 @@ export async function handleUpdate(update: Update): Promise<void> {
       return;
     }
     assignTx(tx.id, center.id);
-    await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: `Записано: ${center.name}` });
-    await call(token, "editMessageText", {
-      ...target,
-      text: `${txText(getTx(tx.id)!)}\n\n✓ Записано: <b>${esc(center.path)}</b>`,
-      parse_mode: "HTML",
-    });
+    markNeedsNote(tx.id, true);
+    await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: center.name });
+    const fresh = getTx(tx.id)!;
+    if (fresh.amount < 0) {
+      await call(token, "editMessageText", {
+        ...target,
+        text: `${txText(fresh)}${aiHint(fresh)}\n\n✓ ${esc(center.path)}\n<b>2 из 3.</b> На что именно?`,
+        parse_mode: "HTML",
+        reply_markup: { inline_keyboard: categoryKeyboard(fresh) },
+      });
+    } else {
+      await askNote(token, chatId, target, fresh);
+    }
   } else if (action === "m" || action === "b" || action === "c") {
     await call(token, "answerCallbackQuery", { callback_query_id: q.id });
     const kb = action === "m" ? rootsKeyboard(tx) : action === "c" ? childKeyboard(tx, Number(centerRaw)) : suggestKeyboard(tx);

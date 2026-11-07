@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useTransition } from "react";
 import { Icon } from "./Icon.tsx";
+import { NAV_ITEMS, type NavId } from "@/lib/nav.ts";
 
 const isActive = (path: string, href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(href + "/"));
 
@@ -41,42 +42,43 @@ export function TopNav() {
 }
 
 /** Нижняя панель на телефоне и боковое меню на большом экране. */
-export function Nav({ pending }: { pending: number }) {
+export function Nav({ pending, items }: { pending: number; items: NavId[] }) {
   const path = usePathname();
   const cls = (href: string) => `nav-item ${isActive(path, href) ? "is-active" : ""}`;
   const badge = pending > 0 ? <span className="badge">{pending > 99 ? "99+" : pending}</span> : null;
-  const moreActive = ["/more", "/inbox", "/analytics", "/centers", "/settings", "/norms", "/income", "/transit", "/help"].some((h) => isActive(path, h));
+  const chosen = items.map((id) => NAV_ITEMS.find((i) => i.id === id)!).filter(Boolean);
+  const half = Math.ceil(chosen.length / 2);
+  const left = chosen.slice(0, half);
+  const right = chosen.slice(half);
+  const inBar = new Set<string>(chosen.map((i) => i.href));
+  const moreActive =
+    isActive(path, "/more") ||
+    ["/inbox", "/analytics", "/centers", "/settings", "/norms", "/income", "/transit", "/help", "/categories", "/history", "/cash", "/cards", "/plans", "/sales"]
+      .filter((h) => !inBar.has(h))
+      .some((h) => isActive(path, h));
+  const tab = (i: (typeof NAV_ITEMS)[number]) => (
+    <Link key={i.id} href={i.href} className={cls(i.href)}>
+      {i.id === "home" || i.id === "inbox" ? (
+        <span className="icon-wrap">
+          <Icon name={i.icon} />
+          {badge}
+        </span>
+      ) : (
+        <Icon name={i.icon} />
+      )}
+      <span>{i.label}</span>
+    </Link>
+  );
 
   return (
     <>
       {/* Телефон */}
-      <nav className="tabbar tabbar-7" aria-label="Меню">
-        <Link href="/" className={cls("/")}>
-          <span className="icon-wrap">
-            <Icon name="home" />
-            {badge}
-          </span>
-          <span>Главная</span>
-        </Link>
-        <Link href="/cards" className={cls("/cards")}>
-          <Icon name="card" />
-          <span>Карты</span>
-        </Link>
-        <Link href="/cash" className={cls("/cash")}>
-          <Icon name="wallet" />
-          <span>Кассы</span>
-        </Link>
+      <nav className="tabbar" aria-label="Меню" style={{ gridTemplateColumns: `repeat(${chosen.length + 2}, 1fr)` }}>
+        {left.map(tab)}
         <Link href="/new" className="nav-plus" aria-label="Новая операция">
           <Icon name="plus" size={28} />
         </Link>
-        <Link href="/plans" className={cls("/plans")}>
-          <Icon name="calendar" />
-          <span>Платежи</span>
-        </Link>
-        <Link href="/sales" className={cls("/sales")}>
-          <Icon name="bag" />
-          <span>Продажи</span>
-        </Link>
+        {right.map(tab)}
         <Link href="/more" className={`nav-item ${moreActive ? "is-active" : ""}`}>
           <Icon name="more" />
           <span>Ещё</span>

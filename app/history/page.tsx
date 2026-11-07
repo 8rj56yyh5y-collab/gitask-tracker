@@ -24,7 +24,7 @@ export default function History() {
             Ждут направления · {formatMoney(pendingSum)}
           </h2>
           {pending.map((t) => (
-            <UnassignedItem key={t.id} tx={t} centers={centers} next="/history" />
+            <UnassignedItem key={t.id} tx={t} centers={centers} />
           ))}
         </section>
       )}
