@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { addIncomeAction, createSalaryAction } from "../actions.ts";
-import { AccountSelect } from "../components/AccountSelect.tsx";
-import { CenterSelect } from "../components/CenterSelect.tsx";
+import { createSalaryAction } from "../actions.ts";
+import { AccountChips } from "../components/Pickers.tsx";
 import { Hint } from "../components/Hint.tsx";
 import { MonthMoneyCard } from "../components/MonthMoneyCard.tsx";
-import { OTHER_INCOME_KINDS, canAutoCredit, listSalaries, monthIncomes } from "@/lib/income.ts";
+import { canAutoCredit, listSalaries, monthIncomes } from "@/lib/income.ts";
 import { formatMoney } from "@/lib/money.ts";
 import { listCards } from "@/lib/repo.ts";
 import { listCashboxes } from "@/lib/cash.ts";
@@ -23,7 +22,7 @@ export default async function Income({ searchParams }: { searchParams: Promise<{
   return (
     <div className="narrow-wide">
       <h1>Доходы</h1>
-      <Hint>Ставка приходит каждый месяц в своё число, остальное — премии, мотивация, подработка. Здесь же видно, в плюсе месяц или в минусе.</Hint>
+      <Hint>Сколько денег пришло вам в этом месяце и сколько ещё придёт. Ставка записывается сама в своё число.</Hint>
       {ok && <div className="card ok-note">{ok === "salary" ? "Ставка добавлена ✓" : "Доход записан ✓"}</div>}
 
       <MonthMoneyCard />
@@ -31,10 +30,10 @@ export default async function Income({ searchParams }: { searchParams: Promise<{
       <section>
         <h2>Ставка — каждый месяц</h2>
         {salaries.length === 0 && (
-          <div className="card">
-            <p className="muted small" style={{ margin: 0 }}>
-              Добавьте ниже: сколько, какого числа и куда приходит. D&amp;N будет ждать эти деньги каждый месяц.
-            </p>
+          <div className="empty">
+            <div className="empty-icon">🗓</div>
+            <strong>Ставка ещё не добавлена</strong>
+            <p>Укажите сумму и число месяца — дальше D&amp;N будет записывать её сам.</p>
           </div>
         )}
         {salaries.map((p) => (
@@ -49,94 +48,58 @@ export default async function Income({ searchParams }: { searchParams: Promise<{
             </div>
             <div className="muted small">
               {p.auto && canAutoCredit(p)
-                ? "зачисляется автоматически"
+                ? "запишется сама"
                 : p.auto
-                  ? "отметится, когда Monobank пришлёт поступление"
+                  ? "отметится, когда придёт на Monobank"
                   : "в этот день спросим в Telegram, пришли ли деньги"}
             </div>
           </Link>
         ))}
       </section>
 
-      <form action={createSalaryAction} className="card form">
-        <h2>Добавить ставку</h2>
-        <div className="grid-2-tight">
-          <label>
-            Название
-            <input name="title" defaultValue="Ставка" required />
+      <details className="card settings-fold add-fold" open={salaries.length === 0}>
+        <summary>+ Добавить ставку</summary>
+        <form action={createSalaryAction} className="form form-big" style={{ marginTop: 14 }}>
+          <label className="amount-field">
+            <input name="amount" inputMode="decimal" required className="amount-input" placeholder="0" aria-label="Сумма ставки, ₴" />
+            <span className="amount-cur" aria-hidden>₴</span>
           </label>
+          <div className="grid-2-tight">
+            <label>
+              Название
+              <input name="title" defaultValue="Ставка" required />
+            </label>
+            <label>
+              Какого числа
+              <input name="day" type="number" min={1} max={31} defaultValue={1} required />
+            </label>
+          </div>
           <label>
             От кого
             <input name="payer" placeholder="например, работодатель" />
           </label>
-        </div>
-        <div className="grid-2-tight">
-          <label>
-            Сумма, ₴
-            <input name="amount" inputMode="decimal" required placeholder="20000" />
+          <AccountChips label="Куда приходит" none="Не указано" />
+          <label className="check">
+            <input type="checkbox" name="auto" value="1" defaultChecked /> Записывать автоматически каждый месяц
           </label>
-          <label>
-            Какого числа
-            <input name="day" type="number" min={1} max={31} defaultValue={1} required />
-          </label>
-        </div>
-        <label>
-          Куда приходит
-          <AccountSelect none="— не указано —" />
-        </label>
-        <label>
-          Направление
-          <CenterSelect none="— не нужно —" />
-        </label>
-        <label className="check">
-          <input type="checkbox" name="auto" value="1" defaultChecked /> Зачислять автоматически в этот день
-        </label>
-        <p className="muted small" style={{ margin: 0 }}>
-          Если деньги приходят на карту Monobank, D&amp;N дождётся поступления от банка и отметит его сам — так ничего не задвоится.
-        </p>
-        <button className="btn btn-primary">Добавить ставку</button>
-      </form>
+          <p className="muted small" style={{ margin: 0 }}>
+            Если ставка приходит на Monobank, D&amp;N дождётся поступления от банка и отметит его — двойной записи не будет.
+          </p>
+          <button className="btn btn-primary btn-big">Добавить ставку</button>
+        </form>
+      </details>
 
-      <form action={addIncomeAction} className="card form">
-        <h2>Другой доход</h2>
-        <div className="grid-2-tight">
-          <label>
-            Сумма, ₴
-            <input name="amount" inputMode="decimal" required placeholder="0" />
-          </label>
-          <label>
-            Что это
-            <select name="kind" defaultValue="Мотивация">
-              {OTHER_INCOME_KINDS.map((k) => (
-                <option key={k}>{k}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <label>
-          Название (если «Другое»)
-          <input name="title" placeholder="необязательно" />
-        </label>
-        <label>
-          Куда пришли
-          <AccountSelect none="— не указано —" />
-        </label>
-        <div className="grid-2-tight">
-          <label>
-            Дата
-            <input name="at" type="date" />
-          </label>
-          <label>
-            Комментарий
-            <input name="note" placeholder="необязательно" />
-          </label>
-        </div>
-        <button className="btn btn-primary">Записать доход</button>
-      </form>
+      <Link href="/new?type=in" className="card add-link">
+        <span className="set-icon" aria-hidden>💰</span>
+        <span className="set-title">
+          <strong>Записать другой доход</strong>
+          <span className="muted">премия, мотивация, подработка, подарок</span>
+        </span>
+      </Link>
 
       <section className="card">
         <h2>Доходы в этом месяце</h2>
-        {incomes.length === 0 && <p className="muted small">Пока ничего не пришло.</p>}
+        {incomes.length === 0 && <p className="muted small">В этом месяце доходов пока нет.</p>}
         {incomes.map((t) => (
           <Link key={t.id} href={`/inbox/${t.id}`} className="row-between tree-row plain">
             <span>

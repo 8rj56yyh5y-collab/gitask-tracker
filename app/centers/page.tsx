@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { addCenter, removeCenter, restoreCenterAction } from "../actions.ts";
+import { addCenter, restoreCenterAction } from "../actions.ts";
 import { Hint } from "../components/Hint.tsx";
 import { centerStats, centerTree, listHiddenCenters } from "@/lib/repo.ts";
 import { cashBalances, listCashboxes } from "@/lib/cash.ts";
@@ -18,8 +18,8 @@ export default function Directions() {
     <div className="narrow-wide">
       <h1>Направления</h1>
       <Hint>
-        На что уходят деньги: личное, работа, семья. У направления может быть лимит на месяц и своя касса с наличными — её остаток виден
-        здесь же.
+        Направление — это «на что» или «чьи» деньги: личные, работа, семья. Нажмите на направление, чтобы задать лимит на месяц, завести
+        кассу или переименовать.
       </Hint>
       <div className="card">
         {tree.map((c) => {
@@ -40,12 +40,7 @@ export default function Directions() {
                   {own.map((b) => ` · касса ${formatMoney(bal.get(b.id) ?? 0)}`).join("")}
                 </span>
               </Link>
-              <form action={removeCenter}>
-                <input type="hidden" name="id" value={c.id} />
-                <button className="btn btn-ghost btn-sm" title="Скрыть" aria-label={`Скрыть «${c.name}»`}>
-                  ✕
-                </button>
-              </form>
+              <span className="row-go" aria-hidden>›</span>
             </div>
           );
         })}
@@ -67,8 +62,9 @@ export default function Directions() {
         </section>
       )}
 
-      <form action={addCenter} className="card form">
-        <h2>Новое направление</h2>
+      <details className="card settings-fold add-fold">
+        <summary>+ Новое направление</summary>
+      <form action={addCenter} className="form" style={{ marginTop: 14 }}>
         <input type="hidden" name="next" value="/centers" />
         <label>
           Название
@@ -106,13 +102,14 @@ export default function Directions() {
           <input name="opening" inputMode="decimal" placeholder="0" />
         </label>
         <label className="check">
-          <input type="checkbox" name="internal" /> Это переводы между своими счетами (не доход и не расход)
+          <input type="checkbox" name="internal" /> Только для переводов между своими картами (не доход и не расход)
         </label>
-        <button className="btn btn-primary">Добавить</button>
+        <button className="btn btn-primary btn-big">Добавить направление</button>
       </form>
+      </details>
 
       <p className="muted small">
-        <Link href="/cash" className="link">Все кассы и переводы между ними ›</Link>
+        <Link href="/cash" className="link">Все кассы ›</Link>
       </p>
 
       {listHiddenCenters().length > 0 && (

@@ -15,25 +15,25 @@ export default function More() {
     [
       "Каждый день",
       [
-        { href: "/inbox", icon: "inbox", title: "Без направления", note: count ? `${count} — укажите, на что ушли деньги` : "Все операции записаны" },
-        { href: "/history", icon: "history", title: "История", note: "Все операции по датам" },
-        { href: "/transit", icon: "swap", title: "Транзит денег", note: transit ? `Сейчас чужих денег: ${formatMoney(transit)}` : "Чужие деньги, которые нужно передать" },
+        { href: "/inbox", icon: "inbox", title: "Без направления", note: count ? `${count} ждут — выберите, на что ушли деньги` : "Всё записано ✓" },
+        { href: "/history", icon: "history", title: "История", note: "Все операции, новые сверху" },
+        { href: "/transit", icon: "swap", title: "Чужие деньги", note: transit ? `У вас сейчас ${formatMoney(transit)} — нужно передать` : "Деньги, которые нужно кому-то отдать" },
       ],
     ],
     [
-      "Деньги",
+      "Деньги и планы",
       [
-        { href: "/income", icon: "wallet", title: "Доходы", note: "Ставка, премии и итог месяца" },
-        { href: "/centers", icon: "tag", title: "Направления и кассы", note: "На что уходят деньги, лимиты, наличные" },
-        { href: "/norms", icon: "target", title: "Норма трат", note: "Сколько тратить в месяц на каждое направление" },
-        { href: "/analytics", icon: "chart", title: "Аналитика", note: "Куда ушли деньги по месяцам" },
+        { href: "/income", icon: "income", title: "Доходы", note: "Ставка, премии и ваш итог за месяц" },
+        { href: "/centers", icon: "tag", title: "Направления", note: "Личные, работа, семья — и лимиты на месяц" },
+        { href: "/norms", icon: "target", title: "Норма трат", note: "Сколько обычно уходит в месяц — подскажет D&N" },
+        { href: "/analytics", icon: "chart", title: "Аналитика", note: "Куда уходят деньги: месяцы и сравнение" },
       ],
     ],
     [
       "Настройка и помощь",
       [
-        { href: "/help", icon: "help", title: "Как пользоваться", note: "Короткие ответы на частые вопросы" },
-        { href: "/settings", icon: "settings", title: "Настройки", note: "Telegram, Monobank, Apple Pay, оформление" },
+        { href: "/help", icon: "help", title: "Помощь", note: "Короткие ответы: что где и как" },
+        { href: "/settings", icon: "settings", title: "Настройки", note: "Telegram, Monobank, Apple Pay, тема" },
       ],
     ],
   ];
