@@ -10,9 +10,10 @@ import { cookies } from "next/headers";
 import { THEME_COOKIE, normalizeTheme } from "@/lib/theme.ts";
 import { BANK_NAMES } from "@/lib/banks.ts";
 import { archiveCashbox, cashMove, createCashbox, parseAccount, transfer, updateCashbox } from "@/lib/cash.ts";
-import { cancelPlan, createPlan, payPlan, updatePlan } from "@/lib/plans.ts";
+import { afterTxDeleted, cancelPlan, createPlan, payPlan, restorePlan, undoPlanPayment, updatePlan } from "@/lib/plans.ts";
 import { archiveGroup, archiveProduct, createSale, deleteSale, payCompany, saveGroup, saveProduct, setSalesBase } from "@/lib/sales.ts";
 import { acceptNorms, extendNorm, restartNorm } from "@/lib/norms.ts";
+import { setSetting } from "@/lib/settings.ts";
 import { redirect } from "next/navigation";
 import { toKop, parseAmount } from "@/lib/money.ts";
 import {
@@ -22,6 +23,7 @@ import {
   createCard,
   createCenter,
   deleteTx,
+  getTx,
   insertTx,
   monthDate,
   monthKey,
@@ -84,7 +86,11 @@ export async function assignTransaction(f: FormData) {
 
 export async function removeTransaction(f: FormData) {
   const id = num(f, "id");
-  if (id) deleteTx(id);
+  if (id) {
+    const planId = getTx(id)?.plan_id;
+    deleteTx(id);
+    afterTxDeleted(planId);
+  }
   refresh();
 }
 
@@ -444,4 +450,23 @@ export async function restartNormAction() {
   restartNorm();
   refresh();
   redirect("/norms");
+}
+
+export async function undoPlanPaymentAction(f: FormData) {
+  const planId = undoPlanPayment(num(f, "txId") ?? 0);
+  refresh();
+  redirect(planId ? `/plans/${planId}?undone=1` : "/plans");
+}
+
+export async function restorePlanAction(f: FormData) {
+  const id = num(f, "id");
+  if (id) restorePlan(id);
+  refresh();
+  redirect(`/plans/${id}`);
+}
+
+export async function toggleSetupAction(f: FormData) {
+  setSetting("setup_hidden", str(f, "hide") === "1" ? "1" : null);
+  refresh();
+  back(f);
 }

@@ -1,3 +1,4 @@
+import { Hint } from "../components/Hint.tsx";
 import { addCard, mergeCardsAction, setDefaultLimitAction } from "../actions.ts";
 import { CardTile } from "../components/CardTile.tsx";
 import { LimitBar } from "../components/LimitBar.tsx";
@@ -28,6 +29,7 @@ export default function Cards() {
   return (
     <>
       <h1>Карты</h1>
+      <Hint>Ваши карты, сколько с каждой потрачено за месяц и сколько осталось до лимита. Нажмите на карту, чтобы изменить лимит, цвет или значок.</Hint>
       {limited.length > 0 && (
         <div className="card">
           <h2>Лимиты всех карт за месяц</h2>

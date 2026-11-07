@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { cancelPlanAction, payPlanAction, updatePlanAction } from "../../actions.ts";
+import { cancelPlanAction, payPlanAction, restorePlanAction, undoPlanPaymentAction, updatePlanAction } from "../../actions.ts";
 import { AccountSelect } from "../../components/AccountSelect.tsx";
 import { CenterSelect } from "../../components/CenterSelect.tsx";
 import { TxRow } from "../../components/TxRow.tsx";
@@ -9,8 +9,9 @@ import { formatMoney } from "@/lib/money.ts";
 import { getPlan } from "@/lib/plans.ts";
 import type { Tx } from "@/lib/repo.ts";
 
-export default async function PlanPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PlanPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ undone?: string }> }) {
   const { id: raw } = await params;
+  const { undone } = await searchParams;
   const p = getPlan(Number(raw));
   if (!p) notFound();
   const left = p.total - p.paid;
@@ -40,6 +41,17 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
           {isIn ? "получено" : "оплачено"} {formatMoney(p.paid)} из {formatMoney(p.total)}
         </div>
       </section>
+
+      {undone && (
+        <div className="card ok-note">↩ Оплата отменена{p.status === "open" ? " — платёж снова ждёт оплаты." : "."}</div>
+      )}
+      {p.status === "cancelled" && (
+        <form action={restorePlanAction} className="card">
+          <p style={{ marginTop: 0 }}>Этот платёж отменён.</p>
+          <input type="hidden" name="id" value={p.id} />
+          <button className="btn btn-primary">↩ Вернуть платёж</button>
+        </form>
+      )}
 
       {p.status === "open" && (
         <form action={payPlanAction} className="card form">
@@ -71,10 +83,23 @@ export default async function PlanPage({ params }: { params: Promise<{ id: strin
         <h2>{isIn ? "Поступления" : "Оплаты"}</h2>
         {payments.length === 0 && <p className="muted small">{isIn ? "Денег пока не приходило." : "Оплат пока не было."}</p>}
         {payments.map((t) => (
-          <Link key={t.id} href={`/inbox/${t.id}`} className="plain">
-            <TxRow tx={t} />
-          </Link>
+          <div key={t.id} className="pay-row">
+            <Link href={`/inbox/${t.id}`} className="plain pay-row-main">
+              <TxRow tx={t} />
+            </Link>
+            <form action={undoPlanPaymentAction}>
+              <input type="hidden" name="txId" value={t.id} />
+              <button className="btn btn-sm btn-ghost" title={t.source === "manual" ? "Удалить эту оплату" : "Операция из банка останется в истории, но перестанет считаться оплатой этого платежа"}>
+                ↩ Отменить
+              </button>
+            </form>
+          </div>
         ))}
+        {payments.length > 0 && (
+          <p className="muted small" style={{ margin: "6px 0 0" }}>
+            Отметили по ошибке? Нажмите «↩ Отменить» — платёж снова станет неоплаченным.
+          </p>
+        )}
       </section>
 
       <form action={updatePlanAction} className="card form">

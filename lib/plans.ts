@@ -70,6 +70,48 @@ export function updatePlan(id: number, p: NewPlan) {
   refreshStatus(id);
 }
 
+/**
+ * Платёж снова открыт, если оплачено меньше суммы (после отмены оплаты).
+ * Следующий ежемесячный, созданный при закрытии, убираем, если по нему ещё ничего не платили.
+ */
+function reopenIfUnpaid(id: number) {
+  const p = getPlan(id);
+  if (!p || p.status !== "done" || p.paid >= p.total) return;
+  const db = getDb();
+  db.prepare("UPDATE plans SET status = 'open', done_at = NULL WHERE id = ?").run(id);
+  const next = db.prepare("SELECT id FROM plans WHERE prev_id = ? AND status = 'open'").all(id) as { id: number }[];
+  for (const n of next) {
+    const used = db.prepare("SELECT 1 FROM transactions WHERE plan_id = ? LIMIT 1").get(n.id);
+    if (!used) db.prepare("DELETE FROM plans WHERE id = ?").run(n.id);
+  }
+}
+
+/**
+ * Отменить оплату по платежу. Оплату, записанную вручную, удаляем;
+ * операцию из банка (Monobank, Apple Pay, SMS) оставляем — она была, — только отвязываем от платежа.
+ * Возвращает id платежа или null.
+ */
+export function undoPlanPayment(txId: number): number | null {
+  const db = getDb();
+  const tx = db.prepare("SELECT id, plan_id, source FROM transactions WHERE id = ?").get(txId) as { id: number; plan_id: number | null; source: string } | undefined;
+  if (!tx?.plan_id) return null;
+  if (tx.source === "manual") db.prepare("DELETE FROM transactions WHERE id = ?").run(txId);
+  else db.prepare("UPDATE transactions SET plan_id = NULL WHERE id = ?").run(txId);
+  reopenIfUnpaid(tx.plan_id);
+  return tx.plan_id;
+}
+
+/** После удаления операции: если она была оплатой платежа — платёж снова открыт. */
+export function afterTxDeleted(planId: number | null | undefined) {
+  if (planId) reopenIfUnpaid(planId);
+}
+
+/** Вернуть отменённый платёж в список. */
+export function restorePlan(id: number) {
+  getDb().prepare("UPDATE plans SET status = 'open', done_at = NULL WHERE id = ? AND status = 'cancelled'").run(id);
+  refreshStatus(id);
+}
+
 export function cancelPlan(id: number) {
   getDb().prepare("UPDATE plans SET status = 'cancelled', done_at = ? WHERE id = ?").run(new Date().toISOString(), id);
 }
@@ -87,10 +129,11 @@ function refreshStatus(id: number): Plan | null {
   if (!p || p.status !== "open" || p.paid < p.total) return p;
   getDb().prepare("UPDATE plans SET status = 'done', done_at = ? WHERE id = ?").run(new Date().toISOString(), id);
   if (p.repeat === "month") {
-    createPlan({
+    const next = createPlan({
       title: p.title, payee: p.payee, total: p.total, dueDate: p.due_date ? nextMonth(p.due_date) : null,
       cardId: p.card_id, cashboxId: p.cashbox_id, centerId: p.cost_center_id, note: p.note, repeat: "month", direction: p.direction,
     });
+    getDb().prepare("UPDATE plans SET prev_id = ? WHERE id = ?").run(id, next);
   }
   return getPlan(id);
 }

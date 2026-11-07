@@ -1,3 +1,4 @@
+import { Hint } from "../components/Hint.tsx";
 import Link from "next/link";
 import { TxRow } from "../components/TxRow.tsx";
 import { UnassignedItem } from "../components/UnassignedItem.tsx";
@@ -15,6 +16,7 @@ export default function History() {
   return (
     <div className="narrow-wide">
       <h1>История</h1>
+      <Hint>Все операции по датам. Нажмите на операцию, чтобы поменять категорию или удалить.</Hint>
 
       {pending.length > 0 && (
         <section className="pending-block">

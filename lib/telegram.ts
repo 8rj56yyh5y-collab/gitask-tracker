@@ -2,7 +2,7 @@ import { randomBytes, randomInt } from "node:crypto";
 import { formatMoney } from "./money.ts";
 import { assignTx, centerTree, getTx, suggestCenters, type Tx } from "./repo.ts";
 import { getSetting, setSetting } from "./settings.ts";
-import { getPlan, markReminded, payPlan, plansToRemind, type Plan } from "./plans.ts";
+import { getPlan, markReminded, payPlan, plansToRemind, undoPlanPayment, type Plan } from "./plans.ts";
 
 // Уведомления в Telegram: после каждой новой операции бот присылает сообщение
 // с кнопками категорий. Нажатие кнопки сразу записывает операцию.
@@ -237,9 +237,33 @@ export async function handleUpdate(update: Update): Promise<void> {
       await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: "Платёж уже закрыт" });
       return;
     }
-    payPlan(p.id, p.total - p.paid, { cardId: p.card_id, cashboxId: p.cashbox_id });
+    const txId = payPlan(p.id, p.total - p.paid, { cardId: p.card_id, cashboxId: p.cashbox_id });
     await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: "Записано: оплачено" });
-    await call(token, "editMessageText", { chat_id: chatId, message_id: q.message.message_id, text: `✓ Оплачено: <b>${esc(p.title)}</b> · ${esc(formatMoney(p.total - p.paid))}`, parse_mode: "HTML" });
+    await call(token, "editMessageText", {
+      chat_id: chatId,
+      message_id: q.message.message_id,
+      text: `✓ Оплачено: <b>${esc(p.title)}</b> · ${esc(formatMoney(p.total - p.paid))}`,
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: [[{ text: "↩ Отменить", callback_data: `u:${txId}` }]] },
+    });
+    return;
+  }
+  if (action === "u") {
+    // «↩ Отменить» — нажали «Оплачено» по ошибке.
+    const planId = undoPlanPayment(Number(txRaw));
+    const p = planId ? getPlan(planId) : null;
+    if (!p) {
+      await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: "Эту оплату уже отменили" });
+      return;
+    }
+    await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: "Оплата отменена" });
+    await call(token, "editMessageText", {
+      chat_id: chatId,
+      message_id: q.message.message_id,
+      text: `↩ Оплата отменена: <b>${esc(p.title)}</b> снова ждёт оплаты · ${esc(formatMoney(p.total - p.paid))}`,
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: [[{ text: "✓ Оплачено", callback_data: `p:${p.id}` }]] },
+    });
     return;
   }
   const tx = getTx(Number(txRaw));

@@ -1,3 +1,4 @@
+import { Hint } from "../components/Hint.tsx";
 import Link from "next/link";
 import { deleteSaleAction, payCompanyAction } from "../actions.ts";
 import { AccountSelect } from "../components/AccountSelect.tsx";
@@ -28,6 +29,7 @@ export default async function Sales({ searchParams }: { searchParams: Promise<{ 
           + Продажа
         </Link>
       </div>
+      <Hint>Продажа товара компании: ваша комиссия — ваш доход, остальное — долг компании, пока не отдадите.</Hint>
       <div className="month-switch" style={{ margin: "12px 0" }}>
         <Link href={`/sales?m=${monthKey(shiftMonth(d, -1))}`} className="btn btn-sm" aria-label="Предыдущий месяц">‹</Link>
         <strong>{title}</strong>
