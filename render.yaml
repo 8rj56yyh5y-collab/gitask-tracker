@@ -7,7 +7,6 @@ services:
     runtime: node
     plan: starter # постоянный диск есть только на платных планах (~$7/мес)
     region: frankfurt
-    branch: claude/hopeful-davinci-yrcko2
     buildCommand: npm ci && npm run build
     startCommand: npm start
     disk:

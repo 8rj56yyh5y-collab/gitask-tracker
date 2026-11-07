@@ -7,8 +7,6 @@ Railway — хостинг, который сам берёт код из GitHub 
 
 1. Зайти на https://railway.com и войти через GitHub.
 2. **New Project → Deploy from GitHub repo** → выбрать `gitask-tracker`.
-3. Если pull request ещё не влит в `main`: в сервисе **Settings → Source → Branch** выбрать
-   `claude/hopeful-davinci-yrcko2`.
 
 ## 2. Диск для базы
 

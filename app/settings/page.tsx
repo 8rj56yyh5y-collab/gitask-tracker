@@ -6,7 +6,7 @@ import { telegramState } from "@/lib/telegram.ts";
 import { MAX_BACKFILL_DAYS } from "@/lib/monobank.ts";
 import { publicBase } from "@/lib/url.ts";
 
-const DOCS = "https://github.com/8rj56yyh5y-collab/gitask-tracker/blob/claude/hopeful-davinci-yrcko2/docs";
+const DOCS = "https://github.com/8rj56yyh5y-collab/gitask-tracker/blob/main/docs";
 
 export default async function Settings({
   searchParams,
