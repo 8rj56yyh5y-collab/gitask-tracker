@@ -73,7 +73,8 @@ function txText(tx: Tx): string {
   const time = new Date(tx.occurred_at).toLocaleString("ru-RU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
   const lines = [
     `<b>${esc(formatMoney(tx.amount, tx.currency))}</b>${tx.counterparty ? ` · ${esc(tx.counterparty)}` : ""}`,
-    [tx.card_label, SOURCE[tx.source] ?? tx.source, time].filter(Boolean).map((x) => esc(String(x))).join(" · "),
+    // Если карту не узнали — показываем, как её назвал Wallet, чтобы было понятно, откуда платёж.
+    [tx.card_label || (tx.description ? `карта: ${tx.description}` : ""), SOURCE[tx.source] ?? tx.source, time].filter(Boolean).map((x) => esc(String(x))).join(" · "),
   ];
   return lines.join("\n");
 }

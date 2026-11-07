@@ -51,7 +51,7 @@ export default async function Settings({
       </section>
 
       <section className="card form" id="telegram">
-        <h2>Уведомления в Telegram</h2>
+        <h2>Уведомления в Telegram — чтобы не забыть записать</h2>
         {sp.tg_error && <p className="danger small">{sp.tg_error}</p>}
         {!tg.connected ? (
           <>
@@ -125,26 +125,34 @@ export default async function Settings({
       </section>
 
       <section className="card form" id="shortcuts">
-        <h2>Apple Pay и SMS других банков</h2>
-        <p className="small">
-          ПриватБанк, ПУМБ, А-Банк, Радабанк, Райффайзен — через приложение «Команды» на iPhone: после оплаты Apple Pay или
-          SMS от банка операция сама попадает в D&amp;N. Пошагово — в{" "}
-          <a href={`${DOCS}/IPHONE_SETUP.md`} className="link" target="_blank" rel="noreferrer">
-            инструкции
-          </a>
-          .
+        <h2>Оплаты Apple Pay — с любой карты</h2>
+        <p className="small" style={{ margin: 0 }}>
+          После оплаты телефоном iPhone сам отправит в D&amp;N сумму, магазин и карту. Карту D&amp;N узнает по названию банка.
+          {tg.linked ? " Сразу придёт сообщение в Telegram с выбором категории." : " Подключите Telegram выше — тогда сразу придёт сообщение с выбором категории."}
         </p>
         <label>
-          Адрес для «Команд»
-          <input readOnly value={`${base}/api/ingest`} />
+          Ваша ссылка для «Команд»
+          <input readOnly value={ingestKey ? `${base}/api/ingest?key=${ingestKey}` : "ключ не задан на сервере (DN_INGEST_TOKEN)"} />
         </label>
-        <label>
-          Ключ (в заголовке Authorization: Bearer …)
-          <input readOnly value={ingestKey || "не задан на сервере (DN_INGEST_TOKEN)"} />
-        </label>
-        <p className="muted small">
-          Карты других банков добавьте на странице <Link href="/cards" className="link">Лимиты карт</Link> — по последним 4 цифрам
-          D&amp;N узнаёт, с какой карты пришла операция.
+        <ol className="small steps">
+          <li>
+            «Команды» → <b>Автоматизация</b> → <b>+</b> → <b>Транзакция</b>. Карты — <b>все</b>, <b>Запускать сразу</b> → Далее.
+          </li>
+          <li>
+            <b>Новая пустая автоматизация</b> → <b>Добавить действие</b> → <b>Получить содержимое URL</b>. Вставьте ссылку выше.
+          </li>
+          <li>
+            Нажмите <b>›</b> у действия: <b>Метод</b> — POST, <b>Тело запроса</b> — <b>Форма</b>. Добавьте три поля «Текст»:
+            <br />
+            <code>amount</code> → «Ввод команды» → <b>Сумма</b>; <code>merchant</code> → <b>Продавец</b>; <code>card</code> → <b>Карта или пропуск</b>.
+          </li>
+          <li>
+            <b>Готово</b>. Оплатите что-нибудь телефоном — операция появится в «Истории»{tg.linked ? " и в Telegram" : ""}.
+          </li>
+        </ol>
+        <p className="muted small" style={{ margin: 0 }}>
+          Добавьте карты в разделе <Link href="/cards" className="link">Карты</Link>: если карта банка одна, D&amp;N сам поймёт, с какой она. Ссылка содержит
+          секретный ключ — не пересылайте её никому.
         </p>
       </section>
 

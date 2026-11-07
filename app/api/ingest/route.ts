@@ -8,21 +8,32 @@ import { revalidatePath } from "next/cache";
 import { notifyNewTx } from "@/lib/telegram.ts";
 
 // Приём операций из «Команд» iOS.
+//   Проще всего: POST https://<сайт>/api/ingest?key=<ключ> с телом «Форма»: amount, merchant, card
+//   (ключ в ссылке, без заголовков). Так же принимается JSON и заголовок Authorization: Bearer <ключ>.
 //   Apple Pay:  { "source": "applepay", "amount": "₴250,00", "merchant": "АТБ", "card": "ПриватБанк •••• 1234" }
 //   SMS банка:  { "source": "sms", "text": "Oplata 250.00 UAH ATB *1234 ..." }
-// Ответ: { id, url } — «Команда» открывает url, где сразу выбирается категория.
+// Ответ: { id, url } — по url сразу выбирается категория; в Telegram приходит сообщение с кнопками.
+
+async function readBody(req: Request): Promise<Record<string, unknown> | null> {
+  const type = req.headers.get("content-type") ?? "";
+  try {
+    if (type.includes("application/json")) return await req.json();
+    if (type.includes("form")) return Object.fromEntries([...(await req.formData()).entries()].map(([k, v]) => [k, String(v)]));
+    const text = await req.text();
+    if (!text.trim()) return {};
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
 
 export async function POST(req: Request) {
   if (!ingestTokenOk(bearer(req))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  let body: Record<string, unknown>;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Нужен JSON" }, { status: 400 });
-  }
+  const body = await readBody(req);
+  if (!body) return NextResponse.json({ error: "Не удалось прочитать данные: нужна форма или JSON" }, { status: 400 });
   const s = (k: string) => (typeof body[k] === "string" ? (body[k] as string).trim() : "");
-  const source = s("source") === "sms" ? "sms" : "applepay";
+  const source = s("source") === "sms" || (!s("amount") && s("text")) ? "sms" : "applepay";
 
   let amount: number | null;
   let direction: "in" | "out" = s("direction") === "in" ? "in" : "out";
