@@ -174,8 +174,14 @@ export async function connectMonobankAction(f: FormData) {
   let message = "";
   let ok = false;
   try {
-    const r = await connectMonobank(token, `${base}/api/monobank?key=${encodeURIComponent(key!)}`);
-    message = `Monobank подключён${r.owner ? ` (${r.owner})` : ""}: новых карт ${r.added}, связано с уже добавленными ${r.linked}.`;
+    // Дата из формы — начало выбранного дня по Киеву (часовой пояс сервера задан в instrumentation.ts).
+    const d = str(f, "from").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const from = d ? new Date(Number(d[1]), Number(d[2]) - 1, Number(d[3])) : new Date();
+    const r = await connectMonobank(token, `${base}/api/monobank?key=${encodeURIComponent(key!)}`, { from, backfill: f.get("backfill") === "on" });
+    const since = new Date(r.from).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
+    message =
+      `Monobank подключён${r.owner ? ` (${r.owner})` : ""}: новых карт ${r.added}, связано с уже добавленными ${r.linked}. Операции ведутся с ${since}.` +
+      (r.backfillAccounts ? ` Прошлые операции загружаются в фоне — по минуте на каждый счёт.` : "");
     ok = true;
   } catch (e) {
     message = (e as Error).message || "Не получилось подключить Monobank.";

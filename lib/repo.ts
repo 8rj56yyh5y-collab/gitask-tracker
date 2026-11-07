@@ -18,6 +18,7 @@ export interface Card {
   kind: string;
   monthly_limit: number;
   mono_account_id: string | null;
+  track_from?: string | null;
 }
 
 export interface Tx {

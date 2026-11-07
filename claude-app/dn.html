@@ -150,6 +150,17 @@ th:not(:first-child), td:not(:first-child) { text-align: right; }
 .empty { text-align: center; padding: 28px 16px; color: var(--muted); }
 .empty strong { display: block; color: var(--ink); font-size: 17px; margin-bottom: 6px; }
 
+/* Продажи */
+.calc { display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 12px; background: var(--raised); font-variant-numeric: tabular-nums; }
+.calc .row span:first-child { color: var(--muted); }
+.calc .total { border-top: 1px solid var(--line); padding-top: 6px; font-weight: 700; }
+.auto { font-size: 12px; color: var(--accent); font-weight: 600; }
+.seg3 { grid-template-columns: 1fr 1fr 1fr; }
+.paid { color: var(--good); }
+textarea { min-height: 120px; resize: vertical; }
+.rate { display: grid; grid-template-columns: minmax(0, 1fr) 76px 76px; gap: 8px; align-items: center; }
+.rate input { min-height: 38px; padding: 6px 8px; }
+.preview { font-size: 14px; }
 @media (min-width: 960px) {
   .app { padding-left: calc(250px + 40px); padding-right: 40px; padding-block: 28px 40px; max-width: none; }
   .top { display: none; }
@@ -180,7 +191,7 @@ th:not(:first-child), td:not(:first-child) { text-align: right; }
   <a class="tab" href="#home" data-tab="home"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Главная</a>
   <a class="tab" href="#history" data-tab="history"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v5l3 2M3.05 11a9 9 0 1 1 .5 4M3 4v5h5"/></svg>История<span class="badge" data-badge hidden></span></a>
   <button class="plus" type="button" data-add aria-label="Новая операция"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
-  <a class="tab" href="#analytics" data-tab="analytics"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Аналитика</a>
+  <a class="tab" href="#sales" data-tab="sales"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9zM7.5 7.5h.01"/></svg>Продажи</a>
   <a class="tab" href="#more" data-tab="more"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Ещё</a>
 </nav>
 
@@ -190,12 +201,15 @@ th:not(:first-child), td:not(:first-child) { text-align: right; }
   <a class="nav" href="#home" data-tab="home">Главная</a>
   <a class="nav" href="#history" data-tab="history">История <span class="badge" data-badge hidden></span></a>
   <a class="nav" href="#analytics" data-tab="analytics">Аналитика</a>
+  <a class="nav" href="#sales" data-tab="sales">Продажи</a>
+  <a class="nav" href="#rates" data-tab="rates">Ставки комиссий</a>
   <a class="nav" href="#cards" data-tab="cards">Карты и лимиты</a>
   <a class="nav" href="#categories" data-tab="categories">Категории</a>
   <a class="nav" href="#help" data-tab="help">Как пользоваться</a>
 </aside>
 
 <div class="sheet" id="sheet" hidden><form class="sheet-body" id="txForm" autocomplete="off"></form></div>
+<div class="sheet" id="saleSheet" hidden><form class="sheet-body" id="saleForm" autocomplete="off"></form></div>
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script>
@@ -205,9 +219,10 @@ const S = {
   db: null, user: null, uid: null, sample: null,
   readOnly: false, noStore: false, slow: false, error: null,
   cats: new Map(), cards: new Map(), txs: [], reports: new Map(), names: {},
-  loaded: { cats: false, cards: false, tx: false },
+  loaded: { cats: false, cards: false, tx: false, sales: false },
   aOffset: 0, ai: { busy: false, text: "", err: "" }, dirty: false,
   edit: null, form: null,
+  groups: new Map(), sales: [], salesCfg: { base: "gross" }, sOffset: 0, sale: null, sheetText: "", sheetPreview: null, sheetBusy: false,
 };
 const view = document.getElementById("view");
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -307,7 +322,8 @@ function render() {
   const n = unassigned().length;
   document.querySelectorAll("[data-badge]").forEach((b) => { b.hidden = !n; b.textContent = n > 99 ? "99+" : String(n); });
   const tab = r.startsWith("cat-") ? "categories" : r;
-  const moreTabs = ["more", "cards", "categories", "help"];
+  const moreTabs = ["more", "cards", "categories", "help", "analytics"];
+  if (tab === "rates") document.querySelectorAll('[data-tab="sales"]').forEach((el) => el.classList.add("on"));
   document.querySelectorAll("[data-tab]").forEach((el) => {
     const t = el.dataset.tab;
     el.classList.toggle("on", t === tab || (el.classList.contains("tab") && t === "more" && moreTabs.includes(tab)));
@@ -316,8 +332,8 @@ function render() {
   view.className = "view";
   if (S.noStore) return (view.innerHTML = `<div class="card empty wide"><strong>Хранилище недоступно</strong>Откройте эту страницу в приложении Claude, войдя в свой аккаунт — тогда записи сохранятся и будут видны на всех устройствах.</div>`);
   if (S.error) return (view.innerHTML = `<div class="card empty wide"><strong>Данные не загрузились</strong>Обновите страницу. Если повторяется — проверьте интернет.</div>`);
-  if (!S.loaded.cats || !S.loaded.tx || !S.loaded.cards) return (view.innerHTML = `<div class="card empty wide">${S.slow ? "<strong>Нет связи с хранилищем</strong>Проверьте интернет — данные появятся, как только связь вернётся." : "Загружаю…"}</div>`);
-  const fn = { home: vHome, history: vHistory, analytics: vAnalytics, more: vMore, cards: vCards, categories: vCategories, help: vHelp }[r];
+  if (!S.loaded.cats || !S.loaded.tx || !S.loaded.cards || !S.loaded.sales) return (view.innerHTML = `<div class="card empty wide">${S.slow ? "<strong>Нет связи с хранилищем</strong>Проверьте интернет — данные появятся, как только связь вернётся." : "Загружаю…"}</div>`);
+  const fn = { home: vHome, history: vHistory, analytics: vAnalytics, more: vMore, cards: vCards, categories: vCategories, help: vHelp, sales: vSales, rates: vRates }[r];
   if (fn) fn();
   else if (r.startsWith("cat-") && S.cats.has(r.slice(4))) vCategory(r.slice(4));
   else vHome();
@@ -373,6 +389,9 @@ function vHome() {
   }
   if (alerts.length) h += `<section class="card wide stack"><h2>Сигналы по лимитам</h2>${alerts.map((s) => `<a class="signal ${s.status}" href="#cat-${esc(s.id)}">${esc(s.name)}: ${s.status === "over" ? `перелимит ${fmt(s.spent - s.budget)} (лимит ${fmt(s.budget)})` : `при таком темпе ≈ ${fmt(s.forecast)} при лимите ${fmt(s.budget)}`}</a>`).join("")}</section>`;
   h += `<section class="card"><h2>Расходы · ${esc(r.label.toLowerCase())}</h2><div class="big">${fmt(total)}</div><div style="margin-top:8px">${roots.map((s) => budgetLine(s, total, "#cat-" + s.id)).join("") || '<p class="muted">Категорий пока нет — добавьте в «Категории».</p>'}</div></section>`;
+  const sm = salesMonth(0);
+  h += `<a class="card" href="#sales"><h2>Продажи · ${esc(r.label.toLowerCase())}</h2>${sm.list.length ? `<div class="big">${fmt(sm.amount)}</div><div class="small" style="margin-top:6px">${sm.list.length} продаж · отделу продаж ${fmt(sm.salesFee)}${sm.unpaid ? ` · <strong>к выплате ${fmt(sm.unpaid)}</strong>` : ""} · чистыми ${fmt(sm.net)}</div>` : '<p class="muted" style="margin:0">Продажи пока не записаны. Нажмите + → «Продажа».</p>'}</a>`;
+  h += `<a class="card" href="#analytics"><h2>Аналитика ›</h2><p class="muted" style="margin:0">Любой месяц, год по месяцам, сравнение с прошлым месяцем, разбор от ИИ.</p></a>`;
   h += `<a class="card" href="#cards"><h2>Лимиты карт</h2>${cards.length ? `<div>Списано <strong class="num">${fmt(tu)}</strong> из ${fmt(tl)}</div>${hot.map((c) => { const lv = level(use.get(c.id) || 0, c.limit); return `<div class="lvl lv-${lv}" style="margin-top:6px">${esc(cardLabel(c.id))}: ${lv === "red" ? "перелимит " + fmt((use.get(c.id) || 0) - c.limit) : "осталось " + fmt(c.limit - (use.get(c.id) || 0))}</div>`; }).join("")}` : '<p class="muted" style="margin:0">Добавьте карты и месячные лимиты — здесь будет видно, сколько осталось.</p>'}</a>`;
   view.innerHTML = h;
 }
@@ -435,7 +454,7 @@ function vAnalytics() {
 function vMore() {
   view.className = "view narrow";
   const item = (href, title, note, ic) => `<a href="${href}"><span class="ic">${ic}</span><span class="t"><strong>${title}</strong><span class="muted small">${note}</span></span><span class="muted">›</span></a>`;
-  view.innerHTML = `<h1>Ещё</h1><div class="card menu">${item("#cards", "Карты и лимиты", "Сколько осталось по каждой карте", "▭")}${item("#categories", "Категории", "Лимиты и прогноз по каждой", "◈")}${item("#history", "Нужно записать", unassigned().length ? unassigned().length + " ждут записи" : "Всё разнесено", "!")}${item("#help", "Как пользоваться", "Доступ для других, советы", "?")}</div>`;
+  view.innerHTML = `<h1>Ещё</h1><div class="card menu">${item("#analytics", "Аналитика", "Месяцы, год, сравнение, разбор от ИИ", "▥")}${item("#rates", "Ставки комиссий", "Проценты отделу продаж и маркетплейсам", "%")}${item("#cards", "Карты и лимиты", "Сколько осталось по каждой карте", "▭")}${item("#categories", "Категории", "Лимиты и прогноз по каждой", "◈")}${item("#history", "Нужно записать", unassigned().length ? unassigned().length + " ждут записи" : "Всё разнесено", "!")}${item("#help", "Как пользоваться", "Доступ для других, советы", "?")}</div>`;
 }
 
 function vCards() {
@@ -491,7 +510,7 @@ function openSheet(tx) {
   const sug = suggest(t, 4);
   const f = document.getElementById("txForm");
   f.innerHTML = `<div class="grab"></div><div class="row"><strong style="font-size:18px">${tx ? "Операция" : "Новая операция"}</strong><button type="button" class="btn sm ghost" data-close>Закрыть</button></div>
-  <div class="seg" role="group" aria-label="Тип"><button type="button" data-dir="out">Расход</button><button type="button" data-dir="in">Поступление</button></div>
+  <div class="seg ${tx ? "" : "seg3"}" role="group" aria-label="Тип"><button type="button" data-dir="out">Расход</button><button type="button" data-dir="in">Поступление</button>${tx ? "" : '<button type="button" data-tosale>Продажа</button>'}</div>
   <label class="f">Сумма, ₴<input id="fAmount" class="amount" inputmode="decimal" placeholder="0" value="${tx ? Math.abs(t.amount) / 100 : ""}" required></label>
   <div class="f"><span>Категория</span><div class="cats" id="fCats">${sug.map((id) => `<button type="button" data-cat="${esc(id)}">${esc(S.cats.get(id).name)}</button>`).join("")}</div>
   <select id="fCat" aria-label="Все категории"><option value="">Пока не знаю — разнести позже</option>${tree().map((c) => `<option value="${esc(c.id)}">${"  ".repeat(c.depth)}${esc(c.name)}</option>`).join("")}</select></div>
@@ -553,6 +572,7 @@ document.getElementById("txForm").addEventListener("submit", async (e) => {
 document.getElementById("txForm").addEventListener("click", async (e) => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.dir) { S.form.dir = b.dataset.dir; syncForm(); }
+  else if (b.hasAttribute("data-tosale")) { closeSheet(); openSale(null, document.getElementById("fAmount")?.value || ""); }
   else if (b.dataset.cat !== undefined && b.closest("#fCats")) { S.form.cat = S.form.cat === b.dataset.cat ? "" : b.dataset.cat; syncForm(); }
   else if (b.hasAttribute("data-close")) closeSheet();
   else if (b.hasAttribute("data-del")) document.getElementById("delZone").innerHTML = `<div class="inline"><span class="small" style="align-self:center">Удалить безвозвратно?</span><button type="button" class="btn sm danger" data-del-yes>Удалить</button><button type="button" class="btn sm ghost" data-close>Отмена</button></div>`;
@@ -604,6 +624,272 @@ view.addEventListener("submit", async (e) => {
 view.addEventListener("focusout", () => setTimeout(() => { if (S.dirty && !(view.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))) render(); }, 0));
 window.addEventListener("hashchange", () => { window.scrollTo(0, 0); S.dirty = false; render(); });
 
+// ---------- Продажи ----------
+// Ставки задаются по группам товаров: процент отделу продаж и процент маркетплейса.
+// В каждой продаже ставки запоминаются, чтобы изменение ставки не меняло прошлые расчёты.
+const pct = (v) => (Math.round((Number(v) || 0) * 100) / 100).toLocaleString("ru-RU") + "%";
+const parsePct = (v) => { const n = Number(String(v ?? "").replace(",", ".").replace(/[^\d.]/g, "")); return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0; };
+const activeGroups = () => [...S.groups.values()].filter((g) => !g.archived).sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.name.localeCompare(b.name, "ru"));
+const kwList = (g) => (Array.isArray(g.keywords) ? g.keywords : String(g.keywords || "").split(",")).map((k) => String(k).trim().toLowerCase()).filter(Boolean);
+function matchGroup(text) {
+  const t = String(text || "").toLowerCase();
+  if (!t.trim()) return null;
+  let best = null, len = 0;
+  for (const g of activeGroups()) for (const k of [...kwList(g), g.name.toLowerCase()]) if (k.length >= 2 && t.includes(k) && k.length > len) { best = g.id; len = k.length; }
+  return best;
+}
+function calcSale(amount, salesRate, mpRate, channel) {
+  const mpFee = channel === "mp" ? Math.round((amount * mpRate) / 100) : 0;
+  const base = S.salesCfg.base === "net" ? amount - mpFee : amount;
+  const salesFee = Math.round((base * salesRate) / 100);
+  return { mpFee, salesFee, net: amount - mpFee - salesFee };
+}
+function salesMonth(off) {
+  const r = monthRange(off), list = S.sales.filter((x) => inRange(x, r)).sort((a, b) => b.at.localeCompare(a.at));
+  const sum = (f) => list.reduce((a, x) => a + (x[f] || 0), 0);
+  return { r, list, amount: sum("amount"), mpFee: sum("mpFee"), salesFee: sum("salesFee"), net: sum("net"), unpaid: list.filter((x) => !x.paid).reduce((a, x) => a + (x.salesFee || 0), 0) };
+}
+function saleRow(x) {
+  const g = S.groups.get(x.group), d = new Date(x.at);
+  const meta = [d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" }), x.channel === "mp" ? "маркетплейс " + pct(x.mpRate) : "вживую"];
+  if (x.manager) meta.push(esc(x.manager));
+  return `<button type="button" class="tx" data-sale="${esc(x.id)}"><span style="min-width:0"><span class="who">${esc(x.product || "Без названия")}</span><br><span class="muted small">${meta.join(" · ")}</span><br><span class="chip">${esc(g?.name || "без группы")}</span> <span class="chip ${x.paid ? "" : "bad"}">${x.paid ? "отделу выплачено" : "отделу " + fmt(x.salesFee)}</span></span><span class="amt in">${fmt(x.amount)}<br><span class="muted small">чистыми ${fmt(x.net)}</span></span></button>`;
+}
+
+function vSales() {
+  const m = salesMonth(S.sOffset), r = m.r;
+  const byG = new Map();
+  for (const x of m.list) { const g = byG.get(x.group || "") || { n: 0, amount: 0, salesFee: 0, mpFee: 0 }; g.n++; g.amount += x.amount; g.salesFee += x.salesFee; g.mpFee += x.mpFee; byG.set(x.group || "", g); }
+  let h = `<div class="wide monthnav"><button type="button" class="btn sm" data-smonth="-1" aria-label="Предыдущий месяц">‹</button><strong>Продажи · ${esc(r.label)}</strong><button type="button" class="btn sm" data-smonth="1" aria-label="Следующий месяц" ${S.sOffset >= 0 ? "disabled" : ""}>›</button></div>`;
+  if (!activeGroups().length) h += `<a class="card wide pending" href="#rates"><strong>Сначала задайте ставки комиссий</strong><div class="small">Группы товаров и проценты отделу продаж и маркетплейсам — можно просто вставить ваш лист.</div></a>`;
+  h += `<section class="card wide"><div class="kpis"><div><div class="muted small">Продано</div><div class="big">${fmt(m.amount)}</div><div class="small muted">${m.list.length} продаж</div></div><div><div class="muted small">Комиссия маркетплейсов</div><div class="big">${fmt(m.mpFee)}</div></div><div><div class="muted small">Отделу продаж</div><div class="big">${fmt(m.salesFee)}</div><div class="small ${m.unpaid ? "up" : "paid"}">${m.unpaid ? "к выплате " + fmt(m.unpaid) : m.salesFee ? "всё выплачено" : ""}</div></div><div><div class="muted small">Чистыми вам</div><div class="big">${fmt(m.net)}</div></div></div>`;
+  if (m.unpaid && !S.readOnly) h += S.payConfirm ? `<div class="inline" style="margin-top:12px"><span class="small" style="align-self:center">Отметить выплату ${fmt(m.unpaid)} отделу продаж за ${esc(r.label.toLowerCase())}?</span><button type="button" class="btn sm primary" data-payyes>Да, выплачено</button><button type="button" class="btn sm ghost" data-payno>Отмена</button></div>` : `<div style="margin-top:12px"><button type="button" class="btn sm" data-payall>Отметить: выплачено отделу ${fmt(m.unpaid)}</button></div>`;
+  h += `</section>`;
+  if (byG.size) h += `<section class="card"><h2>По группам товаров</h2><div class="tbl"><table><thead><tr><th>Группа</th><th>Продаж</th><th>Сумма</th><th>Отделу</th></tr></thead><tbody>${[...byG.entries()].sort((a, b) => b[1].amount - a[1].amount).map(([id, g]) => `<tr><td>${esc(S.groups.get(id)?.name || "без группы")}</td><td>${g.n}</td><td>${fmt(g.amount)}</td><td>${fmt(g.salesFee)}</td></tr>`).join("")}</tbody></table></div></section>`;
+  h += `<section class="card"><div class="row"><h2 style="margin:0">Продажи</h2><a class="btn sm ghost" href="#rates">Ставки ›</a></div>${m.list.map(saleRow).join("") || '<p class="muted" style="margin:8px 0 0">В этом месяце продаж нет. Нажмите + → «Продажа».</p>'}</section>`;
+  view.innerHTML = h;
+}
+
+function vRates() {
+  view.className = "view narrow";
+  const gs = activeGroups();
+  let h = `<div class="muted small"><a href="#sales">Продажи</a></div><h1>Ставки комиссий</h1>`;
+  h += `<section class="card stack"><h2>Комиссия отделу продаж считается</h2><div class="seg" role="group"><button type="button" data-base="gross" class="${S.salesCfg.base !== "net" ? "on" : ""}">от суммы продажи</button><button type="button" data-base="net" class="${S.salesCfg.base === "net" ? "on" : ""}">после комиссии маркетплейса</button></div></section>`;
+  h += `<section class="card stack"><h2>Группы товаров</h2><div class="rate small muted"><span>Группа и ключевые слова</span><span>Отделу, %</span><span>Маркетпл., %</span></div>${gs.map((g) => `<form class="stack" data-group="${esc(g.id)}" style="border-top:1px solid var(--line);padding-top:10px"><div class="rate"><input id="gn-${esc(g.id)}" name="name" value="${esc(g.name)}" aria-label="Название группы"><input id="gs-${esc(g.id)}" name="sales" inputmode="decimal" value="${g.sales ?? ""}" aria-label="Процент отделу продаж"><input id="gm-${esc(g.id)}" name="mp" inputmode="decimal" value="${g.mp ?? ""}" aria-label="Процент маркетплейса"></div><input id="gk-${esc(g.id)}" name="keywords" value="${esc(kwList(g).join(", "))}" placeholder="ключевые слова через запятую: принтер, bambu, ender" aria-label="Ключевые слова"><div class="inline"><button class="btn sm" ${S.readOnly ? "disabled" : ""}>Сохранить</button><button type="button" class="btn sm ghost danger" data-hidegroup="${esc(g.id)}" ${S.readOnly ? "disabled" : ""}>Скрыть</button></div></form>`).join("") || '<p class="muted" style="margin:0">Групп пока нет — добавьте ниже или вставьте ваш лист.</p>'}</section>`;
+  h += `<form class="card stack" id="addGroup"><h2>Новая группа</h2><div class="rate"><input id="ng" name="name" required placeholder="например, Филамент"><input id="ns" name="sales" inputmode="decimal" placeholder="10"><input id="nm" name="mp" inputmode="decimal" placeholder="5"></div><input id="nk" name="keywords" placeholder="ключевые слова через запятую: pla, petg, катушка"><button class="btn primary" ${S.readOnly ? "disabled" : ""}>Добавить группу</button></form>`;
+  h += `<section class="card stack"><h2>Вставить лист комиссий</h2><p class="small muted" style="margin:0">Скопируйте ваш лист (из Excel, Google Таблиц или заметок) и вставьте сюда — Claude разберёт группы, проценты и подберёт ключевые слова. Перед сохранением вы увидите результат.</p><textarea id="sheetText" placeholder="Например:&#10;3D-принтеры — 7%, маркетплейс 8%&#10;Филамент — 10%, маркетплейс 5%&#10;Электротранспорт — 5%">${esc(S.sheetText)}</textarea>`;
+  if (S.sheetPreview) h += `<div class="preview stack"><strong>Получилось ${S.sheetPreview.length} групп:</strong><div class="tbl"><table><thead><tr><th>Группа</th><th>Отделу</th><th>Маркетпл.</th></tr></thead><tbody>${S.sheetPreview.map((x) => `<tr><td>${esc(x.name)}<br><span class="muted small">${esc(x.keywords.join(", "))}</span></td><td>${x.sales === null ? '<span class="up">не указано</span>' : pct(x.sales)}</td><td>${x.mp === null ? "—" : pct(x.mp)}</td></tr>`).join("")}</tbody></table></div><div class="inline"><button type="button" class="btn primary" data-savesheet ${S.readOnly ? "disabled" : ""}>Сохранить ставки</button><button type="button" class="btn ghost" data-dropsheet>Отмена</button></div></div>`;
+  else h += S.sample ? `<button type="button" class="btn primary" data-parsesheet ${S.sheetBusy ? "disabled" : ""}>${S.sheetBusy ? "Разбираю…" : "Разобрать лист"}</button>` : `<p class="muted small" style="margin:0">ИИ недоступен в этом окне — добавьте группы вручную выше.</p>`;
+  h += `</section>`;
+  view.innerHTML = h;
+}
+
+async function parseSheet() {
+  const text = S.sheetText.trim();
+  if (!text) return toast("Сначала вставьте лист");
+  if (!S.sample || S.sheetBusy) return;
+  S.sheetBusy = true; render();
+  try {
+    const res = await S.sample.json(`Ниже лист комиссий отдела продаж (Украина). Разбери его на группы товаров.
+Верни только JSON-массив объектов {"name": string, "sales": number|null, "mp": number|null, "keywords": string[]}:
+- name — короткое название группы товаров;
+- sales — процент отделу продаж (число без знака %); null, если в листе не указан;
+- mp — процент комиссии маркетплейса для этой группы; null, если не указан;
+- keywords — 3–8 коротких слов или фраз в нижнем регистре, по которым в названии проданного товара можно узнать эту группу (типы товаров, бренды, модели, материалы).
+Не выдумывай проценты, которых нет в листе.
+
+Лист:
+${text.slice(0, 20000)}`, { modelTier: "default" });
+    const arr = Array.isArray(res) ? res : [];
+    S.sheetPreview = arr.filter((x) => x && typeof x.name === "string" && x.name.trim()).slice(0, 60).map((x) => ({
+      name: x.name.trim().slice(0, 80),
+      sales: x.sales === null || x.sales === undefined || x.sales === "" ? null : parsePct(x.sales),
+      mp: x.mp === null || x.mp === undefined || x.mp === "" ? null : parsePct(x.mp),
+      keywords: (Array.isArray(x.keywords) ? x.keywords : []).map((k) => String(k).trim().toLowerCase()).filter(Boolean).slice(0, 12),
+    }));
+    if (!S.sheetPreview.length) { S.sheetPreview = null; toast("Не нашёл групп в тексте — проверьте лист"); }
+  } catch (e) {
+    toast(e?.code === "not_granted" ? "Доступ к Claude не разрешён" : e?.code === "rate_limited" ? "Слишком много запросов — попробуйте позже" : "Не получилось разобрать — попробуйте ещё раз");
+  }
+  S.sheetBusy = false; render();
+}
+async function saveSheet() {
+  const items = S.sheetPreview || [];
+  let order = activeGroups().length;
+  for (const x of items) {
+    const ex = activeGroups().find((g) => g.name.toLowerCase() === x.name.toLowerCase());
+    const data = { name: x.name, sales: x.sales ?? 0, mp: x.mp ?? 0, keywords: x.keywords.join(", ") };
+    const ok = ex ? await write(() => S.db.collection("groups").doc(ex.id).update(data)) : await write(() => S.db.collection("groups").doc(newId("g")).set({ ...data, archived: false, order: ++order }));
+    if (!ok) return;
+  }
+  S.sheetPreview = null; S.sheetText = ""; toast(`Сохранено групп: ${items.length}`); render();
+}
+
+// ---------- Лист «Продажа» ----------
+function openSale(sale, presetAmount = "") {
+  S.sale = sale
+    ? { ...sale, groupTouched: true, auto: "" }
+    : { id: null, product: "", amount: parseAmount(presetAmount) || 0, group: "", channel: "direct", manager: lastManager(), note: "", at: new Date().toISOString(), card: lastCard() || "cash", paid: false, auto: "", groupTouched: false };
+  const x = S.sale, f = document.getElementById("saleForm");
+  const local = new Date(new Date(x.at).getTime() - new Date(x.at).getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  f.innerHTML = `<div class="grab"></div><div class="row"><strong style="font-size:18px">${sale ? "Продажа" : "Новая продажа"}</strong><button type="button" class="btn sm ghost" data-sclose>Закрыть</button></div>
+  ${sale ? "" : `<div class="seg seg3" role="group" aria-label="Тип"><button type="button" data-todir="out">Расход</button><button type="button" data-todir="in">Поступление</button><button type="button" class="on">Продажа</button></div>`}
+  <label class="f">Что продано<input id="sProduct" value="${esc(x.product)}" placeholder="например, Bambu Lab A1 mini" required></label>
+  <label class="f">Сумма продажи, ₴<input id="sAmount" class="amount" inputmode="decimal" placeholder="0" value="${x.amount ? x.amount / 100 : ""}" required></label>
+  <label class="f"><span>Группа товара <span class="auto" id="sAuto"></span></span><select id="sGroup"><option value="">— выберите —</option>${activeGroups().map((g) => `<option value="${esc(g.id)}">${esc(g.name)} · отделу ${pct(g.sales)}</option>`).join("")}</select></label>
+  <div class="f"><span>Где продано</span><div class="seg" role="group" aria-label="Канал"><button type="button" data-ch="direct">Вживую · без комиссии</button><button type="button" data-ch="mp" id="sMpBtn">Маркетплейс</button></div></div>
+  <label class="f">Менеджер (необязательно)<input id="sManager" value="${esc(x.manager)}" placeholder="кто продал"></label>
+  ${sale ? "" : `<label class="f">Деньги пришли<select id="sCard"><option value="none">не записывать в учёт денег</option><option value="cash">наличными / в кассу</option>${[...S.cards.values()].filter((c) => !c.archived).map((c) => `<option value="${esc(c.id)}">на карту ${esc(c.bank)} •• ${esc(c.last4)}</option>`).join("")}</select></label>`}
+  <div class="calc" id="sCalc"></div>
+  <label class="f">Комментарий<input id="sNote" value="${esc(x.note)}"></label>
+  <label class="f">Дата и время<input id="sAt" type="datetime-local" value="${local}"></label>
+  ${sale ? `<label class="f" style="flex-direction:row;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="sPaid" style="width:auto;min-height:0" ${x.paid ? "checked" : ""}> Комиссия отделу выплачена</label>` : ""}
+  <button class="btn primary" ${S.readOnly ? "disabled" : ""}>${sale ? "Сохранить" : "Записать продажу"}</button>
+  ${sale ? `<div id="sDelZone"><button type="button" class="btn ghost danger" data-sdel>Удалить продажу</button></div>` : ""}`;
+  f.querySelector("#sGroup").value = x.group || "";
+  if (!sale) f.querySelector("#sCard").value = x.card;
+  syncSale();
+  document.getElementById("saleSheet").hidden = false;
+  if (!sale) setTimeout(() => f.querySelector("#sProduct").focus(), 50);
+}
+function saleRates() {
+  const x = S.sale, g = S.groups.get(x.group);
+  // У сохранённой продажи остаются её ставки, пока не сменили группу.
+  if (x.id && x.groupAtOpen === undefined) x.groupAtOpen = x.group;
+  if (x.id && x.group === x.groupAtOpen && typeof x.salesRate === "number") return { salesRate: x.salesRate, mpRate: x.mpRate ?? 0 };
+  return { salesRate: g?.sales ?? 0, mpRate: g?.mp ?? 0 };
+}
+function syncSale() {
+  const f = document.getElementById("saleForm"), x = S.sale;
+  if (!x || document.getElementById("saleSheet").hidden && !f.querySelector("#sCalc")) return;
+  const { salesRate, mpRate } = saleRates();
+  f.querySelectorAll("[data-ch]").forEach((b) => b.classList.toggle("on", b.dataset.ch === x.channel));
+  const mpBtn = f.querySelector("#sMpBtn"); if (mpBtn) mpBtn.textContent = x.group ? `Маркетплейс · ${pct(mpRate)}` : "Маркетплейс";
+  const auto = f.querySelector("#sAuto"); if (auto) auto.textContent = x.auto === "kw" ? "· определено по названию" : x.auto === "ai" ? "· определил Claude" : x.auto === "ai-wait" ? "· Claude определяет…" : "";
+  const c = calcSale(x.amount || 0, salesRate, mpRate, x.channel);
+  f.querySelector("#sCalc").innerHTML = !x.amount ? `<span class="muted small">Введите сумму — здесь появится расчёт комиссий.</span>` : !x.group ? `<div class="row"><span>Сумма</span><strong>${fmt(x.amount)}</strong></div><span class="small up">Выберите группу товара, чтобы посчитать комиссию отделу продаж.</span>` :
+    `<div class="row"><span>Сумма продажи</span><span>${fmt(x.amount)}</span></div>${x.channel === "mp" ? `<div class="row"><span>Комиссия маркетплейса ${pct(mpRate)}</span><span>−${fmt(c.mpFee)}</span></div>` : ""}<div class="row"><span>Отделу продаж ${pct(salesRate)}${S.salesCfg.base === "net" && x.channel === "mp" ? " (от суммы после маркетплейса)" : ""}</span><span>−${fmt(c.salesFee)}</span></div><div class="row total"><span>Чистыми вам</span><span>${fmt(c.net)}</span></div>`;
+}
+function closeSale() { document.getElementById("saleSheet").hidden = true; S.sale = null; if (S.dirty) render(); }
+function lastManager() { return [...S.sales].sort((a, b) => b.at.localeCompare(a.at))[0]?.manager || ""; }
+let saleTimer, aiSaleCtl;
+async function aiGroup(text) {
+  if (!S.sample || !activeGroups().length || !S.sale || S.sale.groupTouched || S.sale.group) return;
+  aiSaleCtl?.abort(); aiSaleCtl = new AbortController();
+  S.sale.auto = "ai-wait"; syncSale();
+  try {
+    const groups = activeGroups().map((g) => ({ id: g.id, name: g.name, keywords: kwList(g).join(", ") }));
+    const res = await S.sample.json(`Определи группу товара для расчёта комиссии отдела продаж. Проданный товар: ${JSON.stringify(text)}.
+Группы: ${JSON.stringify(groups)}.
+Ответь только JSON {"id": "<id подходящей группы>"} или {"id": null}, если ни одна не подходит.`, { modelTier: "quick", signal: aiSaleCtl.signal });
+    if (S.sale && !S.sale.groupTouched && !S.sale.group && res && S.groups.has(res.id)) {
+      S.sale.group = res.id; S.sale.auto = "ai";
+      document.getElementById("sGroup").value = res.id;
+    } else if (S.sale) S.sale.auto = "";
+  } catch { if (S.sale) S.sale.auto = ""; }
+  syncSale();
+}
+document.getElementById("saleForm").addEventListener("input", (e) => {
+  const x = S.sale; if (!x) return;
+  if (e.target.id === "sAmount") x.amount = parseAmount(e.target.value) || 0;
+  if (e.target.id === "sManager") x.manager = e.target.value;
+  if (e.target.id === "sProduct") {
+    x.product = e.target.value;
+    if (!x.groupTouched) {
+      const g = matchGroup(x.product);
+      x.group = g || ""; x.auto = g ? "kw" : "";
+      document.getElementById("sGroup").value = x.group;
+      clearTimeout(saleTimer);
+      if (!g && x.product.trim().length >= 3) saleTimer = setTimeout(() => aiGroup(x.product), 1200);
+    }
+  }
+  syncSale();
+});
+document.getElementById("saleForm").addEventListener("change", (e) => {
+  if (e.target.id === "sGroup" && S.sale) { S.sale.group = e.target.value; S.sale.groupTouched = true; S.sale.auto = ""; aiSaleCtl?.abort(); syncSale(); }
+});
+document.getElementById("saleForm").addEventListener("click", async (e) => {
+  const b = e.target.closest("button"); if (!b || !S.sale) return;
+  if (b.dataset.ch) { S.sale.channel = b.dataset.ch; syncSale(); }
+  else if (b.hasAttribute("data-sclose")) closeSale();
+  else if (b.dataset.todir) { const amt = document.getElementById("sAmount").value; closeSale(); openSheet(null); S.form.dir = b.dataset.todir; syncForm(); document.getElementById("fAmount").value = amt; }
+  else if (b.hasAttribute("data-sdel")) document.getElementById("sDelZone").innerHTML = `<div class="inline"><span class="small" style="align-self:center">Удалить продажу${S.sale.txId ? " и её поступление" : ""}?</span><button type="button" class="btn sm danger" data-sdelyes>Удалить</button><button type="button" class="btn sm ghost" data-sclose>Отмена</button></div>`;
+  else if (b.hasAttribute("data-sdelyes")) {
+    const x = S.sale;
+    if (await write(() => S.db.collection("sales").doc(x.id).delete(), "Продажа удалена")) {
+      if (x.txId) await write(() => S.db.collection("tx").doc(x.txId).delete());
+      closeSale();
+    }
+  }
+});
+document.getElementById("saleForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.currentTarget, x = S.sale;
+  x.product = f.querySelector("#sProduct").value.trim();
+  x.amount = parseAmount(f.querySelector("#sAmount").value) || 0;
+  if (!x.product) return toast("Напишите, что продано");
+  if (!x.amount) return toast("Введите сумму продажи");
+  if (!x.group) return toast("Выберите группу товара");
+  const { salesRate, mpRate } = saleRates(), c = calcSale(x.amount, salesRate, mpRate, x.channel);
+  const at = f.querySelector("#sAt").value ? new Date(f.querySelector("#sAt").value).toISOString() : new Date().toISOString();
+  const id = x.id || newId("s");
+  const data = {
+    at, product: x.product, amount: x.amount, group: x.group, channel: x.channel, salesRate, mpRate, ...c,
+    manager: f.querySelector("#sManager").value.trim(), note: f.querySelector("#sNote").value.trim(),
+    paid: x.id ? f.querySelector("#sPaid").checked : false, by: x.by || S.uid || "", created: x.created || new Date().toISOString(), txId: x.txId || "",
+  };
+  const cardSel = x.id ? "none" : f.querySelector("#sCard").value;
+  if (!x.id && cardSel !== "none") data.txId = newId("t");
+  const btn = f.querySelector("button.primary"); btn.disabled = true;
+  const ok = await write(() => S.db.collection("sales").doc(id).set(data), x.id ? "Сохранено" : `Продажа записана · отделу ${fmt(c.salesFee)}`);
+  if (ok && !x.id && data.txId) {
+    // Поступление денег за продажу — в общий учёт денег.
+    await write(() => S.db.collection("tx").doc(data.txId).set({ amount: x.amount, at, cat: S.cats.has("sales") ? "sales" : "", card: cardSel === "cash" ? "" : cardSel, who: x.product, forWhom: "", note: "Продажа", by: data.by, created: data.created, saleId: id }));
+  } else if (ok && x.id && x.txId) {
+    const t = S.txs.find((t) => t.id === x.txId);
+    if (t && (t.amount !== x.amount || t.at !== at)) await write(() => S.db.collection("tx").doc(x.txId).update({ amount: x.amount, at, who: x.product }));
+  }
+  btn.disabled = false;
+  if (ok) closeSale();
+});
+document.getElementById("saleSheet").addEventListener("click", (e) => { if (e.target.id === "saleSheet") closeSale(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !document.getElementById("saleSheet").hidden) closeSale(); });
+
+view.addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-sale],[data-smonth],[data-payall],[data-payyes],[data-payno],[data-base],[data-hidegroup],[data-parsesheet],[data-savesheet],[data-dropsheet]");
+  if (!b) return;
+  if (b.dataset.sale) { const x = S.sales.find((s) => s.id === b.dataset.sale); if (x) openSale(x); }
+  else if (b.dataset.smonth) { S.sOffset = Math.min(0, S.sOffset + Number(b.dataset.smonth)); S.payConfirm = false; render(); }
+  else if (b.hasAttribute("data-payall")) { S.payConfirm = true; render(); }
+  else if (b.hasAttribute("data-payno")) { S.payConfirm = false; render(); }
+  else if (b.hasAttribute("data-payyes")) {
+    S.payConfirm = false;
+    const list = salesMonth(S.sOffset).list.filter((x) => !x.paid), at = new Date().toISOString();
+    for (const x of list) if (!(await write(() => S.db.collection("sales").doc(x.id).update({ paid: true, paidAt: at })))) return;
+    toast("Отмечено: выплачено отделу продаж"); render();
+  }
+  else if (b.dataset.base) { await write(() => S.db.collection("settings").doc("sales").set({ base: b.dataset.base }), "Сохранено"); }
+  else if (b.dataset.hidegroup) { await write(() => S.db.collection("groups").doc(b.dataset.hidegroup).update({ archived: true }), "Группа скрыта"); }
+  else if (b.hasAttribute("data-parsesheet")) { S.sheetText = document.getElementById("sheetText")?.value || ""; parseSheet(); }
+  else if (b.hasAttribute("data-savesheet")) saveSheet();
+  else if (b.hasAttribute("data-dropsheet")) { S.sheetPreview = null; render(); }
+});
+view.addEventListener("input", (e) => { if (e.target.id === "sheetText") S.sheetText = e.target.value; });
+view.addEventListener("submit", async (e) => {
+  const f = e.target;
+  if (f.dataset.group) {
+    e.preventDefault();
+    const name = f.name.value.trim(); if (!name) return toast("Нужно название группы");
+    document.activeElement?.blur();
+    await write(() => S.db.collection("groups").doc(f.dataset.group).update({ name, sales: parsePct(f.sales.value), mp: parsePct(f.mp.value), keywords: f.keywords.value }), "Ставки сохранены");
+  } else if (f.id === "addGroup") {
+    e.preventDefault();
+    const name = f.name.value.trim(); if (!name) return;
+    document.activeElement?.blur();
+    if (await write(() => S.db.collection("groups").doc(newId("g")).set({ name, sales: parsePct(f.sales.value), mp: parsePct(f.mp.value), keywords: f.keywords.value, archived: false, order: activeGroups().length + 1 }), "Группа добавлена")) f.reset();
+  }
+});
+
 // ---------- ИИ ----------
 let aiCtl;
 const AI_ERR = { not_granted: "Доступ к Claude не разрешён для этой страницы.", sampling_disabled: "Claude недоступен для этого аккаунта.", rate_limited: "Слишком много запросов — попробуйте через несколько минут.", refused: "Claude не смог подготовить разбор — попробуйте позже.", session_expired: "Войдите в Claude заново.", empty_completion: "Пустой ответ — попробуйте ещё раз." };
@@ -651,6 +937,9 @@ render();
   const fail = (e) => { clearTimeout(timer); if (e?.code !== "revoked") S.error = e?.code || "unavailable"; else S.readOnly = true; render(); };
   db.collection("categories").onSnapshot((snap) => { S.cats = new Map(snap.docs.map((d) => [d.id, { id: d.id, ...d.data() }])); settle("cats", snap); render(); }, fail);
   db.collection("cards").onSnapshot((snap) => { S.cards = new Map(snap.docs.map((d) => [d.id, { id: d.id, ...d.data() }])); settle("cards", snap); render(); }, fail);
+  db.collection("groups").onSnapshot((snap) => { S.groups = new Map(snap.docs.map((d) => [d.id, { id: d.id, ...d.data() }])); render(); if (S.sale) syncSale(); }, () => {});
+  db.collection("sales").onSnapshot((snap) => { S.sales = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((x) => typeof x.amount === "number" && x.at); S.loaded.sales = true; render(); }, fail);
+  db.collection("settings").doc("sales").onSnapshot((snap) => { S.salesCfg = { base: "gross", ...(snap.data() || {}) }; render(); if (S.sale) syncSale(); }, () => {});
   db.collection("reports").onSnapshot((snap) => { S.reports = new Map(snap.docs.map((d) => [d.id, d.data()])); render(); }, () => {});
   db.collection("tx").onSnapshot(async (snap) => {
     S.txs = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((t) => typeof t.amount === "number" && t.at);

@@ -3,6 +3,7 @@ import { connectMonobankAction, connectTelegramAction, disconnectTelegramAction 
 import { SubmitButton } from "../components/SubmitButton.tsx";
 import { aiConfigured } from "@/lib/ai.ts";
 import { telegramState } from "@/lib/telegram.ts";
+import { MAX_BACKFILL_DAYS } from "@/lib/monobank.ts";
 import { publicBase } from "@/lib/url.ts";
 
 const DOCS = "https://github.com/8rj56yyh5y-collab/gitask-tracker/blob/claude/hopeful-davinci-yrcko2/docs";
@@ -17,6 +18,9 @@ export default async function Settings({
   const base = await publicBase();
   const https = base.startsWith("https://");
   const ingestKey = process.env.DN_INGEST_TOKEN ?? "";
+  const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const today = ymd(new Date());
+  const minDay = ymd(new Date(Date.now() - MAX_BACKFILL_DAYS * 864e5));
 
   return (
     <div className="narrow-wide">
@@ -75,12 +79,22 @@ export default async function Settings({
         {sp.mono_error && <p className="danger small">{sp.mono_error}</p>}
         <p className="small">
           Откройте <a href="https://api.monobank.ua/" className="link" target="_blank" rel="noreferrer">api.monobank.ua</a>, войдите
-          через приложение Monobank и скопируйте токен. D&amp;N сам добавит все карты и будет получать каждую операцию.
+          через приложение Monobank и скопируйте токен. D&amp;N сам добавит все карты и будет получать каждую операцию с выбранного дня.
           Токен не сохраняется.
         </p>
-        <form action={connectMonobankAction} className="inline">
-          <input name="token" required placeholder="Токен Monobank" autoComplete="off" />
-          <SubmitButton className="btn btn-primary btn-sm" pending="Подключаю…">
+        <form action={connectMonobankAction} className="form">
+          <input name="token" required placeholder="Токен Monobank" autoComplete="off" aria-label="Токен Monobank" />
+          <label>
+            Вести операции с
+            <input name="from" type="date" defaultValue={today} max={today} min={minDay} />
+          </label>
+          <label className="check">
+            <input type="checkbox" name="backfill" /> Загрузить прошлые операции с этой даты (не дальше {MAX_BACKFILL_DAYS} дней)
+          </label>
+          <p className="muted small">
+            По умолчанию — с сегодняшнего дня: старые операции не подтягиваются, только новые.
+          </p>
+          <SubmitButton className="btn btn-primary" pending="Подключаю…">
             Подключить
           </SubmitButton>
         </form>

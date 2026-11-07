@@ -30,6 +30,16 @@ const server = http.createServer((req, res) => {
       );
     }
     if (req.url === "/personal/webhook") return res.end("{}");
+    const st = req.url!.match(/^\/personal\/statement\/([^/]+)\/(\d+)\/(\d+)$/);
+    if (st) {
+      const [, acc, from, to] = st;
+      // Две операции: одна внутри запрошенного периода, одна — до него (банк её не вернёт).
+      const items = [
+        { id: `${acc}-old`, time: Number(from) - 3600, amount: -50000, description: "До даты", currencyCode: 980 },
+        { id: `${acc}-in`, time: Number(from) + 3600, amount: -120000, description: "АТБ", currencyCode: 980 },
+      ].filter((i) => i.time >= Number(from) && i.time <= Number(to));
+      return res.end(JSON.stringify(items));
+    }
     res.writeHead(404).end("{}");
   });
 });
@@ -37,12 +47,13 @@ await new Promise<void>((r) => server.listen(0, r));
 const base = `http://127.0.0.1:${(server.address() as any).port}`;
 process.env.DN_TELEGRAM_API = base;
 process.env.DN_MONO_API = base;
+process.env.DN_MONO_PAUSE_MS = "0";
 after(() => server.close());
 
 const repo = await import("../lib/repo.ts");
 const tg = await import("../lib/telegram.ts");
 const { setSetting, getSetting } = await import("../lib/settings.ts");
-const { connectMonobank } = await import("../lib/monobank.ts");
+const { connectMonobank, saveMonoItem, backfill } = await import("../lib/monobank.ts");
 const center = (name: string) => repo.listCenters().find((c) => c.name.startsWith(name))!;
 
 test("telegram: connect, link chat by code, notify, assign by button", async () => {
@@ -114,4 +125,41 @@ test("monobank: adds cards, links existing by last 4 digits, registers webhook",
   assert.equal(repo.findCard({ monoAccount: "acc-fop" })!.last4, "5555");
   assert.equal(repo.listCards().filter((c) => c.last4 === "5555").length, 1);
   assert.equal(calls.find((c) => c.path === "/personal/webhook")!.body.webHookUrl, "https://dn.example.com/api/monobank?key=k");
+});
+
+test("monobank: operations before the tracking date are skipped", async () => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const r = await connectMonobank("mono-token-1234567890abcdef", "https://dn.example.com/api/monobank?key=k", { from: today });
+  assert.equal(r.backfillAccounts, 0, "no backfill unless asked");
+  const card = repo.findCard({ monoAccount: "acc-black" })!;
+  assert.equal(card.track_from, today.toISOString());
+  const yesterday = Math.floor(today.getTime() / 1000) - 3600;
+  assert.equal(saveMonoItem("acc-black", { id: "old-1", time: yesterday, amount: -1000 }), null);
+  const fresh = saveMonoItem("acc-black", { id: "new-1", time: Math.floor(Date.now() / 1000), amount: -2000, description: "OKKO" });
+  assert.ok(fresh && !fresh.duplicate);
+  assert.equal(repo.getTx(fresh!.id)!.card_id, card.id);
+  // повтор той же операции не дублируется
+  assert.equal(saveMonoItem("acc-black", { id: "new-1", time: Math.floor(Date.now() / 1000), amount: -2000 })!.duplicate, true);
+});
+
+test("monobank: backfill from the chosen date loads past operations once", async () => {
+  const from = new Date(Date.now() - 40 * 864e5); // 40 дней — по два запроса по 31 дню на счёт
+  calls.length = 0;
+  const r = await connectMonobank("mono-token-1234567890abcdef", "https://dn.example.com/api/monobank?key=k", { from, backfill: true, wait: true });
+  assert.equal(r.backfillAccounts, 2);
+  const statementCalls = calls.filter((c) => c.path.startsWith("/personal/statement/"));
+  assert.equal(statementCalls.length, 4, "2 accounts × 2 chunks of 31 days");
+  assert.equal(r.backfilled, 2, "one past operation per account in range");
+  assert.equal(repo.listRecent(1000).filter((t) => t.counterparty === "АТБ").length, 2);
+  // повторная загрузка не создаёт дублей
+  const before = repo.listRecent(1000).length;
+  assert.equal(await backfill("mono-token-1234567890abcdef", ["acc-black", "acc-fop"], from, new Date()), 0);
+  assert.equal(repo.listRecent(1000).length, before);
+});
+
+test("monobank: backfill is limited to the allowed depth", async () => {
+  const r = await connectMonobank("mono-token-1234567890abcdef", "https://dn.example.com/api/monobank?key=k", { from: new Date(2020, 0, 1), backfill: true, wait: true });
+  const days = (Date.now() - new Date(r.from).getTime()) / 864e5;
+  assert.ok(days <= 92.01 && days > 91, `clamped to 92 days, got ${days}`);
 });

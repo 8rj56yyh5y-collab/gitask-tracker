@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { bearer, ingestTokenOk } from "@/lib/auth.ts";
-import { findCard, insertTx } from "@/lib/repo.ts";
+import { saveMonoItem } from "@/lib/monobank.ts";
 import { revalidatePath } from "next/cache";
 import { notifyNewTx } from "@/lib/telegram.ts";
 
@@ -8,8 +8,6 @@ import { notifyNewTx } from "@/lib/telegram.ts";
 // Регистрируется на адрес https://<домен>/api/monobank?key=<DN_INGEST_TOKEN>.
 // Monobank проверяет адрес GET-запросом, а операции присылает POST-ом:
 // { type: "StatementItem", data: { account, statementItem: { id, time, description, mcc, amount, currencyCode, ... } } }
-
-const CURRENCY: Record<number, string> = { 980: "UAH", 840: "USD", 978: "EUR" };
 
 export async function GET(req: Request) {
   if (!ingestTokenOk(bearer(req))) return new NextResponse("unauthorized", { status: 401 });
@@ -43,26 +41,9 @@ export async function POST(req: Request) {
   // Отвечаем 200 даже на неизвестные события, иначе Monobank будет повторять и может отключить вебхук.
   if (body.type !== "StatementItem" || !item?.id || typeof item.amount !== "number") return new NextResponse("ignored");
 
-  const card = findCard({ monoAccount: body.data?.account ?? null });
-  // amount — в валюте счёта (её и списали с карты, она идёт в лимиты),
-  // currencyCode/operationAmount — валюта и сумма самой покупки. Для покупок в валюте пишем оригинал в комментарий.
-  const opCurrency = CURRENCY[item.currencyCode ?? 980] ?? String(item.currencyCode);
-  const foreign =
-    item.currencyCode && item.currencyCode !== 980 && typeof item.operationAmount === "number"
-      ? `${(Math.abs(item.operationAmount) / 100).toFixed(2)} ${opCurrency}`
-      : "";
-  const { id, duplicate } = insertTx({
-    amountKop: item.amount,
-    currency: "UAH",
-    occurredAt: new Date((item.time ?? Date.now() / 1000) * 1000).toISOString(),
-    cardId: card?.id ?? null,
-    counterparty: item.counterName || item.description || "",
-    description: [item.comment, foreign].filter(Boolean).join(" · "),
-    source: "monobank",
-    externalId: `mono:${item.id}`,
-    raw: JSON.stringify(body),
-  });
-  if (!duplicate) await notifyNewTx(id);
+  // Операции до даты, с которой ведётся карта, пропускаются.
+  const saved = saveMonoItem(body.data?.account, item);
+  if (saved && !saved.duplicate) await notifyNewTx(saved.id);
   revalidatePath("/", "layout");
   return new NextResponse("ok");
 }
