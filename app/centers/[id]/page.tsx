@@ -141,6 +141,10 @@ export default async function CenterPage({ params }: { params: Promise<{ id: str
           <input name="color" type="color" defaultValue={center.color} />
         </label>
         <label className="check">
+          <input type="checkbox" name="personal" defaultChecked={Boolean((center as { is_personal?: number }).is_personal)} /> Это мои личные деньги — учитывать в «Мои
+          деньги за месяц»
+        </label>
+        <label className="check">
           <input type="checkbox" name="internal" defaultChecked={Boolean(center.is_internal)} /> Не считать расходом (переводы между своими картами)
         </label>
         <button className="btn btn-primary">Сохранить</button>

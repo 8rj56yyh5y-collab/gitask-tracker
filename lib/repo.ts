@@ -9,6 +9,7 @@ export interface CostCenter {
   color: string;
   monthly_budget: number;
   is_internal: number;
+  is_personal?: number;
 }
 
 export interface Card {
@@ -92,7 +93,7 @@ export function createCenter(name: string, parentId: number | null, color: strin
 }
 
 /** Переименовать, перекрасить, перенести категорию. Нельзя вложить её саму в себя или в свою подкатегорию. */
-export function updateCenter(id: number, c: { name: string; color: string; parentId: number | null; internal: boolean }) {
+export function updateCenter(id: number, c: { name: string; color: string; parentId: number | null; internal: boolean; personal?: boolean }) {
   const db = getDb();
   if (c.parentId !== null) {
     let p: number | null = c.parentId;
@@ -104,7 +105,9 @@ export function updateCenter(id: number, c: { name: string; color: string; paren
       p = r?.parent_id ?? null;
     }
   }
-  db.prepare("UPDATE cost_centers SET name = ?, color = ?, parent_id = ?, is_internal = ? WHERE id = ?").run(c.name, c.color, c.parentId, c.internal ? 1 : 0, id);
+  db.prepare("UPDATE cost_centers SET name = ?, color = ?, parent_id = ?, is_internal = ?, is_personal = COALESCE(?, is_personal) WHERE id = ?").run(
+    c.name, c.color, c.parentId, c.internal ? 1 : 0, c.personal === undefined ? null : c.personal ? 1 : 0, id,
+  );
 }
 
 export function restoreCenter(id: number) {
@@ -617,4 +620,12 @@ export function saveAiReport(month: string, text: string) {
 export function internalCenterId(): number | null {
   const r = getDb().prepare("SELECT id FROM cost_centers WHERE is_internal = 1 AND archived = 0 ORDER BY id LIMIT 1").get() as Row | undefined;
   return r ? Number(r.id) : null;
+}
+
+/** Личные направления и все вложенные в них — только они входят в «Мои деньги». */
+export function personalCenterIds(): number[] {
+  const all = getDb().prepare("SELECT id, parent_id, is_personal FROM cost_centers").all() as { id: number; parent_id: number | null; is_personal: number }[];
+  const out = all.filter((c) => c.is_personal).map((c) => c.id);
+  for (let i = 0; i < out.length; i++) for (const c of all) if (c.parent_id === out[i] && !out.includes(c.id)) out.push(c.id);
+  return out;
 }

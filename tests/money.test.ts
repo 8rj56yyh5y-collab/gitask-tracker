@@ -264,3 +264,23 @@ test("платёж из кассы направления без своего н
   assert.equal(repo.getTx(tx)!.cost_center_id, personal);
   assert.equal(cash.cashBalances().get(box), 5_000_000);
 });
+
+test("«Мои деньги»: только личные направления; деньги отдела не входят", async () => {
+  const income = await import("../lib/income.ts");
+  const personal = center("Личные");
+  const dept = center("Отдел продаж");
+  assert.ok(repo.personalCenterIds().includes(personal), "«Личные» отмечено как личное при миграции");
+  assert.ok(!repo.personalCenterIds().includes(dept));
+  repo.createCenter("Кафе", personal, "#000000", 0, false);
+  const cafe = center("Кафе");
+  const before = income.monthMoney();
+  repo.insertTx({ amountKop: -100_000, source: "manual", costCenterId: dept });
+  repo.insertTx({ amountKop: -40_000, source: "manual", costCenterId: cafe });
+  repo.insertTx({ amountKop: 500_000, source: "manual", costCenterId: dept });
+  const after = income.monthMoney();
+  assert.equal(after.expense - before.expense, 40_000, "только расход во вложенном личном");
+  assert.equal(after.income, before.income, "приход отдела — не мой доход");
+  assert.ok(after.personal.includes("Личные"));
+  repo.insertTx({ amountKop: -7_000, source: "monobank" });
+  assert.equal(income.monthMoney().unsorted - after.unsorted, 1);
+});

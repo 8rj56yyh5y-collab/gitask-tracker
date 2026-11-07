@@ -31,6 +31,7 @@ export default function Directions() {
                 <span>
                   <i className="dot" style={{ background: c.color }} />
                   <strong style={{ fontWeight: c.depth ? 500 : 650 }}>{c.name}</strong>
+                  {(c as { is_personal?: number }).is_personal ? <span className="chip chip-mine">мои деньги</span> : null}
                 </span>
                 <span className="muted small dir-sub">
                   {c.is_internal
@@ -93,6 +94,9 @@ export default function Directions() {
         <label>
           Лимит в месяц, ₴ (необязательно)
           <input name="budget" inputMode="decimal" />
+        </label>
+        <label className="check">
+          <input type="checkbox" name="personal" /> Это мои личные деньги (входит в «Мои деньги за месяц»)
         </label>
         <label className="check">
           <input type="checkbox" name="withCash" /> Своя касса с наличными

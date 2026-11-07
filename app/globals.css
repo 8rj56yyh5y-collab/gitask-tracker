@@ -393,3 +393,5 @@ button.top-btn { cursor: pointer; font: inherit; }
 @keyframes dn-spin { to { transform: rotate(360deg); } }
 .side-refresh { margin-top: auto; }
 .row-between.plain { display: flex; }
+.mm-scope { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.chip-mine { margin-left: 6px; font-size: 11px; padding: 1px 6px; border-radius: 8px; background: color-mix(in srgb, var(--green) 15%, transparent); color: var(--green); vertical-align: middle; }

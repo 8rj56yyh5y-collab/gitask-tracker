@@ -11,7 +11,7 @@ export function MonthMoneyCard({ link = false }: { link?: boolean }) {
   const body = (
     <>
       <div className="row-between">
-        <h2 style={{ margin: 0 }}>Итог за {month}</h2>
+        <h2 style={{ margin: 0 }}>Мои деньги за {month}</h2>
         {link && <span className="muted small">Доходы ›</span>}
       </div>
       <div className="mm-grid">
@@ -41,6 +41,12 @@ export function MonthMoneyCard({ link = false }: { link?: boolean }) {
       {m.expected === 0 && m.toPay === 0 && m.net > 0 && (
         <div className="muted small" style={{ marginTop: 8 }}>Можно отложить до {formatMoney(m.net)}.</div>
       )}
+      <div className="muted small mm-scope">
+        {m.personal.length
+          ? `Учтено только личное: ${m.personal.join(", ")}, ставка и ваши доходы. Деньги отдела и других направлений сюда не входят.`
+          : "Отметьте, какое направление — ваши личные деньги (Направления → направление → «Это мои личные деньги»)."}
+        {m.unsorted > 0 && ` Ещё ${m.unsorted} опер. без направления — пока не учтены.`}
+      </div>
     </>
   );
   return link ? (
