@@ -55,3 +55,14 @@ test("parseBankMessage: incoming transfer in Ukrainian", () => {
 test("parseBankMessage: no amount → null", () => {
   assert.equal(parseBankMessage("Ваш код підтвердження 1234"), null);
 });
+
+test("bank detection: Wallet card names and SMS senders", async () => {
+  const { detectBank } = await import("../lib/banks.ts");
+  assert.equal(detectBank("Radabank Visa"), "Радабанк");
+  assert.equal(detectBank("A-Bank Mastercard"), "А-Банк");
+  assert.equal(detectBank("Monobank Black"), "Monobank");
+  assert.equal(detectBank("NovaPay"), "NovaPay");
+  assert.equal(detectBank("Альянс Банк"), "Альянс Банк");
+  assert.equal(detectBank("ПриватБанк Універсальна"), "ПриватБанк");
+  assert.equal(detectBank("Visa Gold"), null);
+});

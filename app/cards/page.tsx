@@ -3,8 +3,9 @@ import { LimitBar } from "../components/LimitBar.tsx";
 import { cardUsage, listCards } from "@/lib/repo.ts";
 import { formatMoney } from "@/lib/money.ts";
 import { forecastExhaustDay, limitState } from "@/lib/limits.ts";
+import { BANK_NAMES } from "@/lib/banks.ts";
 
-const BANKS = ["ПриватБанк", "ПУМБ", "А-Банк", "Радабанк", "Райффайзен", "Monobank", "Другой"];
+const BANKS = BANK_NAMES;
 const KINDS: Record<string, string> = { personal: "Личная", fop: "ФОП", corporate: "Корпоративная", cash: "Касса (наличные)" };
 
 export default function Cards() {

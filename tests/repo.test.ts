@@ -102,3 +102,12 @@ test("categories can be renamed, moved and restored; no cycles", () => {
   repo.restoreCenter(auto);
   assert.ok(repo.listCenters().some((c) => c.id === auto));
 });
+
+test("card is found by Wallet card name when there is one card of that bank", () => {
+  repo.createCard({ bank: "NovaPay", last4: "7777", owner: "", kind: "personal", monthly_limit: 0, mono_account_id: null });
+  assert.equal(repo.findCard({ hint: "NovaPay Card" })!.last4, "7777");
+  repo.createCard({ bank: "Радабанк", last4: "1111", owner: "", kind: "personal", monthly_limit: 0, mono_account_id: null });
+  repo.createCard({ bank: "Радабанк", last4: "2222", owner: "", kind: "personal", monthly_limit: 0, mono_account_id: null });
+  assert.equal(repo.findCard({ hint: "Radabank Visa" }), null, "two cards of one bank — ambiguous");
+  assert.equal(repo.findCard({ hint: "Radabank •••• 2222" })!.last4, "2222");
+});
