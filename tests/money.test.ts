@@ -122,7 +122,7 @@ test("норма трат: 30 дней сбора, предложение, пр�
   const norms = await import("../lib/norms.ts");
   const settings = await import("../lib/settings.ts");
   const start = new Date(Date.now() - 40 * 864e5);
-  settings.setSetting("norm_start", start.toISOString().slice(0, 10));
+  settings.setSetting("norm_start", plans.ymd(start));
   repo.createCenter("Еда тест", null, "#f59e0b", 0, false);
   const food = center("Еда тест");
   const t = repo.insertTx({ amountKop: -1_234_500, source: "manual", occurredAt: new Date(Date.now() - 5 * 864e5).toISOString() }).id;
@@ -177,7 +177,7 @@ test("касса привязана к категории: расход без �
   const b = cash.cashMove(box, { amountKop: -20_000, centerId: center("Личные") });
   assert.equal(repo.getTx(b)!.cost_center_id, center("Личные"), "выбранная вручную категория важнее");
   const c = cash.cashMove(box, { amountKop: 100_000 });
-  assert.equal(repo.getTx(c)!.cost_center_id, null, "приход не трогаем");
+  assert.equal(repo.getTx(c)!.cost_center_id, sales, "приход тоже относится к направлению кассы");
   cash.updateCashbox(box, { name: "Касса отдела", owner: "", color: "#16a34a", opening: 0, centerId: null });
   assert.equal(cash.getCashbox(box)!.center_id, null);
 });

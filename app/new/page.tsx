@@ -1,69 +1,137 @@
 import Link from "next/link";
-import { addTransaction } from "../actions.ts";
+import { addIncomeAction, addTransaction, transferAction } from "../actions.ts";
+import { AccountChips, CenterChips, ChipPicker, SegTabs } from "../components/Pickers.tsx";
 import { AccountSelect } from "../components/AccountSelect.tsx";
-import { centerTree } from "@/lib/repo.ts";
+import { OTHER_INCOME_KINDS } from "@/lib/income.ts";
 
-export default function NewTx() {
-  const tree = centerTree();
+const TABS = [
+  { id: "out", label: "Расход", href: "/new" },
+  { id: "in", label: "Доход", href: "/new?type=in" },
+  { id: "move", label: "Перевод", href: "/new?type=move" },
+];
+
+function Amount({ autoFocus = true }: { autoFocus?: boolean }) {
+  return (
+    <label className="amount-field">
+      <span className="sr-only">Сумма, ₴</span>
+      <input name="amount" inputMode="decimal" required autoFocus={autoFocus} placeholder="0" className="amount-input" aria-label="Сумма в гривнах" />
+      <span className="amount-cur" aria-hidden>
+        ₴
+      </span>
+    </label>
+  );
+}
+
+function More({ children }: { children: React.ReactNode }) {
+  return (
+    <details className="more-fields">
+      <summary>Добавить детали: где, для кого, дата</summary>
+      <div className="form">{children}</div>
+    </details>
+  );
+}
+
+export default async function NewTx({ searchParams }: { searchParams: Promise<{ type?: string }> }) {
+  const { type } = await searchParams;
+  const tab = type === "in" || type === "move" ? type : "out";
+
   return (
     <div className="narrow">
       <h1>Новая операция</h1>
-      <div className="inline" style={{ marginBottom: 12, flexWrap: "wrap" }}>
-        <Link href="/income" className="btn btn-sm">Доход ›</Link>
-        <Link href="/plans#new" className="btn btn-sm">Запланировать платёж ›</Link>
-        <Link href="/sales/new" className="btn btn-sm">Продажа товара ›</Link>
-        <Link href="/transit" className="btn btn-sm">Чужие деньги ›</Link>
-        <Link href="/centers" className="btn btn-sm">Касса ›</Link>
+      <SegTabs tabs={TABS} active={tab} />
+
+      {tab === "out" && (
+        <form action={addTransaction} className="card form form-big">
+          <input type="hidden" name="direction" value="out" />
+          <Amount />
+          <CenterChips required label="На что потратили" includeInternal={false} />
+          <AccountChips label="Чем платили" none="Наличными / не важно" />
+          <More>
+            <label>
+              Где или кому
+              <input name="counterparty" placeholder="например, АТБ" />
+            </label>
+            <label>
+              Для кого
+              <input name="forWhom" placeholder="например, для семьи" />
+            </label>
+            <label>
+              Комментарий
+              <input name="description" />
+            </label>
+            <label>
+              Дата и время
+              <input name="date" type="datetime-local" />
+            </label>
+          </More>
+          <button className="btn btn-primary btn-big">Записать расход</button>
+        </form>
+      )}
+
+      {tab === "in" && (
+        <form action={addIncomeAction} className="card form form-big">
+          <Amount />
+          <ChipPicker name="kind" label="Что это" defaultValue="Ставка" options={["Ставка", ...OTHER_INCOME_KINDS].map((k) => ({ value: k, label: k }))} />
+          <AccountChips label="Куда пришли" none="Наличными / не важно" />
+          <More>
+            <label>
+              Название (если «Другое»)
+              <input name="title" />
+            </label>
+            <label>
+              Комментарий
+              <input name="note" />
+            </label>
+            <label>
+              Дата
+              <input name="at" type="date" />
+            </label>
+          </More>
+          <button className="btn btn-primary btn-big">Записать доход</button>
+          <p className="muted small" style={{ margin: 0 }}>
+            Ставка приходит каждый месяц? Настройте её один раз в <Link href="/income" className="link">Доходах</Link> — дальше D&amp;N будет
+            записывать её сам.
+          </p>
+        </form>
+      )}
+
+      {tab === "move" && (
+        <form action={transferAction} className="card form form-big">
+          <input type="hidden" name="next" value="/" />
+          <Amount />
+          <div className="grid-2-tight">
+            <label>
+              Откуда
+              <AccountSelect name="from" />
+            </label>
+            <label>
+              Куда
+              <AccountSelect name="to" />
+            </label>
+          </div>
+          <label>
+            Комментарий
+            <input name="note" placeholder="например, снял в банкомате" />
+          </label>
+          <button className="btn btn-primary btn-big">Перевести</button>
+          <p className="muted small" style={{ margin: 0 }}>
+            Перевод между своими картами и кассами — это не расход и не доход. Чужие деньги, которые нужно передать, записывайте в{" "}
+            <Link href="/transit" className="link">Транзит</Link>.
+          </p>
+        </form>
+      )}
+
+      <div className="new-links">
+        <Link href="/plans#new" className="new-link">
+          📅 <span>Запланировать платёж</span>
+        </Link>
+        <Link href="/sales/new" className="new-link">
+          🛍 <span>Продажа товара</span>
+        </Link>
+        <Link href="/transit" className="new-link">
+          ↔ <span>Чужие деньги</span>
+        </Link>
       </div>
-      <form action={addTransaction} className="card form">
-        <div className="seg">
-          <label>
-            <input type="radio" name="direction" value="out" defaultChecked /> Расход
-          </label>
-          <label>
-            <input type="radio" name="direction" value="in" /> Доход
-          </label>
-        </div>
-        <label>
-          Сумма, ₴
-          <input name="amount" inputMode="decimal" required autoFocus placeholder="0" className="amount-input" />
-        </label>
-        <label>
-          Направление
-          <select name="centerId" required defaultValue="">
-            <option value="" disabled>
-              — выберите —
-            </option>
-            {tree.map((c) => (
-              <option key={c.id} value={c.id}>
-                {" ".repeat(c.depth * 3)}
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Карта или касса
-          <AccountSelect none="не указано" />
-        </label>
-        <label>
-          Где или кому
-          <input name="counterparty" placeholder="например, магазин" />
-        </label>
-        <label>
-          Для кого
-          <input name="forWhom" placeholder="для себя, для семьи…" />
-        </label>
-        <label>
-          Комментарий
-          <input name="description" />
-        </label>
-        <label>
-          Дата и время
-          <input name="date" type="datetime-local" />
-        </label>
-        <button className="btn btn-primary">Записать</button>
-      </form>
     </div>
   );
 }

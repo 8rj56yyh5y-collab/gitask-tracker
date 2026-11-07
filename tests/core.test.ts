@@ -75,3 +75,11 @@ test("card style: bank defaults, custom colour, readable text", async () => {
   assert.equal(cardStyle({ bank: "ПУМБ", color: "red" }).color, "#d71920", "invalid colour falls back to bank colour");
   assert.equal(inkOn("#ffffff"), "#111111");
 });
+
+test("OTP Bank узнаётся по названию карты", async () => {
+  const { detectBank, BANK_NAMES } = await import("../lib/banks.ts");
+  assert.equal(detectBank("OTP Bank •••• 1234"), "OTP Bank");
+  assert.equal(detectBank("ОТП Банк"), "OTP Bank");
+  assert.equal(detectBank("Monobank Black"), "Monobank");
+  assert.ok(BANK_NAMES.includes("OTP Bank"));
+});

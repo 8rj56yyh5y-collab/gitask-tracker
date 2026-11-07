@@ -1,0 +1,83 @@
+import Link from "next/link";
+import { centerTree, listCards } from "@/lib/repo.ts";
+import { listCashboxes } from "@/lib/cash.ts";
+import { cardStyle } from "@/lib/banks.ts";
+
+export type ChipOption = { value: string | number; label: string; color?: string | null; hint?: string; sub?: boolean };
+
+/** Выбор одного варианта крупными кнопками-«чипами» (вместо выпадающего списка). */
+export function ChipPicker({
+  name,
+  options,
+  defaultValue,
+  required,
+  label,
+}: {
+  name: string;
+  options: ChipOption[];
+  defaultValue?: string | number | null;
+  required?: boolean;
+  label?: string;
+}) {
+  return (
+    <fieldset className="chips-field">
+      {label && <legend>{label}</legend>}
+      <div className="chips">
+        {options.map((o, i) => (
+          <label key={`${o.value}-${i}`} className={`chip-opt ${o.sub ? "is-sub" : ""}`} title={o.hint}>
+            <input type="radio" name={name} value={o.value} defaultChecked={String(defaultValue ?? "") === String(o.value)} required={required} />
+            {o.color && <i className="chip-dot" style={{ background: o.color }} />}
+            <span>{o.label}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+/** Направления: сначала подсказанные, затем все; вложенные — сразу после своего. */
+export function CenterChips({
+  name = "centerId",
+  defaultValue,
+  required,
+  label = "На что",
+  first = [],
+  withNone,
+  includeInternal = true,
+}: {
+  name?: string;
+  defaultValue?: number | null;
+  required?: boolean;
+  label?: string;
+  first?: number[];
+  withNone?: string;
+  includeInternal?: boolean;
+}) {
+  const tree = centerTree().filter((c) => includeInternal || !c.is_internal);
+  const ordered = [...first.map((id) => tree.find((c) => c.id === id)).filter((c) => c !== undefined), ...tree.filter((c) => !first.includes(c.id))];
+  const opts: ChipOption[] = ordered.map((c) => ({ value: c.id, label: c.name, color: c.color, sub: c.depth > 0 && !first.includes(c.id) }));
+  if (withNone) opts.unshift({ value: "", label: withNone });
+  return <ChipPicker name={name} options={opts} defaultValue={defaultValue ?? (withNone ? "" : undefined)} required={required} label={label} />;
+}
+
+/** Карта или касса: «card:ID» / «cash:ID». */
+export function AccountChips({ name = "account", defaultValue = "", label = "Откуда", none = "Не указано" }: { name?: string; defaultValue?: string; label?: string; none?: string | null }) {
+  const opts: ChipOption[] = [];
+  if (none) opts.push({ value: "", label: none });
+  for (const b of listCashboxes()) opts.push({ value: `cash:${b.id}`, label: `💵 ${b.name}`, color: null });
+  for (const c of listCards()) opts.push({ value: `card:${c.id}`, label: `${c.bank} •${c.last4}`, color: cardStyle(c).color });
+  return <ChipPicker name={name} options={opts} defaultValue={defaultValue} label={label} />;
+}
+
+/** Вкладки-ссылки сверху формы: «Расход · Доход · Перевод». */
+export function SegTabs({ tabs, active }: { tabs: { id: string; label: string; href: string }[]; active: string }) {
+  return (
+    <nav className="segtabs" aria-label="Тип операции">
+      {tabs.map((t) => (
+        <Link key={t.id} href={t.href} className={`segtab ${t.id === active ? "is-on" : ""}`} aria-current={t.id === active ? "page" : undefined} replace scroll={false}>
+          {t.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
