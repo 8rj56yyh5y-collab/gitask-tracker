@@ -1,5 +1,6 @@
 import { formatMoney } from "@/lib/money.ts";
 import type { Tx } from "@/lib/repo.ts";
+import { BankBadge } from "./BankBadge.tsx";
 
 const SOURCE: Record<string, string> = {
   manual: "вручную",
@@ -13,6 +14,13 @@ export function TxRow({ tx, children }: { tx: Tx; children?: React.ReactNode }) 
   const d = new Date(tx.occurred_at);
   return (
     <div className="tx">
+      {tx.card_bank ? (
+        <BankBadge bank={tx.card_bank} color={tx.card_color} badge={tx.card_badge} size={32} />
+      ) : (
+        <span className="bank-badge" style={{ width: 32, height: 32, background: "var(--line)", color: "var(--muted)", fontSize: 14, borderRadius: 9 }} aria-hidden>
+          ₴
+        </span>
+      )}
       <div className="tx-main">
         <div className="tx-title">{tx.counterparty || tx.description || "Без описания"}</div>
         <div className="muted small">

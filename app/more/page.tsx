@@ -6,9 +6,9 @@ export default function More() {
   const { count } = unassignedSummary();
   const items = [
     { href: "/inbox", icon: "inbox", title: "Разнести", note: count ? `${count} ждут записи` : "Всё разнесено" },
-    { href: "/cards", icon: "card", title: "Лимиты карт", note: "Сколько осталось по каждой карте" },
+    { href: "/analytics", icon: "chart", title: "Аналитика", note: "Месяцы, год, сравнение, разбор от ИИ" },
     { href: "/centers", icon: "tag", title: "Категории", note: "Лимиты и прогноз по каждой" },
-    { href: "/settings", icon: "settings", title: "Настройки", note: "Telegram, Monobank, Apple Pay, ИИ" },
+    { href: "/settings", icon: "settings", title: "Настройки", note: "Оформление, Telegram, Monobank, Apple Pay, ИИ" },
   ];
   return (
     <div className="narrow-wide">

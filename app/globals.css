@@ -12,8 +12,9 @@
   --red: #dc2626;
   --radius: 14px;
 }
+/* Тема «как в телефоне»: тёмная, только если пользователь не выбрал тему сам. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
     --bg: #0b1120;
     --card: #111827;
     --text: #e5e7eb;
@@ -51,8 +52,8 @@ h2 { font-size: 15px; margin: 0 0 8px; color: var(--muted); font-weight: 600; }
 .alert-on { background: #fef2f2; border-color: #fecaca; color: #7f1d1d; }
 .alert-ok { background: #f0fdf4; border-color: #bbf7d0; color: #14532d; }
 @media (prefers-color-scheme: dark) {
-  .alert-on { background: #2a0f12; border-color: #7f1d1d; color: #fecaca; }
-  .alert-ok { background: #0b2416; border-color: #14532d; color: #bbf7d0; }
+  :root:not([data-theme]) .alert-on { background: #2a0f12; border-color: #7f1d1d; color: #fecaca; }
+  :root:not([data-theme]) .alert-ok { background: #0b2416; border-color: #14532d; color: #bbf7d0; }
 }
 .btn {
   display: inline-block; border: 1px solid var(--line); background: var(--card); color: var(--text);
@@ -81,7 +82,8 @@ input[type="color"] { padding: 2px; height: 40px; }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
 .chip { display: inline-block; margin-top: 4px; margin-right: 4px; font-size: 12px; border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; color: var(--muted); }
 .plain { display: block; }
-.tx { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 8px 0; flex-wrap: wrap; }
+.tx { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 8px 0; }
+.tx > .bank-badge { margin-top: 2px; }
 .tx-main { flex: 1; min-width: 0; }
 .tx-title { font-weight: 600; overflow-wrap: anywhere; }
 .tx-amount { font-weight: 700; white-space: nowrap; }
@@ -166,7 +168,7 @@ h1 .dot { margin-right: 10px; }
 
 /* ---------- Меню ---------- */
 :root { --accent: #2563eb; --tabbar-h: 64px; }
-@media (prefers-color-scheme: dark) { :root { --accent: #60a5fa; } }
+@media (prefers-color-scheme: dark) { :root:not([data-theme]) { --accent: #60a5fa; } }
 body { padding-bottom: calc(var(--tabbar-h) + 16px + env(safe-area-inset-bottom)); }
 .top { padding-top: calc(12px + env(safe-area-inset-top)); }
 .brand { font-size: 24px; }
@@ -273,3 +275,49 @@ body { padding-bottom: calc(var(--tabbar-h) + 16px + env(safe-area-inset-bottom)
 .ok-text { color: var(--green); font-weight: 600; }
 code { background: var(--bg); padding: 1px 6px; border-radius: 6px; font-size: 0.9em; }
 input[readonly] { color: var(--muted); font-size: 14px; }
+
+/* ---------- Темы оформления (выбираются в «Настройках») ---------- */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] {
+  --bg: #0b1120; --card: #111827; --text: #e5e7eb; --muted: #94a3b8; --line: #1f2937;
+  --primary: #e5e7eb; --primary-text: #0b1120; --accent: #60a5fa; color-scheme: dark;
+}
+:root[data-theme="redblack"] {
+  --bg: #0a0a0a; --card: #161616; --text: #f5f5f5; --muted: #a3a3a3; --line: #2a2a2a;
+  --primary: #e11d2e; --primary-text: #ffffff; --accent: #ff3b4a;
+  --green: #22c55e; --yellow: #facc15; --orange: #fb923c; --red: #ff4d5a; color-scheme: dark;
+}
+:root[data-theme="redwhite"] {
+  --bg: #ffffff; --card: #ffffff; --text: #111111; --muted: #6b6b6b; --line: #ececec;
+  --primary: #d90429; --primary-text: #ffffff; --accent: #d90429; color-scheme: light;
+}
+:root[data-theme="redwhite"] .card { box-shadow: 0 1px 3px rgb(0 0 0 / 0.06); }
+:root[data-theme="dark"] .alert-on, :root[data-theme="redblack"] .alert-on { background: #2a0f12; border-color: #7f1d1d; color: #fecaca; }
+:root[data-theme="dark"] .alert-ok, :root[data-theme="redblack"] .alert-ok { background: #0b2416; border-color: #14532d; color: #bbf7d0; }
+:root[data-theme="redblack"] .card { border-color: #262626; }
+:root[data-theme="redblack"] .tabbar { border-top-color: #262626; }
+
+.themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.theme-opt { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; text-align: left; font: inherit; }
+.theme-opt.is-on { border-color: var(--accent); }
+.theme-swatch { height: 44px; border-radius: 8px; border: 1px solid var(--line); position: relative; overflow: hidden; }
+.theme-swatch i { position: absolute; right: 8px; bottom: 8px; width: 18px; height: 18px; border-radius: 50%; }
+
+/* ---------- Карты ---------- */
+.bank-badge { display: inline-flex; align-items: center; justify-content: center; flex: none; border-radius: 10px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+.ctiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.ctile {
+  display: flex; flex-direction: column; gap: 10px; min-height: 150px; padding: 16px; border-radius: 18px;
+  background: linear-gradient(135deg, var(--c) 0%, color-mix(in srgb, var(--c) 72%, #000) 100%); color: var(--ink);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.12); position: relative;
+}
+.ctile .top-row { display: flex; align-items: center; gap: 10px; }
+.ctile .num { font-size: 18px; letter-spacing: 0.12em; font-variant-numeric: tabular-nums; margin-top: auto; }
+.ctile .sub { font-size: 13px; opacity: 0.85; }
+.ctile .limit-track { background: color-mix(in srgb, var(--ink) 25%, transparent); }
+.ctile .lvl { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 16%, transparent); }
+.ctile .lvl-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.ctile.is-hot { outline: 3px solid var(--red); outline-offset: 2px; }
+.card-hero { max-width: 420px; }
+.color-row { display: flex; gap: 10px; align-items: center; }
+.color-row input[type="color"] { width: 64px; flex: none; }

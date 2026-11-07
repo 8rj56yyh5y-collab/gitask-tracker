@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { connectMonobankAction, connectTelegramAction, disconnectTelegramAction } from "../actions.ts";
+import { connectMonobankAction, connectTelegramAction, disconnectTelegramAction, setThemeAction } from "../actions.ts";
 import { SubmitButton } from "../components/SubmitButton.tsx";
 import { aiConfigured } from "@/lib/ai.ts";
 import { telegramState } from "@/lib/telegram.ts";
 import { MAX_BACKFILL_DAYS } from "@/lib/monobank.ts";
 import { publicBase } from "@/lib/url.ts";
+import { cookies } from "next/headers";
+import { THEMES, THEME_COOKIE, normalizeTheme } from "@/lib/theme.ts";
 
 const DOCS = "https://github.com/8rj56yyh5y-collab/gitask-tracker/blob/main/docs";
 
@@ -18,6 +20,7 @@ export default async function Settings({
   const base = await publicBase();
   const https = base.startsWith("https://");
   const ingestKey = process.env.DN_INGEST_TOKEN ?? "";
+  const theme = normalizeTheme((await cookies()).get(THEME_COOKIE)?.value);
   const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const today = ymd(new Date());
   const minDay = ymd(new Date(Date.now() - MAX_BACKFILL_DAYS * 864e5));
@@ -25,6 +28,27 @@ export default async function Settings({
   return (
     <div className="narrow-wide">
       <h1>Настройки</h1>
+
+      <section className="card form" id="theme">
+        <h2>Оформление</h2>
+        {/* У каждой темы своя форма: значение нажатой кнопки в общей форме до сервера не доходит. */}
+        <div className="themes">
+          {THEMES.map((t) => (
+            <form key={t.id} action={setThemeAction}>
+              <input type="hidden" name="theme" value={t.id} />
+              <button className={`theme-opt ${theme === t.id ? "is-on" : ""}`} aria-pressed={theme === t.id} style={{ width: "100%" }}>
+                <span className="theme-swatch" style={{ background: t.bg }}>
+                  <i style={{ background: t.accent }} />
+                </span>
+                <span className="small">{t.name}</span>
+              </button>
+            </form>
+          ))}
+        </div>
+        <p className="muted small" style={{ margin: 0 }}>
+          Сохраняется на этом устройстве.
+        </p>
+      </section>
 
       <section className="card form" id="telegram">
         <h2>Уведомления в Telegram</h2>

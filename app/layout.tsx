@@ -6,6 +6,7 @@ import { SwRegister } from "./sw-register.tsx";
 import { Nav } from "./components/Nav.tsx";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE, sessionValid } from "@/lib/session.ts";
+import { THEME_COOKIE, normalizeTheme } from "@/lib/theme.ts";
 
 export const metadata: Metadata = {
   title: "D&N",
@@ -24,11 +25,15 @@ export const viewport: Viewport = {
 export const dynamic = "force-dynamic";
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const authed = await sessionValid((await cookies()).get(SESSION_COOKIE)?.value);
+  const jar = await cookies();
+  const authed = await sessionValid(jar.get(SESSION_COOKIE)?.value);
+  const theme = normalizeTheme(jar.get(THEME_COOKIE)?.value);
+  // «Как в телефоне» — без атрибута: цвета берутся из настройки телефона.
+  const themeAttr = theme === "system" ? undefined : theme;
   if (!authed) {
     // Страница входа: без меню и без данных.
     return (
-      <html lang="ru">
+      <html lang="ru" data-theme={themeAttr}>
         <body>
           <header className="top">
             <span className="brand">D&amp;N</span>
@@ -40,7 +45,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }
   const { count } = unassignedSummary();
   return (
-    <html lang="ru">
+    <html lang="ru" data-theme={themeAttr}>
       <body>
         <header className="top">
           <Link href="/" className="brand">
