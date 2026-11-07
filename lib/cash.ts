@@ -24,10 +24,19 @@ export function getCashbox(id: number): Cashbox | null {
   return (getDb().prepare("SELECT * FROM cashboxes WHERE id = ?").get(id) as unknown as Cashbox) ?? null;
 }
 
+/** Цвета для новых касс — по очереди, чтобы кассы не были одинаковыми. */
+export const CASH_COLORS = ["#16a34a", "#2563eb", "#9333ea", "#ea580c", "#0d9488", "#db2777", "#ca8a04", "#4f46e5", "#dc2626", "#0891b2"];
+
+/** Следующий свободный цвет (тот, которого ещё нет у касс). */
+export function nextCashColor(): string {
+  const used = new Set((getDb().prepare("SELECT color FROM cashboxes WHERE archived = 0").all() as { color: string }[]).map((r) => r.color.toLowerCase()));
+  return CASH_COLORS.find((c) => !used.has(c)) ?? CASH_COLORS[used.size % CASH_COLORS.length];
+}
+
 export function createCashbox(c: { name: string; owner?: string; color?: string; opening?: number; centerId?: number | null }): number {
   const r = getDb()
     .prepare("INSERT INTO cashboxes (name, owner, color, opening, center_id) VALUES (?, ?, ?, ?, ?)")
-    .run(c.name, c.owner ?? "", c.color ?? "#16a34a", c.opening ?? 0, c.centerId ?? null);
+    .run(c.name, c.owner ?? "", c.color || nextCashColor(), c.opening ?? 0, c.centerId ?? null);
   return Number(r.lastInsertRowid);
 }
 

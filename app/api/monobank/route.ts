@@ -3,6 +3,7 @@ import { bearer, ingestTokenOk } from "@/lib/auth.ts";
 import { saveMonoItem } from "@/lib/monobank.ts";
 import { revalidatePath } from "next/cache";
 import { notifyNewTx } from "@/lib/telegram.ts";
+import { suggestForTx } from "@/lib/suggest.ts";
 import { matchPlanForTx } from "@/lib/plans.ts";
 
 // Вебхук Monobank (личный API, https://api.monobank.ua/docs/).
@@ -46,7 +47,12 @@ export async function POST(req: Request) {
   const saved = saveMonoItem(body.data?.account, item);
   if (saved && !saved.duplicate) {
     matchPlanForTx(saved.id);
-    await notifyNewTx(saved.id);
+    // Monobank ждёт быстрый ответ: подсказку ИИ и уведомление делаем в фоне.
+    const id = saved.id;
+    void (async () => {
+      await suggestForTx(id).catch(() => {});
+      await notifyNewTx(id).catch(() => {});
+    })();
   }
   revalidatePath("/", "layout");
   return new NextResponse("ok");

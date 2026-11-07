@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createCashboxAction } from "../actions.ts";
 import { CenterChips } from "../components/Pickers.tsx";
-import { cashBalances, cashMonthTotals, listCashboxes } from "@/lib/cash.ts";
+import { cashBalances, cashMonthTotals, listCashboxes, nextCashColor } from "@/lib/cash.ts";
 import { formatMoney } from "@/lib/money.ts";
 import { listCenters } from "@/lib/repo.ts";
 
@@ -30,10 +30,10 @@ export default async function Cash({ searchParams }: { searchParams: Promise<{ n
         <div className="summary-value">{formatMoney(total)}</div>
         <div className="summary-row">
           <span>
-            За {monthName}: <b className="pos-text">+{formatMoney(mIn)}</b>
+            За {monthName}: <b className="pos-text">{mIn ? `+${formatMoney(mIn)}` : formatMoney(0)}</b>
           </span>
           <span>
-            <b>−{formatMoney(mOut)}</b>
+            <b>{mOut ? `−${formatMoney(mOut)}` : formatMoney(0)}</b>
           </span>
         </div>
       </section>
@@ -58,8 +58,8 @@ export default async function Cash({ searchParams }: { searchParams: Promise<{ n
               </div>
               <div className="box-tile-balance">{formatMoney(bal.get(b.id) ?? 0)}</div>
               <div className="box-tile-month">
-                <span>+{formatMoney(m.in)}</span>
-                <span>−{formatMoney(m.out)}</span>
+                <span>{m.in ? `+${formatMoney(m.in)}` : formatMoney(0)}</span>
+                <span>{m.out ? `−${formatMoney(m.out)}` : formatMoney(0)}</span>
               </div>
             </Link>
           );
@@ -85,7 +85,7 @@ export default async function Cash({ searchParams }: { searchParams: Promise<{ n
             </label>
             <label>
               Цвет
-              <input name="color" type="color" defaultValue="#16a34a" />
+              <input name="color" type="color" defaultValue={nextCashColor()} />
             </label>
           </div>
           <button className="btn btn-primary btn-big">Создать кассу</button>

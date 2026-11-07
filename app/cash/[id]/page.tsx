@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { archiveCashboxAction, cashMoveAction, transferAction, updateCashboxAction } from "../../actions.ts";
 import { AccountSelect } from "../../components/AccountSelect.tsx";
 import { CenterSelect } from "../../components/CenterSelect.tsx";
-import { CenterChips, SegTabs } from "../../components/Pickers.tsx";
+import { CategoryChips, CenterChips, SegTabs } from "../../components/Pickers.tsx";
+import { popularCategories } from "@/lib/categories.ts";
 import { TxRow } from "../../components/TxRow.tsx";
 import { cashStats, getCashbox } from "@/lib/cash.ts";
 import { getDb } from "@/lib/db.ts";
@@ -90,11 +91,11 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
         <div className="stat-tiles">
           <div className="stat-tile">
             <span>Приход</span>
-            <strong className="pos-text">+{formatMoney(st.monthIn)}</strong>
+            <strong className="pos-text">{st.monthIn ? `+${formatMoney(st.monthIn)}` : formatMoney(0)}</strong>
           </div>
           <div className="stat-tile">
             <span>Расход</span>
-            <strong>−{formatMoney(st.monthOut)}</strong>
+            <strong>{st.monthOut ? `−${formatMoney(st.monthOut)}` : formatMoney(0)}</strong>
           </div>
           <div className="stat-tile">
             <span>Итог</span>
@@ -169,6 +170,7 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
           {op === "out" && (
             <CenterChips label="Направление" defaultValue={b.center_id} withNone="Выберу позже" includeInternal={false} />
           )}
+          {op === "out" && <CategoryChips label="Категория — на что именно" suggested={popularCategories(6)} />}
           {op === "out" && plans.length > 0 && (
             <label>
               Это оплата запланированного платежа?

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { centerTree, listCards } from "@/lib/repo.ts";
 import { listCashboxes } from "@/lib/cash.ts";
 import { cardStyle } from "@/lib/banks.ts";
+import { label as catLabel, listCategories } from "@/lib/categories.ts";
 
 export type ChipOption = { value: string | number; label: string; color?: string | null; hint?: string; sub?: boolean };
 
@@ -53,7 +54,9 @@ export function CenterChips({
   withNone?: string;
   includeInternal?: boolean;
 }) {
-  const tree = centerTree().filter((c) => includeInternal || !c.is_internal);
+  // Переводы между своими картами — в конце списка: выбирают их редко.
+  const all = centerTree().filter((c) => includeInternal || !c.is_internal);
+  const tree = [...all.filter((c) => !c.is_internal), ...all.filter((c) => c.is_internal)];
   const ordered = [...first.map((id) => tree.find((c) => c.id === id)).filter((c) => c !== undefined), ...tree.filter((c) => !first.includes(c.id))];
   const opts: ChipOption[] = ordered.map((c) => ({ value: c.id, label: c.name, color: c.color, sub: c.depth > 0 && !first.includes(c.id) }));
   if (withNone) opts.unshift({ value: "", label: withNone });
@@ -79,5 +82,56 @@ export function SegTabs({ tabs, active }: { tabs: { id: string; label: string; h
         </Link>
       ))}
     </nav>
+  );
+}
+
+/** Категории «на что именно»: подсказанные (✨ ИИ, история, частые) сразу, остальные — под «Все категории». */
+export function CategoryChips({
+  name = "categoryId",
+  defaultValue,
+  suggested = [],
+  aiId,
+  required,
+  label = "Категория — на что именно",
+}: {
+  name?: string;
+  defaultValue?: number | null;
+  suggested?: number[];
+  aiId?: number | null;
+  required?: boolean;
+  label?: string;
+}) {
+  const all = listCategories();
+  const top = [...new Set([...(aiId ? [aiId] : []), ...suggested, ...(defaultValue ? [defaultValue] : [])])]
+    .map((id) => all.find((c) => c.id === id))
+    .filter((c) => c !== undefined)
+    .slice(0, 8);
+  const rest = all.filter((c) => !top.some((t) => t.id === c.id));
+  const picked = defaultValue ?? aiId ?? null;
+  const chip = (c: (typeof all)[number]) => (
+    <label key={c.id} className="chip-opt">
+      <input type="radio" name={name} value={c.id} defaultChecked={picked === c.id} required={required} />
+      <span>
+        {c.id === aiId ? "✨ " : ""}
+        {catLabel(c)}
+      </span>
+    </label>
+  );
+  return (
+    <fieldset className="chips-field">
+      <legend>{label}</legend>
+      <div className="chips">{top.map(chip)}</div>
+      {rest.length > 0 && (
+        <details className="more-fields more-cats">
+          <summary>Все категории ({all.length})</summary>
+          <div className="chips" style={{ marginTop: 10 }}>
+            {rest.map(chip)}
+          </div>
+          <Link href="/categories" className="muted small chips-manage">
+            Настроить список ›
+          </Link>
+        </details>
+      )}
+    </fieldset>
   );
 }

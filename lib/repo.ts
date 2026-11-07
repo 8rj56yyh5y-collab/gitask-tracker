@@ -49,6 +49,13 @@ export interface Tx {
   sale_id?: number | null;
   transit_id?: number | null;
   income_kind?: string | null;
+  category_id?: number | null;
+  ai_category_id?: number | null;
+  ai_note?: string | null;
+  needs_note?: number;
+  assigned_at?: string | null;
+  category_name?: string | null;
+  category_emoji?: string | null;
   center_name?: string | null;
   center_color?: string | null;
 }
@@ -229,6 +236,15 @@ export function updateCardLimit(id: number, limitKop: number) {
   getDb().prepare("UPDATE cards SET monthly_limit = ? WHERE id = ?").run(limitKop, id);
 }
 
+/** Удалить карту: её операции остаются (без карты), дополнительные карты становятся самостоятельными. */
+export function deleteCard(id: number) {
+  const db = getDb();
+  db.prepare("UPDATE transactions SET card_id = NULL WHERE card_id = ?").run(id);
+  db.prepare("UPDATE cards SET parent_id = NULL WHERE parent_id = ?").run(id);
+  db.prepare("UPDATE plans SET card_id = NULL WHERE card_id = ?").run(id);
+  db.prepare("DELETE FROM cards WHERE id = ?").run(id);
+}
+
 export function archiveCard(id: number) {
   getDb().prepare("UPDATE cards SET archived = 1 WHERE id = ?").run(id);
 }
@@ -273,8 +289,10 @@ export function cardUsage(): Map<number, number> {
 
 const TX_SELECT = `
   SELECT t.*, c.bank || ' *' || c.last4 AS card_label, c.bank AS card_bank, c.color AS card_color, c.badge AS card_badge,
-    cc.name AS center_name, cc.color AS center_color, cb.name AS cashbox_name
+    cc.name AS center_name, cc.color AS center_color, cb.name AS cashbox_name,
+    cat.name AS category_name, cat.emoji AS category_emoji
   FROM transactions t
+  LEFT JOIN categories cat ON cat.id = t.category_id
   LEFT JOIN cards c ON c.id = t.card_id
   LEFT JOIN cost_centers cc ON cc.id = t.cost_center_id
   LEFT JOIN cashboxes cb ON cb.id = t.cashbox_id`;
@@ -346,7 +364,7 @@ export function getTx(id: number): Tx | null {
 export function listUnassigned(): Tx[] {
   return rows<Tx>(
     getDb()
-      .prepare(`${TX_SELECT} WHERE t.cost_center_id IS NULL AND t.kind != 'internal' AND t.income_kind IS NULL ORDER BY t.occurred_at DESC`)
+      .prepare(`${TX_SELECT} WHERE (t.cost_center_id IS NULL AND t.kind != 'internal' AND t.income_kind IS NULL) OR t.needs_note = 1 ORDER BY t.occurred_at DESC`)
       .all(),
   );
 }
@@ -355,7 +373,7 @@ export function unassignedSummary(): { count: number; sum: number } {
   const r = getDb()
     .prepare(
       `SELECT COUNT(*) AS n, COALESCE(SUM(ABS(amount)), 0) AS s FROM transactions
-       WHERE cost_center_id IS NULL AND kind != 'internal' AND income_kind IS NULL`,
+       WHERE (cost_center_id IS NULL AND kind != 'internal' AND income_kind IS NULL) OR needs_note = 1`,
     )
     .get() as Row;
   return { count: Number(r.n), sum: Number(r.s) };
@@ -628,4 +646,29 @@ export function personalCenterIds(): number[] {
   const out = all.filter((c) => c.is_personal).map((c) => c.id);
   for (let i = 0; i < out.length; i++) for (const c of all) if (c.parent_id === out[i] && !out.includes(c.id)) out.push(c.id);
   return out;
+}
+
+/** Расходы и поступления по дням месяца (для аналитики за месяц). */
+export function dailyTotals(d: Date): { day: number; date: string; expense: number; income: number }[] {
+  const y = d.getFullYear();
+  const m = d.getMonth();
+  const days = new Date(y, m + 1, 0).getDate();
+  const from = new Date(y, m, 1).toISOString();
+  const to = new Date(y, m + 1, 1).toISOString();
+  const rows = rows_<{ occurred_at: string; amount: number; kind: string }>(
+    getDb().prepare("SELECT occurred_at, amount, kind FROM transactions WHERE occurred_at >= ? AND occurred_at < ? AND kind != 'internal'").all(from, to),
+  );
+  const out = Array.from({ length: days }, (_, i) => ({ day: i + 1, date: `${y}-${String(m + 1).padStart(2, "0")}-${String(i + 1).padStart(2, "0")}`, expense: 0, income: 0 }));
+  for (const r of rows) {
+    const day = new Date(r.occurred_at).getDate();
+    const slot = out[day - 1];
+    if (!slot) continue;
+    if (r.kind === "expense") slot.expense += -Number(r.amount);
+    else if (r.kind === "income") slot.income += Number(r.amount);
+  }
+  return out;
+}
+
+function rows_<T>(r: unknown): T[] {
+  return r as T[];
 }

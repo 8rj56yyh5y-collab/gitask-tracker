@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { connectMonobankAction, connectTelegramAction, disconnectTelegramAction, setThemeAction } from "../actions.ts";
+import { connectMonobankAction, connectTelegramAction, disconnectTelegramAction, setNavAction, setThemeAction } from "../actions.ts";
+import { NAV_COOKIE, NAV_ITEMS, NAV_MAX, parseNav } from "@/lib/nav.ts";
 import { SubmitButton } from "../components/SubmitButton.tsx";
 import { CopyField } from "../components/CopyField.tsx";
 import { aiConfigured } from "@/lib/ai.ts";
@@ -31,7 +32,7 @@ function SecHead({ icon, title, status, ok }: { icon: string; title: string; sta
 export default async function Settings({
   searchParams,
 }: {
-  searchParams: Promise<{ tg_error?: string; mono_error?: string; mono_ok?: string }>;
+  searchParams: Promise<{ tg_error?: string; mono_error?: string; mono_ok?: string; nav_ok?: string }>;
 }) {
   const sp = await searchParams;
   const tg = telegramState();
@@ -43,6 +44,7 @@ export default async function Settings({
   const today = ymd(new Date());
   const minDay = ymd(new Date(Date.now() - MAX_BACKFILL_DAYS * 864e5));
   const monoOn = monobankConnected();
+  const nav = parseNav((await cookies()).get(NAV_COOKIE)?.value);
   const applePayOk = shortcutWorks();
 
   return (
@@ -74,6 +76,40 @@ export default async function Settings({
         </p>
         </div>
       </details>
+
+      <details className="card set-sec" id="nav" open={Boolean(sp.nav_ok)}>
+        <summary>
+          <SecHead icon="🧭" title="Нижнее меню" status={nav.map((id) => NAV_ITEMS.find((i) => i.id === id)?.label).join(" · ")} />
+        </summary>
+        <form action={setNavAction} className="form set-body">
+          <p className="small" style={{ margin: 0 }}>
+            Выберите до {NAV_MAX} пунктов, которые нужны вам под рукой. Кнопки «＋» и «Ещё» есть всегда — через «Ещё» открывается всё остальное.
+          </p>
+          {sp.nav_ok && <p className="small pos-text" style={{ margin: 0 }}>Сохранено ✓ Меню внизу обновилось.</p>}
+          <div className="chips">
+            {NAV_ITEMS.map((i) => (
+              <label key={i.id} className="chip-opt chip-check">
+                <input type="checkbox" name="nav" value={i.id} defaultChecked={nav.includes(i.id)} />
+                <span>{i.label}</span>
+              </label>
+            ))}
+          </div>
+          <div className="row-gap" style={{ margin: 0 }}>
+            <button className="btn btn-primary">Сохранить меню</button>
+            <button className="btn btn-ghost btn-sm" name="reset" value="1">Вернуть как было</button>
+          </div>
+        </form>
+      </details>
+
+      <Link href="/categories" className="card set-sec add-link">
+        <span className="set-head" style={{ flex: 1 }}>
+          <span className="set-icon" aria-hidden>🗂</span>
+          <span className="set-title">
+            <strong>Категории</strong>
+            <span className="muted">На что именно: продукты, такси, аренда…</span>
+          </span>
+        </span>
+      </Link>
 
       <details className="card set-sec" id="telegram" open={!tg.linked}>
         <summary>

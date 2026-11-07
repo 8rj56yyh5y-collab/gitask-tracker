@@ -4,17 +4,23 @@ import { assignTransaction, createTransitAction, linkTransitAction, markIncomeAc
 import { listTransits } from "@/lib/transit.ts";
 import { formatMoney } from "@/lib/money.ts";
 import { TxRow } from "../../components/TxRow.tsx";
-import { CenterChips } from "../../components/Pickers.tsx";
+import { CategoryChips, CenterChips } from "../../components/Pickers.tsx";
+import { getCategory, label, suggestedCategories } from "@/lib/categories.ts";
 import { getTx, suggestCenters } from "@/lib/repo.ts";
 
 // Экран «Куда ушли деньги?» — его открывает «Команда» iOS сразу после оплаты.
-export default async function AssignOne({ params }: { params: Promise<{ id: string }> }) {
+export default async function AssignOne({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ c?: string }> }) {
   const { id } = await params;
+  const { c: pickedRaw } = await searchParams;
   const tx = getTx(Number(id));
   if (!tx) notFound();
   const sugg = new Set(suggestCenters(tx));
   const transits = listTransits(true);
   const isIn = tx.amount > 0;
+  const picked = Number(pickedRaw) || null;
+  // Комментарий, который человек уже писал, — оставляем; иначе подставляем подсказку ИИ.
+  const noteDefault = tx.assigned_at && !tx.needs_note ? tx.description : (tx.ai_note ?? "");
+  const aiCat = getCategory(tx.ai_category_id);
 
   return (
     <div className="narrow-wide">
@@ -31,15 +37,29 @@ export default async function AssignOne({ params }: { params: Promise<{ id: stri
       <form action={assignTransaction} className="card form">
         <input type="hidden" name="id" value={tx.id} />
         <input type="hidden" name="next" value="/inbox" />
-        <CenterChips label={isIn ? "К какому направлению относится" : "Выберите направление"} required defaultValue={tx.cost_center_id} first={[...sugg]} />
+        {aiCat && !isIn && (
+          <div className="ai-hint">
+            ✨ Похоже на <b>{label(aiCat)}</b>
+            {tx.ai_note && <> — «{tx.ai_note}»</>}
+          </div>
+        )}
+        <CenterChips label={isIn ? "1. К какому направлению относится" : "1. Чьи это деньги"} required defaultValue={picked ?? tx.cost_center_id} first={[...sugg]} />
+        {!isIn && (
+          <CategoryChips label="2. На что именно" required defaultValue={tx.category_id} aiId={tx.ai_category_id} suggested={suggestedCategories(tx, 6)} />
+        )}
         <label>
-          Для кого
-          <input name="forWhom" defaultValue={tx.for_whom} placeholder="например, семья" />
+          {isIn ? "2. Комментарий" : "3. Комментарий"} — обязательно
+          <input name="description" required defaultValue={noteDefault} placeholder={isIn ? "например, вернул долг" : "например, продукты на неделю"} />
         </label>
-        <label>
-          Комментарий
-          <input name="description" defaultValue={tx.description} placeholder="необязательно" />
-        </label>
+        <details className="more-fields">
+          <summary>Для кого</summary>
+          <div className="form">
+            <label>
+              Для кого
+              <input name="forWhom" defaultValue={tx.for_whom} placeholder="например, семья" />
+            </label>
+          </div>
+        </details>
         <button className="btn btn-primary btn-big">Сохранить</button>
       </form>
       {isIn && !tx.sale_id && (

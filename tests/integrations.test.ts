@@ -102,11 +102,34 @@ test("telegram: connect, link chat by code, notify, assign by button", async () 
   await tg.handleUpdate({ callback_query: { id: "q2", data: `a:${id}:${sales.id}`, message: { chat: { id: 999 }, message_id: 7 } } });
   assert.equal(repo.getTx(id)!.cost_center_id, null);
 
-  // нажатие кнопки категории записывает операцию
+  // шаг 1: направление → шаг 2: категория
   calls.length = 0;
   await tg.handleUpdate({ callback_query: { id: "q3", data: `a:${id}:${sales.id}`, message: { chat: { id: 42 }, message_id: 7 } } });
   assert.equal(repo.getTx(id)!.cost_center_id, sales.id);
+  const step2 = calls.find((c) => c.path.endsWith("/editMessageText"))!.body;
+  assert.match(step2.text, /2 из 3/);
+  const catButtons = step2.reply_markup.inline_keyboard.flat();
+  const catBtn = catButtons.find((b: any) => String(b.callback_data).startsWith(`k:${id}:`))!;
+  assert.ok(catBtn, "category buttons are shown");
+  assert.ok(catButtons.some((b: any) => b.callback_data === `K:${id}:0`), "all categories button");
+  assert.ok(repo.listUnassigned().some((t) => t.id === id), "without a comment the operation still waits");
+  // шаг 2: категория → шаг 3: просим комментарий
+  calls.length = 0;
+  await tg.handleUpdate({ callback_query: { id: "q4", data: catBtn.callback_data, message: { chat: { id: 42 }, message_id: 7 } } });
+  assert.equal(repo.getTx(id)!.category_id, Number(catBtn.callback_data.split(":")[2]));
+  assert.match(calls.find((c) => c.path.endsWith("/editMessageText"))!.body.text, /3 из 3/);
+  // шаг 3: комментарий сообщением — операция записана полностью
+  calls.length = 0;
+  await tg.handleUpdate({ message: { chat: { id: 42 }, text: "подписка на кино" } });
+  assert.equal(repo.getTx(id)!.description, "подписка на кино");
+  assert.equal(repo.getTx(id)!.needs_note, 0);
+  assert.ok(!repo.listUnassigned().some((t) => t.id === id));
   assert.match(calls.find((c) => c.path.endsWith("/editMessageText"))!.body.text, /Записано/);
+  // все категории по страницам
+  calls.length = 0;
+  await tg.handleUpdate({ callback_query: { id: "q5", data: `K:${id}:1`, message: { chat: { id: 42 }, message_id: 7 } } });
+  const page2 = calls.find((c) => c.path.endsWith("/editMessageReplyMarkup"))!.body.reply_markup.inline_keyboard.flat();
+  assert.ok(page2.some((b: any) => b.text === "2 / 3" || /^2 \/ \d+$/.test(b.text)));
 
   // уже разнесённая операция повторно не уведомляется
   calls.length = 0;

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { addIncomeAction, addTransaction, transferAction } from "../actions.ts";
-import { AccountChips, CenterChips, ChipPicker, SegTabs } from "../components/Pickers.tsx";
+import { AccountChips, CategoryChips, CenterChips, ChipPicker, SegTabs } from "../components/Pickers.tsx";
+import { popularCategories } from "@/lib/categories.ts";
 import { AccountSelect } from "../components/AccountSelect.tsx";
 import { OTHER_INCOME_KINDS } from "@/lib/income.ts";
 
@@ -25,7 +26,7 @@ function Amount({ autoFocus = true }: { autoFocus?: boolean }) {
 function More({ children }: { children: React.ReactNode }) {
   return (
     <details className="more-fields">
-      <summary>Добавить детали: где, для кого, дата</summary>
+      <summary>Ещё: где, для кого, дата</summary>
       <div className="form">{children}</div>
     </details>
   );
@@ -44,7 +45,12 @@ export default async function NewTx({ searchParams }: { searchParams: Promise<{ 
         <form action={addTransaction} className="card form form-big">
           <input type="hidden" name="direction" value="out" />
           <Amount />
-          <CenterChips required label="На что потратили" includeInternal={false} />
+          <CenterChips required label="Чьи это деньги" includeInternal={false} />
+          <CategoryChips required suggested={popularCategories(6)} />
+          <label>
+            Комментарий — на что именно
+            <input name="description" required placeholder="например, продукты на неделю" />
+          </label>
           <AccountChips label="Чем платили" none="Наличными / не важно" />
           <More>
             <label>
@@ -54,10 +60,6 @@ export default async function NewTx({ searchParams }: { searchParams: Promise<{ 
             <label>
               Для кого
               <input name="forWhom" placeholder="например, для семьи" />
-            </label>
-            <label>
-              Комментарий
-              <input name="description" />
             </label>
             <label>
               Дата и время

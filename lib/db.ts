@@ -45,6 +45,17 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 
 -- Кассы (наличные): остаток = начальный остаток + все движения кассы.
+-- Категории — «на что именно» (продукты, такси…). Отдельно от направлений («чьи деньги»).
+CREATE TABLE IF NOT EXISTS categories (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  emoji TEXT NOT NULL DEFAULT '',
+  grp TEXT NOT NULL DEFAULT '',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  custom INTEGER NOT NULL DEFAULT 0,
+  sort INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS transits (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL,
@@ -186,6 +197,12 @@ export function getDb(): DatabaseSync {
   if (!txCols.includes("transit_id")) db.exec("ALTER TABLE transactions ADD COLUMN transit_id INTEGER");
   // Вид дохода: salary — ставка, other — прочий доход.
   if (!txCols.includes("income_kind")) db.exec("ALTER TABLE transactions ADD COLUMN income_kind TEXT");
+  // Категория («на что именно»), подсказка ИИ и обязательный комментарий из Telegram.
+  if (!txCols.includes("category_id")) db.exec("ALTER TABLE transactions ADD COLUMN category_id INTEGER");
+  if (!txCols.includes("ai_category_id")) db.exec("ALTER TABLE transactions ADD COLUMN ai_category_id INTEGER");
+  if (!txCols.includes("ai_note")) db.exec("ALTER TABLE transactions ADD COLUMN ai_note TEXT");
+  if (!txCols.includes("needs_note")) db.exec("ALTER TABLE transactions ADD COLUMN needs_note INTEGER NOT NULL DEFAULT 0");
+  seedCategories(db);
   const centerCols = (db.prepare("PRAGMA table_info(cost_centers)").all() as { name: string }[]).map((c) => c.name);
   // Личное направление: только его доходы и расходы входят в «Мои деньги за месяц».
   if (!centerCols.includes("is_personal")) db.exec("ALTER TABLE cost_centers ADD COLUMN is_personal INTEGER NOT NULL DEFAULT 0");
@@ -220,4 +237,61 @@ function linkCashboxesByName(db: DatabaseSync) {
     if (matches.length === 1) db.prepare("UPDATE cashboxes SET center_id = ? WHERE id = ?").run(matches[0].id, b.id);
   }
   db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('boxes_linked', '1')").run();
+}
+
+/** Готовый список категорий: включены самые частые, остальные можно включить в «Категориях». */
+export const CATEGORY_CATALOG: [string, string, string, boolean][] = [
+  // [название, значок, группа, включена по умолчанию]
+  ["Продукты", "🛒", "Еда", true],
+  ["Кафе и рестораны", "🍽", "Еда", true],
+  ["Кофе", "☕", "Еда", false],
+  ["Доставка еды", "🍔", "Еда", true],
+  ["Топливо", "⛽", "Транспорт", true],
+  ["Такси", "🚕", "Транспорт", true],
+  ["Общественный транспорт", "🚌", "Транспорт", true],
+  ["Авто: ремонт и обслуживание", "🚗", "Транспорт", true],
+  ["Парковка", "🅿️", "Транспорт", false],
+  ["Аренда жилья", "🏠", "Дом", true],
+  ["Коммунальные услуги", "💡", "Дом", true],
+  ["Связь и интернет", "📱", "Дом", true],
+  ["Ремонт", "🛠", "Дом", false],
+  ["Мебель и товары для дома", "🛋", "Дом", false],
+  ["Бытовая химия", "🧴", "Дом", false],
+  ["Аптека", "💊", "Здоровье", true],
+  ["Врачи и анализы", "🩺", "Здоровье", false],
+  ["Стоматология", "🦷", "Здоровье", false],
+  ["Одежда и обувь", "👕", "Личное", true],
+  ["Красота и уход", "💇", "Личное", true],
+  ["Спорт", "🏋️", "Личное", true],
+  ["Развлечения", "🎮", "Личное", true],
+  ["Кино, концерты, события", "🎬", "Личное", false],
+  ["Подписки", "📺", "Личное", true],
+  ["Подарки", "🎁", "Личное", true],
+  ["Книги и обучение", "📚", "Личное", false],
+  ["Дети", "👶", "Личное", true],
+  ["Животные", "🐾", "Личное", false],
+  ["Путешествия", "✈️", "Личное", true],
+  ["Отели", "🏨", "Личное", false],
+  ["Техника и электроника", "💻", "Личное", true],
+  ["Кредиты и рассрочки", "🏦", "Финансы", false],
+  ["Комиссии банка", "💳", "Финансы", true],
+  ["Налоги", "🧾", "Финансы", true],
+  ["Страхование", "🛡", "Финансы", false],
+  ["Благотворительность", "🤝", "Финансы", false],
+  ["Переводы людям", "💸", "Финансы", false],
+  ["Товар и закупка", "📦", "Работа", true],
+  ["Доставка и почта", "🚚", "Работа", true],
+  ["Канцелярия", "🖨", "Работа", false],
+  ["Реклама", "📣", "Работа", false],
+  ["Зарплаты", "👷", "Работа", false],
+  ["Инструменты и оборудование", "🧰", "Работа", false],
+  ["Аренда помещения", "🏢", "Работа", false],
+  ["Другое", "❔", "Другое", true],
+];
+
+function seedCategories(db: DatabaseSync) {
+  const n = db.prepare("SELECT COUNT(*) AS n FROM categories").get() as { n: number };
+  if (n.n > 0) return;
+  const ins = db.prepare("INSERT INTO categories (name, emoji, grp, enabled, sort) VALUES (?, ?, ?, ?, ?)");
+  CATEGORY_CATALOG.forEach(([name, emoji, grp, on], i) => ins.run(name, emoji, grp, on ? 1 : 0, i));
 }
