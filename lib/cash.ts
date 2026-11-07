@@ -98,3 +98,82 @@ export function parseAccount(v: string): Account | null {
   if (!m) return null;
   return m[1] === "card" ? { card: Number(m[2]) } : { cashbox: Number(m[2]) };
 }
+
+// ---------- Аналитика кассы ----------
+
+export interface CashStats {
+  balance: number;
+  monthIn: number;
+  monthOut: number;
+  /** Приход − расход за месяц. */
+  monthNet: number;
+  /** Сколько дней есть данные (не больше 30) — по ним считается прогноз. */
+  dataDays: number;
+  /** Средний итог в день за последние dataDays дней. */
+  perDay: number;
+  /** Прогноз остатка на конец месяца (null — данных пока мало). */
+  forecastEnd: number | null;
+  /** Через сколько дней прогноз станет точным (30 дней данных). */
+  daysToAccurate: number;
+  /** Последние 6 месяцев: приход и расход. */
+  months: { key: string; label: string; in: number; out: number }[];
+}
+
+const DAY_MS = 864e5;
+
+export function cashStats(id: number, now = new Date()): CashStats {
+  const db = getDb();
+  const balance = cashBalances().get(id) ?? 0;
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const sum = (from: Date, to: Date) =>
+    db
+      .prepare(
+        `SELECT COALESCE(SUM(CASE WHEN amount > 0 THEN amount END), 0) AS i, COALESCE(SUM(CASE WHEN amount < 0 THEN -amount END), 0) AS o
+         FROM transactions WHERE cashbox_id = ? AND occurred_at >= ? AND occurred_at < ?`,
+      )
+      .get(id, from.toISOString(), to.toISOString()) as { i: number; o: number };
+  const m = sum(monthStart, nextMonth);
+  const first = db.prepare("SELECT MIN(occurred_at) AS f FROM transactions WHERE cashbox_id = ?").get(id) as { f: string | null };
+  const since = first.f ? Math.max(1, Math.ceil((now.getTime() - new Date(first.f).getTime()) / DAY_MS)) : 0;
+  const dataDays = Math.min(30, since);
+  let perDay = 0;
+  if (dataDays > 0) {
+    const w = sum(new Date(now.getTime() - dataDays * DAY_MS), new Date(now.getTime() + 1));
+    perDay = Math.round((Number(w.i) - Number(w.o)) / dataDays);
+  }
+  const daysLeft = Math.max(0, Math.ceil((nextMonth.getTime() - now.getTime()) / DAY_MS) - 1);
+  const months: CashStats["months"] = [];
+  for (let k = 5; k >= 0; k--) {
+    const a = new Date(now.getFullYear(), now.getMonth() - k, 1);
+    const b = new Date(now.getFullYear(), now.getMonth() - k + 1, 1);
+    const s = sum(a, b);
+    const label = a.toLocaleDateString("ru-RU", { month: "short" }).replace(".", "");
+    months.push({ key: `${a.getFullYear()}-${a.getMonth()}`, label, in: Number(s.i), out: Number(s.o) });
+  }
+  return {
+    balance,
+    monthIn: Number(m.i),
+    monthOut: Number(m.o),
+    monthNet: Number(m.i) - Number(m.o),
+    dataDays,
+    perDay,
+    // Прогноз — от 7 дней данных; до 30 — предварительный.
+    forecastEnd: dataDays >= 7 ? balance + perDay * daysLeft : null,
+    daysToAccurate: Math.max(0, 30 - since),
+    months,
+  };
+}
+
+/** Итоги всех касс за месяц: приход и расход по каждой. */
+export function cashMonthTotals(now = new Date()): Map<number, { in: number; out: number }> {
+  const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const to = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+  const rows = getDb()
+    .prepare(
+      `SELECT cashbox_id AS id, COALESCE(SUM(CASE WHEN amount > 0 THEN amount END), 0) AS i, COALESCE(SUM(CASE WHEN amount < 0 THEN -amount END), 0) AS o
+       FROM transactions WHERE cashbox_id IS NOT NULL AND occurred_at >= ? AND occurred_at < ? GROUP BY cashbox_id`,
+    )
+    .all(from, to) as { id: number; i: number; o: number }[];
+  return new Map(rows.map((r) => [Number(r.id), { in: Number(r.i), out: Number(r.o) }]));
+}

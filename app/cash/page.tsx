@@ -1,102 +1,96 @@
-import { Hint } from "../components/Hint.tsx";
 import Link from "next/link";
-import { createCashboxAction, transferAction } from "../actions.ts";
-import { AccountSelect } from "../components/AccountSelect.tsx";
-import { CenterSelect } from "../components/CenterSelect.tsx";
-import { listCenters } from "@/lib/repo.ts";
-import { cashBalances, listCashboxes } from "@/lib/cash.ts";
+import { createCashboxAction } from "../actions.ts";
+import { CenterChips } from "../components/Pickers.tsx";
+import { cashBalances, cashMonthTotals, listCashboxes } from "@/lib/cash.ts";
 import { formatMoney } from "@/lib/money.ts";
+import { listCenters } from "@/lib/repo.ts";
 
-export default function Cash() {
+export default async function Cash({ searchParams }: { searchParams: Promise<{ new?: string }> }) {
+  const { new: openNew } = await searchParams;
   const boxes = listCashboxes();
   const bal = cashBalances();
-  const centerName = new Map(listCenters().map((c) => [c.id, c.name]));
+  const month = cashMonthTotals();
+  const centers = new Map(listCenters().map((c) => [c.id, c]));
   const total = boxes.reduce((a, b) => a + (bal.get(b.id) ?? 0), 0);
+  const mIn = boxes.reduce((a, b) => a + (month.get(b.id)?.in ?? 0), 0);
+  const mOut = boxes.reduce((a, b) => a + (month.get(b.id)?.out ?? 0), 0);
+  const monthName = new Date().toLocaleDateString("ru-RU", { month: "long" });
+
   return (
     <div className="narrow-wide">
-      <h1>Кассы</h1>
-      <Hint>Наличные деньги. Каждая касса — отдельный кошелёк со своим остатком.</Hint>
-      {boxes.length > 0 && (
-        <p className="muted small" style={{ marginTop: -6 }}>
-          Наличных во всех кассах: <strong>{formatMoney(total)}</strong>
-        </p>
-      )}
-      {boxes.map((b) => (
-        <Link key={b.id} href={`/cash/${b.id}`} className="cashbox-tile" style={{ "--c": b.color } as React.CSSProperties}>
-          <div className="row-between">
-            <strong>{b.name}</strong>
-            <span className="small">{b.owner}</span>
-          </div>
-          <div className="big">{formatMoney(bal.get(b.id) ?? 0)}</div>
-          <div className="small" style={{ opacity: 0.85 }}>
-            {b.center_id && centerName.has(b.center_id) ? `${centerName.get(b.center_id)} · ` : ""}нажмите, чтобы внести приход или расход
-          </div>
+      <div className="page-head">
+        <h1>Кассы</h1>
+        <Link href="/cash?new=1#new" className="btn btn-primary btn-sm">
+          + Касса
         </Link>
-      ))}
+      </div>
+
+      <section className="summary-hero">
+        <div className="summary-label">Наличных во всех кассах</div>
+        <div className="summary-value">{formatMoney(total)}</div>
+        <div className="summary-row">
+          <span>
+            За {monthName}: <b className="pos-text">+{formatMoney(mIn)}</b>
+          </span>
+          <span>
+            <b>−{formatMoney(mOut)}</b>
+          </span>
+        </div>
+      </section>
+
       {boxes.length === 0 && (
-        <div className="card">
+        <div className="empty">
+          <div className="empty-icon">💵</div>
           <strong>Касс пока нет</strong>
-          <p className="muted small">Например: «Домашняя», «Офис», «Магазин». У каждой будет свой остаток.</p>
+          <p>Касса — это наличные: дома, в офисе, у отдела. У каждой свой остаток и своя история.</p>
         </div>
       )}
 
-      {boxes.length > 0 && (
-        <form action={transferAction} className="card form">
-          <h2>Перевод</h2>
-          <p className="muted small" style={{ margin: 0 }}>Между кассами или с карты в кассу (снял наличные) — это не расход.</p>
-          <input type="hidden" name="next" value="/cash" />
-          <div className="grid-2-tight">
-            <label>
-              Откуда
-              <AccountSelect name="from" />
-            </label>
-            <label>
-              Куда
-              <AccountSelect name="to" />
-            </label>
-          </div>
-          <label>
-            Сумма, ₴
-            <input name="amount" inputMode="decimal" required />
-          </label>
-          <label>
-            Комментарий
-            <input name="note" placeholder="например, снял в банкомате" />
-          </label>
-          <button className="btn">Перевести</button>
-        </form>
-      )}
+      <div className="box-grid">
+        {boxes.map((b) => {
+          const m = month.get(b.id) ?? { in: 0, out: 0 };
+          const c = b.center_id ? centers.get(b.center_id) : undefined;
+          return (
+            <Link key={b.id} href={`/cash/${b.id}`} className="box-tile" style={{ "--c": b.color } as React.CSSProperties}>
+              <div className="box-tile-top">
+                <span className="box-tile-name">{b.name}</span>
+                {c && c.name !== b.name && <span className="box-tile-tag">{c.name}</span>}
+              </div>
+              <div className="box-tile-balance">{formatMoney(bal.get(b.id) ?? 0)}</div>
+              <div className="box-tile-month">
+                <span>+{formatMoney(m.in)}</span>
+                <span>−{formatMoney(m.out)}</span>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
 
-      <form action={createCashboxAction} className="card form">
-        <h2>Новая касса</h2>
-        <label>
-          Название
-          <input name="name" required placeholder="например, Домашняя" />
-        </label>
-        <label>
-          Чья
-          <input name="owner" placeholder="например, Анна" />
-        </label>
-        <div className="grid-2-tight">
+      <details className="card settings-fold" id="new" open={Boolean(openNew) || boxes.length === 0}>
+        <summary>Новая касса</summary>
+        <form action={createCashboxAction} className="form" style={{ marginTop: 14 }}>
           <label>
-            Сейчас в кассе, ₴
+            Название
+            <input name="name" required placeholder="например, Домашняя" />
+          </label>
+          <label>
+            Сколько в ней сейчас, ₴
             <input name="opening" inputMode="decimal" placeholder="0" />
           </label>
-          <label>
-            Цвет
-            <input name="color" type="color" defaultValue="#16a34a" />
-          </label>
-        </div>
-        <label>
-          Направление кассы
-          <CenterSelect none="— для разных —" />
-        </label>
-        <p className="muted small" style={{ margin: 0 }}>
-          Например, касса отдела продаж — направление «Отдел продаж»: расходы из неё сразу записываются туда. Для отдельной траты его можно
-          поменять.
-        </p>
-        <button className="btn btn-primary">Создать кассу</button>
-      </form>
+          <CenterChips label="Чьи это деньги (направление)" withNone="Разные" includeInternal={false} />
+          <div className="grid-2-tight">
+            <label>
+              Чья касса
+              <input name="owner" placeholder="необязательно" />
+            </label>
+            <label>
+              Цвет
+              <input name="color" type="color" defaultValue="#16a34a" />
+            </label>
+          </div>
+          <button className="btn btn-primary btn-big">Создать кассу</button>
+        </form>
+      </details>
     </div>
   );
 }

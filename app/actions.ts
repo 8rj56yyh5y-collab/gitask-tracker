@@ -398,7 +398,19 @@ export async function archiveGroupAction(f: FormData) {
 export async function saveProductAction(f: FormData) {
   const name = str(f, "name");
   if (!name) throw new Error("Назовите товар");
-  saveProduct({ id: num(f, "id"), name, group_id: num(f, "groupId"), unit: str(f, "unit") || "уп.", tiersText: str(f, "tiers") });
+  // Простая форма: «цена за 1» и до трёх наборов «количество — цена».
+  let tiersText = str(f, "tiers");
+  if (f.has("price1")) {
+    const parts: string[] = [];
+    if (str(f, "price1")) parts.push(`1=${str(f, "price1")}`);
+    for (const i of [1, 2, 3]) {
+      const q = str(f, `setQty${i}`);
+      const p = str(f, `setPrice${i}`);
+      if (q && p && Number(q) > 1) parts.push(`${q}=${p}`);
+    }
+    tiersText = parts.join("; ");
+  }
+  saveProduct({ id: num(f, "id"), name, group_id: num(f, "groupId"), unit: str(f, "unit") || "шт.", tiersText });
   refresh();
   back(f);
 }

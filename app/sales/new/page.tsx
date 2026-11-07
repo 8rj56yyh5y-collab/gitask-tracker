@@ -1,3 +1,4 @@
+import { SalesTabs } from "../SalesTabs.tsx";
 import Link from "next/link";
 import { createSaleAction } from "../../actions.ts";
 import { AccountSelect } from "../../components/AccountSelect.tsx";
@@ -17,15 +18,13 @@ export default async function NewSale({ searchParams }: { searchParams: Promise<
 
   return (
     <div className="narrow">
-      <div className="muted small">
-        <Link href="/sales">Продажи</Link>
-      </div>
-      <h1>Продажа товара</h1>
+      <SalesTabs active="sales" />
+      <h2 className="section-title">Новая продажа</h2>
       {products.length === 0 ? (
         <div className="card">
           <strong>Сначала добавьте товар</strong>
           <p className="muted small">
-            В <Link href="/sales/catalog" className="link">каталоге</Link>: группа с процентами и товар с ценами за упаковку и за набор.
+            Откройте <Link href="/sales/catalog" className="link">Каталог товаров</Link> и нажмите «+ Добавить товар».
           </p>
         </div>
       ) : (

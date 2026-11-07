@@ -1,3 +1,4 @@
+import { SalesTabs } from "./SalesTabs.tsx";
 import { Hint } from "../components/Hint.tsx";
 import Link from "next/link";
 import { deleteSaleAction, payCompanyAction } from "../actions.ts";
@@ -23,12 +24,7 @@ export default async function Sales({ searchParams }: { searchParams: Promise<{ 
 
   return (
     <div className="narrow-wide">
-      <div className="row-between">
-        <h1 style={{ margin: 0 }}>Продажи</h1>
-        <Link href="/sales/new" className="btn btn-primary btn-sm">
-          + Продажа
-        </Link>
-      </div>
+      <SalesTabs active="sales" />
       <Hint>Продажа товара компании: ваша комиссия — ваш доход, остальное — долг компании, пока не отдадите.</Hint>
       <div className="month-switch" style={{ margin: "12px 0" }}>
         <Link href={`/sales?m=${monthKey(shiftMonth(d, -1))}`} className="btn btn-sm" aria-label="Предыдущий месяц">‹</Link>
@@ -104,7 +100,6 @@ export default async function Sales({ searchParams }: { searchParams: Promise<{ 
       <section className="card">
         <div className="row-between">
           <h2 style={{ margin: 0 }}>Продажи за месяц</h2>
-          <Link href="/sales/catalog" className="btn btn-ghost btn-sm">Каталог и ставки ›</Link>
         </div>
         {s.list.length === 0 && <p className="muted small">Продаж нет. Нажмите «+ Продажа».</p>}
         {s.list.map((x) => (
