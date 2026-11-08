@@ -1,7 +1,7 @@
 import fs from "node:fs";
-import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { closeTenant, getMainDb, tenantFile } from "./db.ts";
-import { MAIN, currentTenant, parseAccountCookie } from "./tenant.ts";
+import { MAIN, currentTenant, parseAccountCookie, sessionSecret } from "./tenant.ts";
 
 // Дополнительные аккаунты: например, для тех, кто тестирует D&N. У каждого свои данные.
 
@@ -25,6 +25,35 @@ export function generatePassword(len = 10): string {
 
 const normLogin = (l: string) => l.trim().toLowerCase();
 
+// Пароль шифруется ключом сервера (AES-256-GCM): владелец может снова посмотреть его и переслать,
+// а в файле базы он не лежит открытым текстом.
+const encKey = () => createHash("sha256").update(`dn-account-pass:${sessionSecret()}`).digest();
+
+function encryptPassword(password: string): string {
+  const iv = randomBytes(12);
+  const c = createCipheriv("aes-256-gcm", encKey(), iv);
+  const data = Buffer.concat([c.update(password, "utf8"), c.final()]);
+  return [iv, c.getAuthTag(), data].map((b) => b.toString("base64url")).join(".");
+}
+
+function decryptPassword(enc: string | null | undefined): string | null {
+  if (!enc) return null;
+  try {
+    const [iv, tag, data] = enc.split(".").map((x) => Buffer.from(x, "base64url"));
+    const d = createDecipheriv("aes-256-gcm", encKey(), iv);
+    d.setAuthTag(tag);
+    return Buffer.concat([d.update(data), d.final()]).toString("utf8");
+  } catch {
+    return null; // ключ сервера сменился — пароль надо выдать заново
+  }
+}
+
+/** Пароль аккаунта, если он сохранён (аккаунты, созданные раньше, — null). */
+export function accountPassword(id: string): string | null {
+  const r = getMainDb().prepare("SELECT pass_enc FROM accounts WHERE id = ?").get(id) as { pass_enc: string | null } | undefined;
+  return decryptPassword(r?.pass_enc);
+}
+
 export function listAccounts(): Account[] {
   return getMainDb().prepare("SELECT id, name, login, ver, ingest_token, created_at FROM accounts ORDER BY created_at").all() as unknown as Account[];
 }
@@ -43,8 +72,8 @@ export function createAccount(name: string, login: string, password = generatePa
   if (db.prepare("SELECT 1 FROM accounts WHERE login = ?").get(l)) throw new Error("Такой логин уже есть");
   const id = randomBytes(6).toString("hex");
   const salt = randomBytes(16).toString("hex");
-  db.prepare("INSERT INTO accounts (id, name, login, salt, hash, ingest_token) VALUES (?, ?, ?, ?, ?, ?)").run(
-    id, name.trim().slice(0, 60) || l, l, salt, hashPassword(password, salt), randomBytes(24).toString("base64url"),
+  db.prepare("INSERT INTO accounts (id, name, login, salt, hash, ingest_token, pass_enc) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
+    id, name.trim().slice(0, 60) || l, l, salt, hashPassword(password, salt), randomBytes(24).toString("base64url"), encryptPassword(password),
   );
   return { account: getAccount(id)!, password };
 }
@@ -75,7 +104,9 @@ export function checkLogin(login: string, password: string): Account | null {
 export function resetPassword(id: string): string {
   const password = generatePassword();
   const salt = randomBytes(16).toString("hex");
-  getMainDb().prepare("UPDATE accounts SET salt = ?, hash = ?, ver = ver + 1 WHERE id = ?").run(salt, hashPassword(password, salt), id);
+  getMainDb()
+    .prepare("UPDATE accounts SET salt = ?, hash = ?, pass_enc = ?, ver = ver + 1 WHERE id = ?")
+    .run(salt, hashPassword(password, salt), encryptPassword(password), id);
   return password;
 }
 

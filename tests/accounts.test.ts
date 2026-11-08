@@ -74,3 +74,14 @@ test("имя и логин можно поменять; пароль и вход
   assert.throws(() => accounts.updateAccount(account.id, "Анна", "boris"), /уже есть/);
   assert.throws(() => accounts.updateAccount(account.id, "Анна", "a"), /Логин/);
 });
+
+test("данные для входа можно посмотреть снова; новый пароль тоже виден", () => {
+  const { account, password } = accounts.createAccount("Вика", "vika");
+  assert.equal(accounts.accountPassword(account.id), password);
+  const fresh = accounts.resetPassword(account.id);
+  assert.notEqual(fresh, password);
+  assert.equal(accounts.accountPassword(account.id), fresh);
+  // в базе пароль не лежит открытым текстом
+  const raw = JSON.stringify(accounts.listAccounts());
+  assert.ok(!raw.includes(fresh));
+});

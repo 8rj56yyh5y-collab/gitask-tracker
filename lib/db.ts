@@ -270,6 +270,9 @@ function migrate(db: DatabaseSync, tenant: string) {
   seedCategories(db);
   const centerCols = (db.prepare("PRAGMA table_info(cost_centers)").all() as { name: string }[]).map((c) => c.name);
   // Личное направление: только его доходы и расходы входят в «Мои деньги за месяц».
+  // Пароль дополнительного аккаунта в зашифрованном виде — чтобы владелец мог снова его посмотреть и переслать.
+  const accCols = (db.prepare("PRAGMA table_info(accounts)").all() as { name: string }[]).map((c) => c.name);
+  if (!accCols.includes("pass_enc")) db.exec("ALTER TABLE accounts ADD COLUMN pass_enc TEXT");
   if (!centerCols.includes("is_personal")) db.exec("ALTER TABLE cost_centers ADD COLUMN is_personal INTEGER NOT NULL DEFAULT 0");
   linkCashboxesByName(db);
   const count = db.prepare("SELECT COUNT(*) AS n FROM cost_centers").get() as { n: number };

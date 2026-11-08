@@ -641,33 +641,25 @@ export async function setTxCardAction(f: FormData) {
 }
 
 // ---------- Аккаунты для других (только владелец) ----------
-async function flashAccount(text: string) {
-  // Пароль показываем один раз: кладём в короткоживущую cookie, а не в адрес страницы.
-  (await cookies()).set("dn_flash", text, { path: "/settings", maxAge: 120, httpOnly: true, sameSite: "lax" });
-}
 
 export async function createAccountAction(f: FormData) {
   if (!isOwner()) throw new Error("Создавать аккаунты может только владелец");
-  const { account, password } = createAccount(str(f, "name"), str(f, "login"));
-  await flashAccount(JSON.stringify({ login: account.login, name: account.name, password }));
+  const { account } = createAccount(str(f, "name"), str(f, "login"));
   refresh();
-  redirect("/settings?acc=1#accounts");
+  redirect(`/settings?acc=1&acc_open=${account.id}#accounts`);
 }
 
 export async function resetAccountAction(f: FormData) {
   if (!isOwner()) throw new Error("Только владелец");
   const id = str(f, "id");
-  const login = str(f, "login");
-  const password = resetPassword(id);
-  await flashAccount(JSON.stringify({ login, name: str(f, "name"), password }));
+  resetPassword(id);
   refresh();
-  redirect("/settings?acc=1#accounts");
+  redirect(`/settings?acc=1&acc_open=${id}#accounts`);
 }
 
 export async function deleteAccountAction(f: FormData) {
   if (!isOwner()) throw new Error("Только владелец");
   deleteAccount(str(f, "id"));
-  (await cookies()).set("dn_flash", "", { path: "/settings", maxAge: 0 });
   refresh();
   redirect("/settings?acc=1#accounts");
 }
@@ -681,8 +673,6 @@ export async function finishWelcomeAction(f: FormData) {
 export async function updateAccountAction(f: FormData) {
   if (!isOwner()) throw new Error("Только владелец");
   updateAccount(str(f, "id"), str(f, "name"), str(f, "login"));
-  // Карточка «аккаунт готов» со старым логином больше не нужна.
-  (await cookies()).set("dn_flash", "", { path: "/settings", maxAge: 0 });
   refresh();
   redirect("/settings?acc=1&acc_saved=1#accounts");
 }
