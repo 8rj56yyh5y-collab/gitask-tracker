@@ -49,6 +49,17 @@ export function createAccount(name: string, login: string, password = generatePa
   return { account: getAccount(id)!, password };
 }
 
+/** Поменять имя и логин. Пароль и вход человека остаются прежними — входить он будет уже с новым логином. */
+export function updateAccount(id: string, name: string, login: string) {
+  const l = normLogin(login);
+  if (!/^[a-z0-9._-]{3,30}$/.test(l)) throw new Error("Логин: 3–30 латинских букв, цифр, точек или дефисов");
+  if (l === "owner" || l === MAIN) throw new Error("Этот логин занят");
+  const db = getMainDb();
+  if (db.prepare("SELECT 1 FROM accounts WHERE login = ? AND id != ?").get(l, id)) throw new Error("Такой логин уже есть");
+  const n = name.trim().slice(0, 60) || l;
+  db.prepare("UPDATE accounts SET name = ?, login = ? WHERE id = ?").run(n, l, id);
+}
+
 /** Проверить логин и пароль. */
 export function checkLogin(login: string, password: string): Account | null {
   const row = getMainDb().prepare("SELECT * FROM accounts WHERE login = ?").get(normLogin(login)) as

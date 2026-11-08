@@ -19,7 +19,7 @@ import { addCategory, renameCategory, setCategoryEnabled, setTxDetails } from "@
 import { addOtherIncome, createSalary, creditDueSalaries } from "@/lib/income.ts";
 import { createTransit, deleteTransit, finishTransit, linkTxToTransit } from "@/lib/transit.ts";
 import { getDb } from "@/lib/db.ts";
-import { createAccount, currentIngestKey, deleteAccount, isOwner, resetPassword } from "@/lib/accounts.ts";
+import { createAccount, currentIngestKey, deleteAccount, isOwner, resetPassword, updateAccount } from "@/lib/accounts.ts";
 import { redirect } from "next/navigation";
 import { toKop, parseAmount } from "@/lib/money.ts";
 import {
@@ -667,6 +667,7 @@ export async function resetAccountAction(f: FormData) {
 export async function deleteAccountAction(f: FormData) {
   if (!isOwner()) throw new Error("Только владелец");
   deleteAccount(str(f, "id"));
+  (await cookies()).set("dn_flash", "", { path: "/settings", maxAge: 0 });
   refresh();
   redirect("/settings?acc=1#accounts");
 }
@@ -675,4 +676,13 @@ export async function finishWelcomeAction(f: FormData) {
   setSetting("welcome_seen", "1");
   refresh();
   redirect(str(f, "next") || "/");
+}
+
+export async function updateAccountAction(f: FormData) {
+  if (!isOwner()) throw new Error("Только владелец");
+  updateAccount(str(f, "id"), str(f, "name"), str(f, "login"));
+  // Карточка «аккаунт готов» со старым логином больше не нужна.
+  (await cookies()).set("dn_flash", "", { path: "/settings", maxAge: 0 });
+  refresh();
+  redirect("/settings?acc=1&acc_saved=1#accounts");
 }

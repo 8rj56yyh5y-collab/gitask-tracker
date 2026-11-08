@@ -7,6 +7,7 @@ import {
   disconnectTelegramAction,
   resetAccountAction,
   setNavAction,
+  updateAccountAction,
   setThemeAction,
 } from "../actions.ts";
 import { currentIngestKey, isOwner, listAccounts } from "@/lib/accounts.ts";
@@ -42,7 +43,7 @@ function SecHead({ icon, title, status, ok }: { icon: string; title: string; sta
 export default async function Settings({
   searchParams,
 }: {
-  searchParams: Promise<{ tg_error?: string; mono_error?: string; mono_ok?: string; nav_ok?: string; acc?: string }>;
+  searchParams: Promise<{ tg_error?: string; mono_error?: string; mono_ok?: string; nav_ok?: string; acc?: string; acc_saved?: string }>;
 }) {
   const sp = await searchParams;
   const tg = telegramState();
@@ -307,12 +308,30 @@ export default async function Settings({
                 <p className="muted small" style={{ margin: 0 }}>Пароль показывается только сейчас. Забудете — нажмите «Новый пароль».</p>
               </div>
             )}
+            {sp.acc_saved && <p className="small pos-text" style={{ margin: 0 }}>Сохранено ✓ Если меняли логин — сообщите человеку новый, пароль прежний.</p>}
             {accounts.map((a) => (
               <div key={a.id} className="acc-row">
                 <span className="set-title">
                   <strong>{a.name}</strong>
                   <span className="muted">логин: {a.login}</span>
                 </span>
+                <details className="acc-edit">
+                  <summary className="btn btn-sm">Изменить</summary>
+                  <form action={updateAccountAction} className="form acc-edit-form">
+                    <input type="hidden" name="id" value={a.id} />
+                    <div className="grid-2-tight">
+                      <label>
+                        Имя
+                        <input name="name" required defaultValue={a.name} />
+                      </label>
+                      <label>
+                        Логин (латиницей)
+                        <input name="login" required defaultValue={a.login} pattern="[a-zA-Z0-9._\-]{3,30}" autoCapitalize="none" />
+                      </label>
+                    </div>
+                    <button className="btn btn-primary btn-sm">Сохранить</button>
+                  </form>
+                </details>
                 <form action={resetAccountAction}>
                   <input type="hidden" name="id" value={a.id} />
                   <input type="hidden" name="login" value={a.login} />
