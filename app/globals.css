@@ -806,3 +806,9 @@ body { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 .acc-edit[open] > summary { display: none; }
 .acc-edit-form { margin-top: 4px; padding: 12px; border-radius: 14px; background: var(--field); }
 .acc-edit-form input { background: var(--card); }
+.acc-login > summary { list-style: none; }
+.acc-login > summary::-webkit-details-marker { display: none; }
+.acc-login[open] { flex-basis: 100%; order: 9; }
+.acc-login[open] > summary { display: inline-flex; margin-bottom: 8px; }
+.acc-login-body { padding: 12px; border-radius: 14px; background: color-mix(in srgb, var(--accent) 8%, var(--card)); display: flex; flex-direction: column; gap: 8px; }
+.acc-login-body textarea { background: var(--card); }

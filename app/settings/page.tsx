@@ -10,7 +10,7 @@ import {
   updateAccountAction,
   setThemeAction,
 } from "../actions.ts";
-import { currentIngestKey, isOwner, listAccounts } from "@/lib/accounts.ts";
+import { accountPassword, currentIngestKey, isOwner, listAccounts } from "@/lib/accounts.ts";
 import { NAV_COOKIE, NAV_ITEMS, NAV_MAX, parseNav } from "@/lib/nav.ts";
 import { SubmitButton } from "../components/SubmitButton.tsx";
 import { CopyField } from "../components/CopyField.tsx";
@@ -43,7 +43,7 @@ function SecHead({ icon, title, status, ok }: { icon: string; title: string; sta
 export default async function Settings({
   searchParams,
 }: {
-  searchParams: Promise<{ tg_error?: string; mono_error?: string; mono_ok?: string; nav_ok?: string; acc?: string; acc_saved?: string }>;
+  searchParams: Promise<{ tg_error?: string; mono_error?: string; mono_ok?: string; nav_ok?: string; acc?: string; acc_saved?: string; acc_open?: string }>;
 }) {
   const sp = await searchParams;
   const tg = telegramState();
@@ -52,12 +52,6 @@ export default async function Settings({
   const ingestKey = currentIngestKey();
   const owner = isOwner();
   const accounts = owner ? listAccounts() : [];
-  let flash: { login: string; name: string; password: string } | null = null;
-  try {
-    flash = JSON.parse((await cookies()).get("dn_flash")?.value ?? "null");
-  } catch {
-    flash = null;
-  }
   const theme = normalizeTheme((await cookies()).get(THEME_COOKIE)?.value);
   const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const today = ymd(new Date());
@@ -298,16 +292,6 @@ export default async function Settings({
             <p className="small" style={{ margin: 0 }}>
               Дайте D&amp;N попробовать другим. У каждого — свой вход и <b>свои данные</b>: ваши карты и операции они не увидят, а вы — их.
             </p>
-            {flash && (
-              <div className="card ok-note" style={{ margin: 0, color: "var(--text)" }}>
-                <strong>Аккаунт «{flash.name}» готов. Отправьте человеку:</strong>
-                <CopyField
-                  value={`D&N — учёт денег\nСайт: ${base}\nЛогин: ${flash.login}\nПароль: ${flash.password}`}
-                  label="данные для входа"
-                />
-                <p className="muted small" style={{ margin: 0 }}>Пароль показывается только сейчас. Забудете — нажмите «Новый пароль».</p>
-              </div>
-            )}
             {sp.acc_saved && <p className="small pos-text" style={{ margin: 0 }}>Сохранено ✓ Если меняли логин — сообщите человеку новый, пароль прежний.</p>}
             {accounts.map((a) => (
               <div key={a.id} className="acc-row">
@@ -315,6 +299,25 @@ export default async function Settings({
                   <strong>{a.name}</strong>
                   <span className="muted">логин: {a.login}</span>
                 </span>
+                <details className="acc-login" open={sp.acc_open === a.id}>
+                  <summary className="btn btn-sm btn-primary">Данные для входа</summary>
+                  <div className="acc-login-body">
+                    {(() => {
+                      const pw = accountPassword(a.id);
+                      return pw ? (
+                        <>
+                          <CopyField value={`D&N — учёт денег\nСайт: ${base}\nЛогин: ${a.login}\nПароль: ${pw}`} label={`данные для входа: ${a.name}`} />
+                          <p className="muted small" style={{ margin: 0 }}>Нажмите кнопку справа — сообщение скопируется, его можно отправить в Telegram.</p>
+                        </>
+                      ) : (
+                        <p className="small" style={{ margin: 0 }}>
+                          Пароль этого аккаунта не сохранился (аккаунт создан до обновления). Нажмите <b>«Новый пароль»</b> — и данные для входа
+                          появятся здесь.
+                        </p>
+                      );
+                    })()}
+                  </div>
+                </details>
                 <details className="acc-edit">
                   <summary className="btn btn-sm">Изменить</summary>
                   <form action={updateAccountAction} className="form acc-edit-form">
@@ -360,7 +363,7 @@ export default async function Settings({
                 </label>
               </div>
               <button className="btn btn-primary">Создать аккаунт</button>
-              <p className="muted small" style={{ margin: 0 }}>Пароль придумается сам — вы увидите его один раз и сможете переслать.</p>
+              <p className="muted small" style={{ margin: 0 }}>Пароль придумается сам. Посмотреть и скопировать его можно в любой момент — кнопка «Данные для входа».</p>
             </form>
           </div>
         </details>
