@@ -3,6 +3,7 @@ import { formatMoney } from "./money.ts";
 import { assignTx, centerTree, getTx, suggestCenters, type Tx } from "./repo.ts";
 import { getSetting, setSetting } from "./settings.ts";
 import { canAutoCredit } from "./income.ts";
+import { cardHintOf, listCards, listMainCards, needsCard, setTxCard } from "./repo.ts";
 import { getCategory, label, listCategories, markNeedsNote, setTxDetails, suggestedCategories } from "./categories.ts";
 import { createTransit, linkTxToTransit, listTransits } from "./transit.ts";
 import { getDb } from "./db.ts";
@@ -140,6 +141,21 @@ function childKeyboard(tx: Tx, parentId: number): Button[][] {
   return rows;
 }
 
+/** Вопрос «с какой карты?», когда Wallet прислал название, которое D&N ещё не знает. */
+function cardQuestion(tx: Tx): string {
+  const hint = cardHintOf(tx);
+  return `${txText(tx)}\n\n💳 <b>С какой карты оплатили?</b>${hint ? `\nВ Apple Pay карта называется «${esc(hint)}» — D&N запомнит ваш выбор.` : ""}`;
+}
+
+/** Кнопки со всеми картами: «OTP Bank •7777». Дополнительные карты — под основной. */
+function cardKeyboard(tx: Tx): Button[][] {
+  const cards = listCards();
+  const btns: Button[] = cards.map((c) => ({ text: `${c.bank} •${c.last4}${c.owner ? ` · ${c.owner}` : ""}`.slice(0, 40), callback_data: `w:${tx.id}:${c.id}` }));
+  const rows = pairs(btns);
+  rows.push([{ text: "Не с карты / другая", callback_data: `w:${tx.id}:0` }]);
+  return rows;
+}
+
 /** Строка с подсказкой ИИ (или по истории): «✨ Похоже на: 🛒 Продукты — продукты домой». */
 function aiHint(tx: Tx): string {
   const c = getCategory(tx.ai_category_id);
@@ -208,11 +224,12 @@ export async function notifyNewTx(txId: number): Promise<void> {
   if (!tx || tx.cost_center_id !== null || tx.kind === "internal") return;
   try {
     const hint = aiHint(tx);
+    const askCard = needsCard(tx) && listMainCards().length > 0;
     await call(token, "sendMessage", {
       chat_id: chat,
-      text: `${txText(tx)}${hint}\n\n<b>1 из 3.</b> Чьи это деньги?`,
+      text: askCard ? cardQuestion(tx) : `${txText(tx)}${hint}\n\n<b>1 из 3.</b> Чьи это деньги?`,
       parse_mode: "HTML",
-      reply_markup: { inline_keyboard: suggestKeyboard(tx) },
+      reply_markup: { inline_keyboard: askCard ? cardKeyboard(tx) : suggestKeyboard(tx) },
     });
   } catch (e) {
     console.error("Telegram notify failed:", e);
@@ -382,6 +399,20 @@ export async function handleUpdate(update: Update): Promise<void> {
     await call(token, "sendMessage", {
       chat_id: chatId,
       text: `↔ ${formatMoney(amount)} — чужие деньги (транзит). Не считаются вашими доходами и расходами. Когда отдадите — отметьте «Отдал» в D&N → Ещё → Транзит.`,
+    });
+    return;
+  }
+  if (action === "w") {
+    // Выбрана карта (или «не с карты») → дальше направление.
+    const cardId = Number(centerRaw) || null;
+    setTxCard(tx.id, cardId);
+    await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: cardId ? "Карта запомнена ✓" : "Без карты" });
+    const fresh = getTx(tx.id)!;
+    await call(token, "editMessageText", {
+      ...target,
+      text: `${txText(fresh)}${aiHint(fresh)}\n\n<b>1 из 3.</b> Чьи это деньги?`,
+      parse_mode: "HTML",
+      reply_markup: { inline_keyboard: suggestKeyboard(fresh) },
     });
     return;
   }

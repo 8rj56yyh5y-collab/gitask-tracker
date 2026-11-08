@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { TxRow } from "./TxRow.tsx";
-import { suggestCenters, type Tx } from "@/lib/repo.ts";
+import { needsCard, suggestCenters, type Tx } from "@/lib/repo.ts";
 
 type Center = { id: number; name: string; path: string; color: string; parent_id?: number | null; is_internal?: number };
 
@@ -14,6 +14,7 @@ export function UnassignedItem({ tx, centers }: { tx: Tx; centers: Map<number, C
   return (
     <div className="card card-unassigned">
       <TxRow tx={tx} hidePending />
+      {needsCard(tx) ? <div className="need-note">💳 Укажите, с какой карты</div> : null}
       {tx.needs_note ? <div className="need-note">✍️ Нужен комментарий — на что именно</div> : null}
       <div className="quick-chips">
         {/* Нажатие открывает операцию с выбранным направлением: остаётся выбрать категорию и написать комментарий. */}

@@ -81,3 +81,18 @@ test("нижнее меню: свой набор, не больше пяти, м
   assert.equal(parseNav("home,cards,cash,plans,sales,history,income").length, NAV_MAX);
   assert.deepEqual(parseNav(",,"), DEFAULT_NAV);
 });
+
+test("карта из Apple Pay: не узнали → выбрали вручную → дальше узнаётся сама, лимит считается", () => {
+  repo.createCard({ bank: "Радабанк", last4: "1111", owner: "", kind: "personal", monthly_limit: 1_000_000, mono_account_id: null });
+  repo.createCard({ bank: "Радабанк", last4: "2222", owner: "", kind: "personal", monthly_limit: 1_000_000, mono_account_id: null });
+  const raw = JSON.stringify({ amount: "₴300,00", merchant: "Сильпо", card: "Rada Gold" });
+  assert.equal(repo.findCard({ hint: "Rada Gold" }), null, "две карты банка — угадывать нельзя");
+  const t = repo.insertTx({ amountKop: -30_000, source: "applepay", counterparty: "Сильпо", description: "Rada Gold", raw }).id;
+  assert.ok(repo.needsCard(repo.getTx(t)!));
+  const card = repo.findCard({ last4: "2222" })!.id;
+  repo.setTxCard(t, card);
+  assert.equal(repo.getTx(t)!.card_id, card);
+  assert.equal(repo.getTx(t)!.description, "", "название карты убрано из описания");
+  assert.equal(repo.cardUsage().get(card), 30_000, "оплата попала в лимит карты");
+  assert.equal(repo.findCard({ hint: "rada  gold" })!.id, card, "в следующий раз карта узнаётся по названию");
+});

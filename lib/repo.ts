@@ -44,6 +44,7 @@ export interface Tx {
   card_color?: string | null;
   card_badge?: string | null;
   cashbox_id?: number | null;
+  raw?: string | null;
   cashbox_name?: string | null;
   plan_id?: number | null;
   sale_id?: number | null;
@@ -255,6 +256,12 @@ export function findCard(opts: { last4?: string | null; monoAccount?: string | n
     const r = db.prepare("SELECT * FROM cards WHERE mono_account_id = ? AND archived = 0").get(opts.monoAccount);
     if (r) return r as unknown as Card;
   }
+  // Название из Wallet, которое вы уже однажды привязали к карте.
+  const alias = normAlias(opts.hint);
+  if (alias) {
+    const r = db.prepare("SELECT c.* FROM card_aliases a JOIN cards c ON c.id = a.card_id WHERE a.alias = ? AND c.archived = 0").get(alias);
+    if (r) return r as unknown as Card;
+  }
   const last4 = opts.last4 ?? opts.hint?.match(/(\d{4})\D*$/)?.[1];
   if (last4) {
     const r = db.prepare("SELECT * FROM cards WHERE last4 = ? AND archived = 0").get(last4);
@@ -270,6 +277,43 @@ export function findCard(opts: { last4?: string | null; monoAccount?: string | n
     if (mains.length === 1) return mains[0];
   }
   return null;
+}
+
+const normAlias = (hint: string | null | undefined) => (hint ?? "").trim().toLocaleLowerCase("ru").replace(/\s+/g, " ").slice(0, 80);
+
+/** Название карты, которое прислали Wallet или SMS (лежит в исходных данных операции). */
+export function cardHintOf(tx: { raw?: string | null; source: string }): string {
+  if (!tx.raw) return "";
+  try {
+    const body = JSON.parse(tx.raw) as Record<string, unknown>;
+    return typeof body.card === "string" ? body.card.trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Указать карту операции вручную. Название из Wallet запоминается за этой картой —
+ * следующие оплаты с неё определятся сами.
+ */
+export function setTxCard(txId: number, cardId: number | null) {
+  const db = getDb();
+  const tx = db.prepare("SELECT id, raw, source, description, assigned_at FROM transactions WHERE id = ?").get(txId) as
+    | { id: number; raw: string | null; source: string; description: string; assigned_at: string | null }
+    | undefined;
+  if (!tx) return;
+  db.prepare("UPDATE transactions SET card_id = ? WHERE id = ?").run(cardId, txId);
+  const hint = cardHintOf(tx);
+  if (cardId && hint) {
+    db.prepare("INSERT INTO card_aliases (alias, card_id) VALUES (?, ?) ON CONFLICT(alias) DO UPDATE SET card_id = excluded.card_id").run(normAlias(hint), cardId);
+    // Название карты лежало в описании, пока карта была неизвестна, — убираем.
+    if (!tx.assigned_at && tx.description === hint) db.prepare("UPDATE transactions SET description = '' WHERE id = ?").run(txId);
+  }
+}
+
+/** Карта не определилась, а это оплата из Wallet/SMS — нужно спросить, с какой карты. */
+export function needsCard(tx: { card_id?: number | null; cashbox_id?: number | null; source: string; kind: string }): boolean {
+  return !tx.card_id && !tx.cashbox_id && (tx.source === "applepay" || tx.source === "sms") && tx.kind !== "internal";
 }
 
 /** Сколько списано с карты за текущий месяц (копейки, положительное число). */

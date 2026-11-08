@@ -137,6 +137,25 @@ test("telegram: connect, link chat by code, notify, assign by button", async () 
   assert.equal(calls.length, 0);
 });
 
+test("telegram: unknown card from Apple Pay — first asks «С какой карты?», then remembers", async () => {
+  repo.createCard({ bank: "ПУМБ", last4: "3131", owner: "", kind: "personal", monthly_limit: 0, mono_account_id: null });
+  repo.createCard({ bank: "ПУМБ", last4: "3232", owner: "", kind: "personal", monthly_limit: 0, mono_account_id: null });
+  const raw = JSON.stringify({ amount: "₴99", merchant: "Аптека", card: "ПУМБ Всеукраинская" });
+  const { id } = repo.insertTx({ amountKop: -9900, source: "applepay", counterparty: "Аптека", raw });
+  calls.length = 0;
+  await tg.notifyNewTx(id);
+  const sent = calls.find((c) => c.path.endsWith("/sendMessage"))!.body;
+  assert.match(sent.text, /С какой карты/);
+  const card = repo.findCard({ last4: "3232" })!.id;
+  const btn = sent.reply_markup.inline_keyboard.flat().find((b: any) => b.callback_data === `w:${id}:${card}`);
+  assert.ok(btn && /ПУМБ •3232/.test(btn.text));
+  calls.length = 0;
+  await tg.handleUpdate({ callback_query: { id: "qw", data: `w:${id}:${card}`, message: { chat: { id: 42 }, message_id: 11 } } });
+  assert.equal(repo.getTx(id)!.card_id, card);
+  assert.match(calls.find((c) => c.path.endsWith("/editMessageText"))!.body.text, /1 из 3/);
+  assert.equal(repo.findCard({ hint: "ПУМБ Всеукраинская" })!.id, card);
+});
+
 test("telegram: notify is skipped silently when not linked", async () => {
   setSetting("tg_chat_id", null);
   const { id } = repo.insertTx({ amountKop: -1000, source: "sms" });

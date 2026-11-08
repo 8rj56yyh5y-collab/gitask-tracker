@@ -56,6 +56,12 @@ CREATE TABLE IF NOT EXISTS categories (
   sort INTEGER NOT NULL DEFAULT 0
 );
 
+-- Как карта называется в Wallet/SMS → какая это карта у вас. Запоминается, когда вы выбираете карту вручную.
+CREATE TABLE IF NOT EXISTS card_aliases (
+  alias TEXT PRIMARY KEY,
+  card_id INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS transits (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL,

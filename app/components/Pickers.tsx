@@ -135,3 +135,14 @@ export function CategoryChips({
     </fieldset>
   );
 }
+
+/** Карта операции: «OTP Bank •7777» кнопками; «Не с карты» — значение 0. */
+export function CardChips({ name = "cardId", defaultValue, label = "С какой карты" }: { name?: string; defaultValue?: number | null; label?: string }) {
+  const opts: ChipOption[] = listCards().map((c) => ({
+    value: c.id,
+    label: `${c.bank} •${c.last4}${c.owner ? ` · ${c.owner}` : ""}`,
+    color: cardStyle(c).color,
+  }));
+  opts.push({ value: 0, label: "Не с карты / другая" });
+  return <ChipPicker name={name} options={opts} defaultValue={defaultValue ?? undefined} label={label} />;
+}
