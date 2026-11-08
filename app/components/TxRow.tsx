@@ -25,13 +25,14 @@ export function TxRow({ tx, children, hidePending }: { tx: Tx; children?: React.
   const src = SOURCE[tx.source] ?? tx.source;
   return (
     <div className="tx">
-      {tx.card_bank ? (
-        <BankBadge bank={tx.card_bank} color={tx.card_color} badge={tx.card_badge} size={32} />
-      ) : (
-        <span className="bank-badge" style={{ width: 32, height: 32, background: "var(--line)", color: "var(--muted)", fontSize: 14, borderRadius: 9 }} aria-hidden>
-          {tx.cashbox_id ? "💵" : "₴"}
-        </span>
-      )}
+      <span className={`tx-avatar ${tx.amount > 0 ? "is-in" : ""}`} style={{ "--tc": tx.center_color ?? "var(--accent)" } as React.CSSProperties} aria-hidden>
+        {tx.category_emoji ? tx.category_emoji : tx.amount > 0 ? "↓" : tx.kind === "internal" ? "⇄" : tx.cashbox_id ? "💵" : (tx.counterparty || tx.description || "₴").trim().slice(0, 1).toUpperCase()}
+        {tx.card_bank && (
+          <span className="tx-avatar-bank">
+            <BankBadge bank={tx.card_bank} color={tx.card_color} badge={tx.card_badge} size={18} />
+          </span>
+        )}
+      </span>
       <div className="tx-main">
         <div className="tx-title">{tx.counterparty || tx.description || "Без описания"}</div>
         <div className="muted small">

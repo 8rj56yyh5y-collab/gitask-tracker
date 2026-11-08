@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { addIncomeAction, addTransaction, transferAction } from "../actions.ts";
-import { AccountChips, CategoryChips, CenterChips, ChipPicker, SegTabs } from "../components/Pickers.tsx";
+import { AccountChips, CardChips, CategoryChips, CenterChips, ChipPicker, SegTabs } from "../components/Pickers.tsx";
 import { popularCategories } from "@/lib/categories.ts";
 import { AccountSelect } from "../components/AccountSelect.tsx";
 import { OTHER_INCOME_KINDS } from "@/lib/income.ts";
@@ -51,7 +51,7 @@ export default async function NewTx({ searchParams }: { searchParams: Promise<{ 
             Комментарий — на что именно
             <input name="description" required placeholder="например, продукты на неделю" />
           </label>
-          <AccountChips label="Чем платили" none="Наличными / не важно" />
+          <CardChips label="С какой карты" />
           <More>
             <label>
               Где или кому

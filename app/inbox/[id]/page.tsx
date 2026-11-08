@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { assignTransaction, createTransitAction, linkTransitAction, markIncomeAction, removeTransaction } from "../../actions.ts";
+import { assignTransaction, setTxCardAction, createTransitAction, linkTransitAction, markIncomeAction, removeTransaction } from "../../actions.ts";
 import { listTransits } from "@/lib/transit.ts";
 import { formatMoney } from "@/lib/money.ts";
 import { TxRow } from "../../components/TxRow.tsx";
@@ -9,30 +9,50 @@ import { getCategory, label, suggestedCategories } from "@/lib/categories.ts";
 import { cardHintOf, getTx, listCards, needsCard, suggestCenters } from "@/lib/repo.ts";
 
 // Экран «Куда ушли деньги?» — его открывает «Команда» iOS сразу после оплаты.
-export default async function AssignOne({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ c?: string }> }) {
+export default async function AssignOne({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ c?: string; card_ok?: string }> }) {
   const { id } = await params;
-  const { c: pickedRaw } = await searchParams;
+  const { c: pickedRaw, card_ok } = await searchParams;
   const tx = getTx(Number(id));
   if (!tx) notFound();
   const sugg = new Set(suggestCenters(tx));
   const transits = listTransits(true);
   const isIn = tx.amount > 0;
   const picked = Number(pickedRaw) || null;
+  const recorded = Boolean(tx.cost_center_id && !tx.needs_note);
   // Комментарий, который человек уже писал, — оставляем; иначе подставляем подсказку ИИ.
   const noteDefault = tx.assigned_at && !tx.needs_note ? tx.description : (tx.ai_note ?? "");
   const aiCat = getCategory(tx.ai_category_id);
 
   return (
     <div className="narrow-wide">
-      <h1>{tx.amount > 0 ? "Что это за поступление?" : "На что ушли деньги?"}</h1>
+      <h1>{recorded ? "Операция" : tx.amount > 0 ? "Что это за поступление?" : "На что ушли деньги?"}</h1>
       {tx.amount > 0 && !tx.sale_id && (
         <Link href={`/sales/new?tx=${tx.id}`} className="card alert-budget plain" style={{ display: "block" }}>
           <strong>Это оплата за товар компании?</strong>
           <div className="muted small">Записать как продажу: посчитается ваша комиссия, остальное — долг компании ›</div>
         </Link>
       )}
+      {card_ok && <div className="card ok-note">Карта сохранена ✓</div>}
       <div className="card">
         <TxRow tx={tx} />
+        {!tx.cashbox_id && listCards().length > 0 && (
+          <details className={`card-edit ${needsCard(tx) ? "is-ask" : ""}`} open={needsCard(tx)}>
+            <summary>
+              <span>💳 {tx.card_label ? `Карта: ${tx.card_label}` : needsCard(tx) ? "Карта не определилась — выберите" : "Карта не указана"}</span>
+              <span className="card-edit-btn">{tx.card_id ? "Изменить" : "Указать"}</span>
+            </summary>
+            <form action={setTxCardAction} className="form" style={{ marginTop: 10 }}>
+              <input type="hidden" name="id" value={tx.id} />
+              <CardChips label="С какой карты оплатили" defaultValue={tx.card_id ?? undefined} />
+              {cardHintOf(tx) && (
+                <p className="muted small" style={{ margin: 0 }}>
+                  В Apple Pay карта называется «{cardHintOf(tx)}». D&amp;N запомнит выбор — следующие оплаты с неё определятся сами.
+                </p>
+              )}
+              <button className="btn btn-primary">Сохранить карту</button>
+            </form>
+          </details>
+        )}
       </div>
       <form action={assignTransaction} className="card form">
         <input type="hidden" name="id" value={tx.id} />
@@ -42,21 +62,6 @@ export default async function AssignOne({ params, searchParams }: { params: Prom
             ✨ Похоже на <b>{label(aiCat)}</b>
             {tx.ai_note && <> — «{tx.ai_note}»</>}
           </div>
-        )}
-        {needsCard(tx) && listCards().length > 0 ? (
-          <div className="card-ask">
-            <CardChips label="💳 С какой карты оплатили?" />
-            {cardHintOf(tx) && <p className="muted small" style={{ margin: "6px 0 0" }}>В Apple Pay карта называется «{cardHintOf(tx)}». D&amp;N запомнит выбор — дальше карта определится сама.</p>}
-          </div>
-        ) : (
-          listCards().length > 0 && (
-            <details className="more-fields">
-              <summary>Карта: {tx.card_label ?? (tx.cashbox_name ? `касса «${tx.cashbox_name}»` : "не указана")} · поменять</summary>
-              <div className="form">
-                <CardChips label="С какой карты" defaultValue={tx.card_id ?? (tx.cashbox_id ? undefined : 0)} />
-              </div>
-            </details>
-          )
         )}
         <CenterChips label={isIn ? "1. К какому направлению относится" : "1. Чьи это деньги"} required defaultValue={picked ?? tx.cost_center_id} first={[...sugg]} />
         {!isIn && (

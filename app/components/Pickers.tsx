@@ -143,6 +143,6 @@ export function CardChips({ name = "cardId", defaultValue, label = "С како�
     label: `${c.bank} •${c.last4}${c.owner ? ` · ${c.owner}` : ""}`,
     color: cardStyle(c).color,
   }));
-  opts.push({ value: 0, label: "Не с карты / другая" });
+  opts.push({ value: 0, label: "💵 Наличными / не с карты" });
   return <ChipPicker name={name} options={opts} defaultValue={defaultValue ?? undefined} label={label} />;
 }
