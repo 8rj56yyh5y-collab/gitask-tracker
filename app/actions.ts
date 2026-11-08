@@ -74,6 +74,7 @@ export async function addTransaction(f: FormData) {
     amountKop: direction * toKop(amount),
     occurredAt: date ? new Date(date).toISOString() : undefined,
     ...accountOf(f),
+    ...(f.has("cardId") ? { cardId: num(f, "cardId") || null, cashboxId: null } : {}),
     costCenterId: num(f, "centerId"),
     forWhom: str(f, "forWhom"),
     counterparty: str(f, "counterparty"),
@@ -628,4 +629,12 @@ export async function deleteCardAction(f: FormData) {
   if (id) deleteCard(id);
   refresh();
   redirect("/cards?deleted=1");
+}
+
+/** Поменять карту операции (отдельно от направления и категории). */
+export async function setTxCardAction(f: FormData) {
+  const id = num(f, "id");
+  if (id && f.has("cardId")) setTxCard(id, num(f, "cardId") || null);
+  refresh();
+  redirect(`/inbox/${id}?card_ok=1`);
 }

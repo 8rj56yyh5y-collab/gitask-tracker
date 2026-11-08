@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { formatMoney } from "@/lib/money.ts";
 import { limitState } from "@/lib/limits.ts";
-import { budgetAlerts, groupUsage, listMainCards, monthSpendByCenter, unassignedSummary } from "@/lib/repo.ts";
+import { budgetAlerts, groupUsage, listMainCards, listRecent, monthSpendByCenter, unassignedSummary } from "@/lib/repo.ts";
 import { BudgetLine } from "./components/BudgetLine.tsx";
 import { cashBalances, listCashboxes } from "@/lib/cash.ts";
 import { listPlans, ymd } from "@/lib/plans.ts";
 import { companyDebt } from "@/lib/sales.ts";
 import { normState } from "@/lib/norms.ts";
 import { SetupCard } from "./components/SetupCard.tsx";
-import { MonthMoneyCard } from "./components/MonthMoneyCard.tsx";
+import { HomeHero, QuickActions } from "./components/HomeHero.tsx";
+import { TxRow } from "./components/TxRow.tsx";
+import { cardStyle } from "@/lib/banks.ts";
 import { transitOpenSum } from "@/lib/transit.ts";
 
 export default function Home() {
@@ -25,22 +27,27 @@ export default function Home() {
     .map((c) => ({ c, s: limitState(usage.get(c.id) ?? 0, c.monthly_limit) }))
     .filter((x) => x.s.level === "orange" || x.s.level === "red");
   const month = new Date().toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+  const recent = listRecent(5);
+  void worst;
 
   return (
     <div className="grid grid-home">
+      <HomeHero />
+      <QuickActions />
       <SetupCard />
-      <Link href="/inbox" className={`card alert span-all ${un.count ? "alert-on" : "alert-ok"}`}>
-        {un.count ? (
-          <>
-            <div className="big">{un.count} без направления</div>
-            <div>на {formatMoney(un.sum)} — нажмите и укажите, на что ушли деньги</div>
-          </>
-        ) : (
-          <div className="big">Все операции записаны ✓</div>
-        )}
-      </Link>
 
-      <MonthMoneyCard link />
+      {un.count > 0 && (
+        <Link href="/inbox" className="todo span-all">
+          <span className="todo-dot" aria-hidden>
+            {un.count}
+          </span>
+          <span className="todo-text">
+            <strong>{un.count === 1 ? "Операция ждёт записи" : "Операции ждут записи"}</strong>
+            <span>на {formatMoney(un.sum)} — укажите, на что ушли деньги</span>
+          </span>
+          <span className="todo-go">›</span>
+        </Link>
+      )}
 
       {alerts.length > 0 && (
         <section className="card span-all alert-budget">
@@ -122,7 +129,7 @@ export default function Home() {
       })()}
 
       <section className="card">
-        <h2>Расходы · {month}</h2>
+        <h2>Траты по направлениям · {month}</h2>
         <div className="big">{formatMoney(total)}</div>
         {spend.length === 0 && <p className="muted">Пока нет расходов.</p>}
         <ul className="bars">
@@ -134,30 +141,50 @@ export default function Home() {
         </ul>
       </section>
 
-      <Link href="/analytics" className="card">
-        <h2>Аналитика ›</h2>
-        <p className="muted small" style={{ margin: 0 }}>
-          Любой месяц, год по месяцам, сравнение с прошлым месяцем, разбор от ИИ.
-        </p>
-      </Link>
+      <section className="card span-all recent">
+        <div className="row-between">
+          <h2 style={{ margin: 0 }}>Последние операции</h2>
+          <Link href="/history" className="link-quiet">
+            Все ›
+          </Link>
+        </div>
+        {recent.length === 0 && <p className="muted small">Пока пусто. Нажмите «Расход» выше, чтобы записать первую.</p>}
+        {recent.map((t) => (
+          <Link key={t.id} href={`/inbox/${t.id}`} className="plain">
+            <TxRow tx={t} />
+          </Link>
+        ))}
+      </section>
 
-      <Link href="/cards" className="card">
-        <h2>Лимиты карт ›</h2>
-        {limited.length === 0 ? (
-          <p className="muted">Добавьте карты и лимиты, чтобы видеть, сколько осталось.</p>
-        ) : (
-          <>
-            <div>
-              Всего списано <strong>{formatMoney(totalUsed)}</strong> из {formatMoney(totalLimit)}
-            </div>
-            {worst.map(({ c, s }) => (
-              <div key={c.id} className={`pill pill-${s.level}`}>
-                {c.bank} *{c.last4}: {s.left >= 0 ? `осталось ${formatMoney(s.left)}` : `перелимит ${formatMoney(-s.left)}`}
-              </div>
-            ))}
-          </>
-        )}
-      </Link>
+      {cards.length > 0 && (
+        <section className="span-all">
+          <div className="row-between strip-head">
+            <h2 style={{ margin: 0 }}>Карты</h2>
+            <Link href="/cards" className="link-quiet">
+              {limited.length ? `списано ${formatMoney(totalUsed)} из ${formatMoney(totalLimit)}` : "Все ›"}
+            </Link>
+          </div>
+          <div className="card-strip">
+            {cards.map((c) => {
+              const used = usage.get(c.id) ?? 0;
+              const st = c.monthly_limit > 0 ? limitState(used, c.monthly_limit) : null;
+              const cs = cardStyle(c);
+              return (
+                <Link key={c.id} href={`/cards/${c.id}`} className="mini-card" style={{ "--c": cs.color, "--ink": cs.ink } as React.CSSProperties}>
+                  <span className="mini-card-bank">{c.bank}</span>
+                  <span className="mini-card-num">•• {c.last4}</span>
+                  <span className="mini-card-sum">{st ? (st.left >= 0 ? `осталось ${formatMoney(st.left)}` : `перелимит ${formatMoney(-st.left)}`) : `списано ${formatMoney(used)}`}</span>
+                  {st && (
+                    <span className="mini-card-track">
+                      <i style={{ width: `${Math.min(100, (used / c.monthly_limit) * 100)}%` }} className={`lvl-${st.level}`} />
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
