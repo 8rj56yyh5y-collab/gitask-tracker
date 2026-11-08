@@ -4,9 +4,9 @@ import { assignTransaction, createTransitAction, linkTransitAction, markIncomeAc
 import { listTransits } from "@/lib/transit.ts";
 import { formatMoney } from "@/lib/money.ts";
 import { TxRow } from "../../components/TxRow.tsx";
-import { CategoryChips, CenterChips } from "../../components/Pickers.tsx";
+import { CardChips, CategoryChips, CenterChips } from "../../components/Pickers.tsx";
 import { getCategory, label, suggestedCategories } from "@/lib/categories.ts";
-import { getTx, suggestCenters } from "@/lib/repo.ts";
+import { cardHintOf, getTx, listCards, needsCard, suggestCenters } from "@/lib/repo.ts";
 
 // Экран «Куда ушли деньги?» — его открывает «Команда» iOS сразу после оплаты.
 export default async function AssignOne({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ c?: string }> }) {
@@ -42,6 +42,21 @@ export default async function AssignOne({ params, searchParams }: { params: Prom
             ✨ Похоже на <b>{label(aiCat)}</b>
             {tx.ai_note && <> — «{tx.ai_note}»</>}
           </div>
+        )}
+        {needsCard(tx) && listCards().length > 0 ? (
+          <div className="card-ask">
+            <CardChips label="💳 С какой карты оплатили?" />
+            {cardHintOf(tx) && <p className="muted small" style={{ margin: "6px 0 0" }}>В Apple Pay карта называется «{cardHintOf(tx)}». D&amp;N запомнит выбор — дальше карта определится сама.</p>}
+          </div>
+        ) : (
+          listCards().length > 0 && (
+            <details className="more-fields">
+              <summary>Карта: {tx.card_label ?? (tx.cashbox_name ? `касса «${tx.cashbox_name}»` : "не указана")} · поменять</summary>
+              <div className="form">
+                <CardChips label="С какой карты" defaultValue={tx.card_id ?? (tx.cashbox_id ? undefined : 0)} />
+              </div>
+            </details>
+          )
         )}
         <CenterChips label={isIn ? "1. К какому направлению относится" : "1. Чьи это деньги"} required defaultValue={picked ?? tx.cost_center_id} first={[...sugg]} />
         {!isIn && (

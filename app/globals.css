@@ -694,3 +694,4 @@ i.out, .legend i.out { background: color-mix(in srgb, var(--text) 55%, transpare
 .chip-check:has(input:checked) { background: var(--primary); border-color: var(--primary); color: var(--primary-text) !important; }
 .add-link .set-head::after { content: none; }
 .tx-note { font-size: 13px; color: var(--text); margin-top: 2px; overflow-wrap: anywhere; }
+.card-ask { padding: 12px; border-radius: 14px; background: color-mix(in srgb, var(--orange) 9%, var(--card)); }

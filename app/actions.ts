@@ -24,6 +24,7 @@ import { toKop, parseAmount } from "@/lib/money.ts";
 import {
   archiveCard,
   deleteCard,
+  setTxCard,
   archiveCenter,
   assignTx,
   createCard,
@@ -92,6 +93,7 @@ export async function assignTransaction(f: FormData) {
   const note = str(f, "description");
   if (!note) throw new Error("Напишите комментарий: на что именно ушли деньги");
   if (tx && tx.amount < 0 && !num(f, "categoryId")) throw new Error("Выберите категорию");
+  if (f.has("cardId") && str(f, "cardId") !== "") setTxCard(id, num(f, "cardId") || null);
   assignTx(id, centerId, str(f, "forWhom"), note);
   setTxDetails(id, { categoryId: num(f, "categoryId"), note });
   refresh();
