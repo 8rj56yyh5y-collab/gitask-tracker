@@ -800,3 +800,9 @@ body { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 .welcome-points li { background: var(--card); box-shadow: var(--shadow); border-radius: 16px; padding: 14px 16px; font-size: 15px; line-height: 1.4; }
 .welcome-actions { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
 .welcome-actions form .btn { width: 100%; }
+.acc-edit > summary { list-style: none; }
+.acc-edit > summary::-webkit-details-marker { display: none; }
+.acc-edit[open] { flex-basis: 100%; order: 10; }
+.acc-edit[open] > summary { display: none; }
+.acc-edit-form { margin-top: 4px; padding: 12px; border-radius: 14px; background: var(--field); }
+.acc-edit-form input { background: var(--card); }

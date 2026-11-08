@@ -59,3 +59,18 @@ test("новый пароль отменяет старый вход; удале
   assert.equal(existsSync(file), false);
   assert.throws(() => tenant.runAs(acc.id, () => repo.listRecent(1)), /не найден/);
 });
+
+test("имя и логин можно поменять; пароль и вход остаются", () => {
+  const { account, password } = accounts.createAccount("Анна", "anna");
+  const cookie = tenant.accountCookieValue(account.id, account.ver);
+  accounts.updateAccount(account.id, "Анна К.", "Anna.K");
+  const a = accounts.getAccount(account.id)!;
+  assert.equal(a.name, "Анна К.");
+  assert.equal(a.login, "anna.k");
+  assert.ok(accounts.checkLogin("anna.k", password));
+  assert.equal(accounts.checkLogin("anna", password), null);
+  assert.ok(accounts.accountSessionOk(cookie), "уже вошедший остаётся в аккаунте");
+  accounts.createAccount("Борис", "boris");
+  assert.throws(() => accounts.updateAccount(account.id, "Анна", "boris"), /уже есть/);
+  assert.throws(() => accounts.updateAccount(account.id, "Анна", "a"), /Логин/);
+});
