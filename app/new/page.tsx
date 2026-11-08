@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { addIncomeAction, addTransaction, transferAction } from "../actions.ts";
-import { AccountChips, CardChips, CategoryChips, CenterChips, ChipPicker, SegTabs } from "../components/Pickers.tsx";
+import { AccountChips, CategoryChips, CenterChips, ChipPicker, SegTabs } from "../components/Pickers.tsx";
 import { popularCategories } from "@/lib/categories.ts";
 import { AccountSelect } from "../components/AccountSelect.tsx";
+import { CashCenterLink } from "../components/CashCenterLink.tsx";
 import { OTHER_INCOME_KINDS } from "@/lib/income.ts";
 
 const TABS = [
@@ -40,18 +41,35 @@ export default async function NewTx({ searchParams }: { searchParams: Promise<{ 
     <div className="narrow">
       <h1>Новая операция</h1>
       <SegTabs tabs={TABS} active={tab} />
+      {tab === "out" && (
+        <div className="explain">
+          <span>🧭</span>
+          <span>
+            <b>Направление</b> — чьи это деньги (личные, работа). По нему видно, сколько ушло за месяц.
+          </span>
+          <span>💵</span>
+          <span>
+            <b>Касса</b> — где лежали наличные. Её остаток меняется, только если выбрать её в пункте 4.
+          </span>
+        </div>
+      )}
 
       {tab === "out" && (
         <form action={addTransaction} className="card form form-big">
           <input type="hidden" name="direction" value="out" />
           <Amount />
-          <CenterChips required label="Чьи это деньги" includeInternal={false} />
-          <CategoryChips required suggested={popularCategories(6)} />
+          <CenterChips required label="1. Чьи это деньги — направление" includeInternal={false} />
+          <CategoryChips required label="2. На что именно — категория" suggested={popularCategories(6)} />
           <label>
-            Комментарий — на что именно
+            3. Комментарий
             <input name="description" required placeholder="например, продукты на неделю" />
           </label>
-          <CardChips label="С какой карты" />
+          <AccountChips
+            label="4. Откуда списались деньги"
+            none="Наличными, без кассы"
+            hint="Выберите кассу — расход появится в её истории, а остаток уменьшится. Карту — трата попадёт в её лимит."
+          />
+          <CashCenterLink />
           <More>
             <label>
               Где или кому
@@ -74,7 +92,7 @@ export default async function NewTx({ searchParams }: { searchParams: Promise<{ 
         <form action={addIncomeAction} className="card form form-big">
           <Amount />
           <ChipPicker name="kind" label="Что это" defaultValue="Ставка" options={["Ставка", ...OTHER_INCOME_KINDS].map((k) => ({ value: k, label: k }))} />
-          <AccountChips label="Куда пришли" none="Наличными / не важно" />
+          <AccountChips label="Куда пришли деньги" none="Наличными, без кассы" hint="Выберите кассу — приход появится в её истории, а остаток вырастет." />
           <More>
             <label>
               Название (если «Другое»)

@@ -75,7 +75,6 @@ export async function addTransaction(f: FormData) {
     amountKop: direction * toKop(amount),
     occurredAt: date ? new Date(date).toISOString() : undefined,
     ...accountOf(f),
-    ...(f.has("cardId") ? { cardId: num(f, "cardId") || null, cashboxId: null } : {}),
     costCenterId: num(f, "centerId"),
     forWhom: str(f, "forWhom"),
     counterparty: str(f, "counterparty"),

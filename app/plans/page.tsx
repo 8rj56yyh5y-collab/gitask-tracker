@@ -119,7 +119,7 @@ export default async function Plans({ searchParams }: { searchParams: Promise<{ 
             <input name="amount" inputMode="decimal" defaultValue={debt > 0 ? debt / 100 : ""} required className="amount-input" aria-label="Сумма, ₴" placeholder="0" />
             <span className="amount-cur" aria-hidden>₴</span>
           </label>
-          <AccountChips label="Откуда отдали" none="Наличными / не важно" />
+          <AccountChips label="Откуда отдали" none="Наличными, без кассы" />
           <button className="btn btn-primary btn-big">Отдал компании</button>
         </form>
       ) : (
@@ -166,7 +166,7 @@ export default async function Plans({ searchParams }: { searchParams: Promise<{ 
                 <input name="due" type="date" />
               </label>
               {!isIn && <CenterChips label="Направление" withNone="Выберу позже" includeInternal={false} />}
-              <AccountChips label={isIn ? "Куда придут деньги" : "Откуда платить"} none="Решу потом" />
+              <AccountChips label={isIn ? "Куда придут деньги" : "Откуда будете платить"} none="Решу потом" />
               <label className="switch">
                 <input type="checkbox" name="repeat" value="month" />
                 <span className="switch-ui" aria-hidden />

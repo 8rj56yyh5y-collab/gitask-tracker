@@ -68,7 +68,7 @@ export default async function PlanPage({ params, searchParams }: { params: Promi
             <span className="amount-cur" aria-hidden>₴</span>
           </label>
           <p className="muted small" style={{ margin: "-6px 0 0", textAlign: "center" }}>можно всю сумму или часть</p>
-          <AccountChips label={isIn ? "Куда пришли" : "Чем платили"} defaultValue={acc} none="Наличными / не важно" />
+          <AccountChips label={isIn ? "Куда пришли деньги" : "Откуда списались деньги"} defaultValue={acc} none="Наличными, без кассы" hint={isIn ? undefined : "Если выбрать кассу — оплата появится в её истории и уменьшит остаток."} />
           <details className="more-fields">
             <summary>Другая дата</summary>
             <div className="form">

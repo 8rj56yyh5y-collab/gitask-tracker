@@ -25,6 +25,11 @@ export default async function Cash({ searchParams }: { searchParams: Promise<{ n
         </Link>
       </div>
 
+      <p className="page-hint">
+        Касса — это где лежат наличные: дома, в офисе, у отдела. Записывайте сюда приход и расход — остаток всегда будет точным. Если у кассы
+        указано направление, её расходы сразу считаются тратами этого направления.
+      </p>
+
       <section className="summary-hero">
         <div className="summary-label">Наличных во всех кассах</div>
         <div className="summary-value">{formatMoney(total)}</div>

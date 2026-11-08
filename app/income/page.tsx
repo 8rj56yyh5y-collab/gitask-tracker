@@ -78,7 +78,7 @@ export default async function Income({ searchParams }: { searchParams: Promise<{
             От кого
             <input name="payer" placeholder="например, работодатель" />
           </label>
-          <AccountChips label="Куда приходит" none="Не указано" />
+          <AccountChips label="Куда приходит" none="Не указано" hint="Выберите кассу — ставка будет добавляться к её остатку." />
           <label className="check">
             <input type="checkbox" name="auto" value="1" defaultChecked /> Записывать автоматически каждый месяц
           </label>
