@@ -1,5 +1,15 @@
 import Link from "next/link";
-import { connectMonobankAction, connectTelegramAction, disconnectTelegramAction, setNavAction, setThemeAction } from "../actions.ts";
+import {
+  connectMonobankAction,
+  connectTelegramAction,
+  createAccountAction,
+  deleteAccountAction,
+  disconnectTelegramAction,
+  resetAccountAction,
+  setNavAction,
+  setThemeAction,
+} from "../actions.ts";
+import { currentIngestKey, isOwner, listAccounts } from "@/lib/accounts.ts";
 import { NAV_COOKIE, NAV_ITEMS, NAV_MAX, parseNav } from "@/lib/nav.ts";
 import { SubmitButton } from "../components/SubmitButton.tsx";
 import { CopyField } from "../components/CopyField.tsx";
@@ -32,13 +42,21 @@ function SecHead({ icon, title, status, ok }: { icon: string; title: string; sta
 export default async function Settings({
   searchParams,
 }: {
-  searchParams: Promise<{ tg_error?: string; mono_error?: string; mono_ok?: string; nav_ok?: string }>;
+  searchParams: Promise<{ tg_error?: string; mono_error?: string; mono_ok?: string; nav_ok?: string; acc?: string }>;
 }) {
   const sp = await searchParams;
   const tg = telegramState();
   const base = await publicBase();
   const https = base.startsWith("https://");
-  const ingestKey = process.env.DN_INGEST_TOKEN ?? "";
+  const ingestKey = currentIngestKey();
+  const owner = isOwner();
+  const accounts = owner ? listAccounts() : [];
+  let flash: { login: string; name: string; password: string } | null = null;
+  try {
+    flash = JSON.parse((await cookies()).get("dn_flash")?.value ?? "null");
+  } catch {
+    flash = null;
+  }
   const theme = normalizeTheme((await cookies()).get(THEME_COOKIE)?.value);
   const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const today = ymd(new Date());
@@ -269,6 +287,65 @@ export default async function Settings({
         </p>
         </div>
       </details>
+
+      {owner && (
+        <details className="card set-sec" id="accounts" open={Boolean(sp.acc)}>
+          <summary>
+            <SecHead icon="👥" title="Доступ для других" status={accounts.length ? `аккаунтов: ${accounts.length}` : "только вы"} />
+          </summary>
+          <div className="form set-body">
+            <p className="small" style={{ margin: 0 }}>
+              Дайте D&amp;N попробовать другим. У каждого — свой вход и <b>свои данные</b>: ваши карты и операции они не увидят, а вы — их.
+            </p>
+            {flash && (
+              <div className="card ok-note" style={{ margin: 0, color: "var(--text)" }}>
+                <strong>Аккаунт «{flash.name}» готов. Отправьте человеку:</strong>
+                <CopyField
+                  value={`D&N — учёт денег\nСайт: ${base}\nЛогин: ${flash.login}\nПароль: ${flash.password}`}
+                  label="данные для входа"
+                />
+                <p className="muted small" style={{ margin: 0 }}>Пароль показывается только сейчас. Забудете — нажмите «Новый пароль».</p>
+              </div>
+            )}
+            {accounts.map((a) => (
+              <div key={a.id} className="acc-row">
+                <span className="set-title">
+                  <strong>{a.name}</strong>
+                  <span className="muted">логин: {a.login}</span>
+                </span>
+                <form action={resetAccountAction}>
+                  <input type="hidden" name="id" value={a.id} />
+                  <input type="hidden" name="login" value={a.login} />
+                  <input type="hidden" name="name" value={a.name} />
+                  <button className="btn btn-sm">Новый пароль</button>
+                </form>
+                <details className="acc-del">
+                  <summary className="btn btn-sm btn-ghost danger">Удалить</summary>
+                  <form action={deleteAccountAction} className="acc-del-confirm">
+                    <input type="hidden" name="id" value={a.id} />
+                    <span className="small">Удалить «{a.name}» вместе со всеми его данными?</span>
+                    <button className="btn btn-sm danger-btn">Да, удалить</button>
+                  </form>
+                </details>
+              </div>
+            ))}
+            <form action={createAccountAction} className="form">
+              <div className="grid-2-tight">
+                <label>
+                  Имя
+                  <input name="name" required placeholder="например, Олег" />
+                </label>
+                <label>
+                  Логин (латиницей)
+                  <input name="login" required pattern="[a-zA-Z0-9._\-]{3,30}" autoCapitalize="none" placeholder="oleg" />
+                </label>
+              </div>
+              <button className="btn btn-primary">Создать аккаунт</button>
+              <p className="muted small" style={{ margin: 0 }}>Пароль придумается сам — вы увидите его один раз и сможете переслать.</p>
+            </form>
+          </div>
+        </details>
+      )}
 
       <form action="/logout" method="post">
         <button className="btn btn-ghost">Выйти</button>

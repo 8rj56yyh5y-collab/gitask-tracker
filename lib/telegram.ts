@@ -6,7 +6,8 @@ import { canAutoCredit } from "./income.ts";
 import { cardHintOf, listCards, listMainCards, needsCard, setTxCard } from "./repo.ts";
 import { getCategory, label, listCategories, markNeedsNote, setTxDetails, suggestedCategories } from "./categories.ts";
 import { createTransit, linkTxToTransit, listTransits } from "./transit.ts";
-import { getDb } from "./db.ts";
+import { getDb, getMainDb } from "./db.ts";
+import { MAIN, currentTenant } from "./tenant.ts";
 import { getPlan, markReminded, payPlan, plansToRemind, undoPlanPayment, type Plan } from "./plans.ts";
 
 // Уведомления в Telegram: после каждой новой операции бот присылает сообщение
@@ -50,10 +51,16 @@ export function telegramSecret(): string | null {
 
 /** Проверяет токен бота, регистрирует вебхук и выдаёт код для привязки чата. */
 export async function connectTelegram(token: string, publicUrl: string): Promise<string> {
+  const tenant = currentTenant();
+  if (tenant !== MAIN) {
+    // Один бот — один аккаунт: иначе уведомления владельца бота перестанут приходить.
+    const ownerBot = getMainDb().prepare("SELECT value FROM settings WHERE key = 'tg_token'").get() as { value: string } | undefined;
+    if (ownerBot?.value === token) throw new Error("Этот бот уже подключён к другому аккаунту. Создайте своего бота в @BotFather.");
+  }
   const me = await call<{ username: string }>(token, "getMe", {});
   const secret = randomBytes(24).toString("hex");
   await call(token, "setWebhook", {
-    url: `${publicUrl}/api/telegram`,
+    url: tenant === MAIN ? `${publicUrl}/api/telegram` : `${publicUrl}/api/telegram?a=${tenant}`,
     secret_token: secret,
     allowed_updates: ["message", "callback_query"],
   });

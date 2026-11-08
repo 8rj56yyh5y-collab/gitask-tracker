@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
-import { bearer, ingestTokenOk } from "@/lib/auth.ts";
+import { bearer } from "@/lib/auth.ts";
+import { tenantForKey } from "@/lib/accounts.ts";
+import { MAIN, runAs } from "@/lib/tenant.ts";
 import { parseAmount, toKop } from "@/lib/money.ts";
 import { parseBankMessage } from "@/lib/sms.ts";
 import { findCard, insertTx, monobankConnected } from "@/lib/repo.ts";
@@ -32,11 +34,16 @@ async function readBody(req: Request): Promise<Record<string, unknown> | null> {
 }
 
 export async function POST(req: Request) {
-  if (!ingestTokenOk(bearer(req))) {
-    noteShortcutSignal("bad_key");
+  // По ключу понятно, чей это аккаунт: операция попадёт в его базу.
+  const tenant = tenantForKey(bearer(req));
+  if (!tenant) {
+    runAs(MAIN, () => noteShortcutSignal("bad_key"));
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  return runAs(tenant, () => handle(req));
+}
 
+async function handle(req: Request) {
   const body = await readBody(req);
   if (!body) {
     noteShortcutSignal("no_data");

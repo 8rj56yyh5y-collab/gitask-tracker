@@ -15,7 +15,11 @@ export function CopyField({ value, label }: { value: string; label?: string }) {
   }
   return (
     <div className="copy-field">
-      <input readOnly value={value} aria-label={label} onFocus={(e) => e.currentTarget.select()} onClick={(e) => e.currentTarget.select()} />
+      {value.includes("\n") ? (
+        <textarea readOnly value={value} aria-label={label} rows={value.split("\n").length} onFocus={(e) => e.currentTarget.select()} />
+      ) : (
+        <input readOnly value={value} aria-label={label} onFocus={(e) => e.currentTarget.select()} onClick={(e) => e.currentTarget.select()} />
+      )}
       <button type="button" className="btn btn-sm copy-btn" onClick={copy} aria-label={`Скопировать${label ? ": " + label : ""}`}>
         {state === "ok" ? "✓" : state === "fail" ? "!" : (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
