@@ -63,13 +63,52 @@ export function CenterChips({
   return <ChipPicker name={name} options={opts} defaultValue={defaultValue ?? (withNone ? "" : undefined)} required={required} label={label} />;
 }
 
-/** Карта или касса: «card:ID» / «cash:ID». */
-export function AccountChips({ name = "account", defaultValue = "", label = "Откуда", none = "Не указано" }: { name?: string; defaultValue?: string; label?: string; none?: string | null }) {
-  const opts: ChipOption[] = [];
-  if (none) opts.push({ value: "", label: none });
-  for (const b of listCashboxes()) opts.push({ value: `cash:${b.id}`, label: `💵 ${b.name}`, color: null });
-  for (const c of listCards()) opts.push({ value: `card:${c.id}`, label: `${c.bank} •${c.last4}`, color: cardStyle(c).color });
-  return <ChipPicker name={name} options={opts} defaultValue={defaultValue} label={label} />;
+/**
+ * Откуда деньги (или куда пришли): карта или касса с наличными — двумя понятными группами.
+ * Значения «card:ID» / «cash:ID»; пустое — «без карты и кассы».
+ * Если выбрать кассу, операция появится в её истории и изменит остаток.
+ */
+export function AccountChips({
+  name = "account",
+  defaultValue = "",
+  label = "Откуда списались деньги",
+  none = "Не важно",
+  hint,
+}: {
+  name?: string;
+  defaultValue?: string;
+  label?: string;
+  none?: string | null;
+  hint?: string;
+}) {
+  const cards = listCards();
+  const boxes = listCashboxes();
+  const radio = (value: string, text: React.ReactNode, color?: string | null) => (
+    <label key={value || "none"} className="chip-opt">
+      <input type="radio" name={name} value={value} defaultChecked={defaultValue === value} data-center={value.startsWith("cash:") ? (boxes.find((b) => `cash:${b.id}` === value)?.center_id ?? "") : undefined} />
+      {color && <i className="chip-dot" style={{ background: color }} />}
+      <span>{text}</span>
+    </label>
+  );
+  return (
+    <fieldset className="chips-field">
+      <legend>{label}</legend>
+      {cards.length > 0 && (
+        <div className="src-group">
+          <div className="src-title">💳 Карта</div>
+          <div className="chips">{cards.map((c) => radio(`card:${c.id}`, `${c.bank} •${c.last4}`, cardStyle(c).color))}</div>
+        </div>
+      )}
+      {boxes.length > 0 && (
+        <div className="src-group">
+          <div className="src-title">💵 Касса с наличными</div>
+          <div className="chips">{boxes.map((b) => radio(`cash:${b.id}`, b.name, b.color))}</div>
+        </div>
+      )}
+      {none && <div className="chips src-none">{radio("", none)}</div>}
+      {hint && <p className="muted small src-hint">{hint}</p>}
+    </fieldset>
+  );
 }
 
 /** Вкладки-ссылки сверху формы: «Расход · Доход · Перевод». */

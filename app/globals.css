@@ -812,3 +812,8 @@ body { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 .acc-login[open] > summary { display: inline-flex; margin-bottom: 8px; }
 .acc-login-body { padding: 12px; border-radius: 14px; background: color-mix(in srgb, var(--accent) 8%, var(--card)); display: flex; flex-direction: column; gap: 8px; }
 .acc-login-body textarea { background: var(--card); }
+.src-group + .src-group, .src-none { margin-top: 10px; }
+.src-title { font-size: 12px; font-weight: 700; color: var(--muted); margin: 2px 0 6px; }
+.src-hint { margin: 8px 0 0; }
+.explain { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; font-size: 13px; padding: 12px 14px; border-radius: 14px; background: var(--field); color: var(--muted); margin-bottom: 4px; }
+.explain b { color: var(--text); }
