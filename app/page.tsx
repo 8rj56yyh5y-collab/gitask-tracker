@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getSetting } from "@/lib/settings.ts";
+import { getDb } from "@/lib/db.ts";
 import { formatMoney } from "@/lib/money.ts";
 import { limitState } from "@/lib/limits.ts";
 import { budgetAlerts, groupUsage, listMainCards, listRecent, monthSpendByCenter, unassignedSummary } from "@/lib/repo.ts";
@@ -14,6 +17,8 @@ import { cardStyle } from "@/lib/banks.ts";
 import { transitOpenSum } from "@/lib/transit.ts";
 
 export default function Home() {
+  // Новый человек без единой операции — сначала короткое знакомство.
+  if (!getSetting("welcome_seen") && !getDb().prepare("SELECT 1 FROM transactions LIMIT 1").get()) redirect("/welcome");
   const un = unassignedSummary();
   const spend = monthSpendByCenter();
   const alerts = budgetAlerts();

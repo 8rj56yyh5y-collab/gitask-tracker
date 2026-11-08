@@ -34,6 +34,7 @@ export default function More() {
       "Настройка и помощь",
       [
         { href: "/help", icon: "help", title: "Помощь", note: "Короткие ответы: что где и как" },
+        { href: "/welcome", icon: "home", title: "Знакомство с D&N", note: "4 экрана: как всё устроено" },
         { href: "/settings", icon: "settings", title: "Настройки", note: "Telegram, Monobank, Apple Pay, тема" },
       ],
     ],

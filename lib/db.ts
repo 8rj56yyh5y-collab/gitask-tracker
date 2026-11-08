@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
+import { MAIN, currentTenant } from "./tenant.ts";
 
 // MVP хранит данные в SQLite (встроен в Node). Для продакшена — PostgreSQL (этап 2).
 
@@ -60,6 +61,18 @@ CREATE TABLE IF NOT EXISTS categories (
 CREATE TABLE IF NOT EXISTS card_aliases (
   alias TEXT PRIMARY KEY,
   card_id INTEGER NOT NULL
+);
+
+-- Дополнительные аккаунты (хранятся только в основной базе). У каждого — своя база acc-<id>.db.
+CREATE TABLE IF NOT EXISTS accounts (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  login TEXT NOT NULL UNIQUE,
+  salt TEXT NOT NULL,
+  hash TEXT NOT NULL,
+  ver INTEGER NOT NULL DEFAULT 1,
+  ingest_token TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS transits (
@@ -167,13 +180,59 @@ const DEFAULT_CENTERS: [string, string, number][] = [
   ["Внутренние переводы", "#6b7280", 1],
 ];
 
-let db: DatabaseSync | null = null;
+/** Направления для нового (не основного) аккаунта — общие, понятные всем. */
+const STARTER_CENTERS: [string, string, number][] = [
+  ["Личные", "#9333ea", 0],
+  ["Семья", "#db2777", 0],
+  ["Работа", "#2563eb", 0],
+  ["Внутренние переводы", "#6b7280", 1],
+];
 
+const dbs = new Map<string, DatabaseSync>();
+
+function baseFile(): string {
+  return process.env.DN_DB_PATH ?? path.join(process.cwd(), "data", "dn.db");
+}
+
+/** Файл базы аккаунта: основной — как раньше, остальные — рядом, acc-<id>.db. */
+export function tenantFile(tenant: string): string {
+  const base = baseFile();
+  if (tenant === MAIN || base === ":memory:") return base;
+  return path.join(path.dirname(base), `acc-${tenant}.db`);
+}
+
+/** База текущего аккаунта (по входу или явно заданного). */
 export function getDb(): DatabaseSync {
-  if (db) return db;
-  const file = process.env.DN_DB_PATH ?? path.join(process.cwd(), "data", "dn.db");
+  return openTenant(currentTenant());
+}
+
+/** Основная база: в ней же список дополнительных аккаунтов. */
+export function getMainDb(): DatabaseSync {
+  return openTenant(MAIN);
+}
+
+/** Закрыть базу аккаунта (перед удалением файла). */
+export function closeTenant(tenant: string) {
+  dbs.get(tenant)?.close();
+  dbs.delete(tenant);
+}
+
+function openTenant(tenant: string): DatabaseSync {
+  const cached = dbs.get(tenant);
+  if (cached) return cached;
+  if (tenant !== MAIN) {
+    const known = getMainDb().prepare("SELECT 1 FROM accounts WHERE id = ?").get(tenant);
+    if (!known) throw new Error("Аккаунт не найден или удалён. Войдите снова.");
+  }
+  const file = tenantFile(tenant);
   if (file !== ":memory:") fs.mkdirSync(path.dirname(file), { recursive: true });
-  db = new DatabaseSync(file);
+  const db = new DatabaseSync(file);
+  dbs.set(tenant, db);
+  migrate(db, tenant);
+  return db;
+}
+
+function migrate(db: DatabaseSync, tenant: string) {
   db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
   db.exec(SCHEMA);
   // Миграции для баз, созданных старыми версиями.
@@ -216,14 +275,14 @@ export function getDb(): DatabaseSync {
   const count = db.prepare("SELECT COUNT(*) AS n FROM cost_centers").get() as { n: number };
   if (count.n === 0) {
     const ins = db.prepare("INSERT INTO cost_centers (name, color, is_internal) VALUES (?, ?, ?)");
-    for (const [name, color, internal] of DEFAULT_CENTERS) ins.run(name, color, internal);
+    for (const [name, color, internal] of tenant === MAIN ? DEFAULT_CENTERS : STARTER_CENTERS) ins.run(name, color, internal);
   }
   // Один раз: «Личные…» — это мои деньги (входит в «Мои деньги за месяц»). Дальше — как отметит человек.
   if (!db.prepare("SELECT 1 FROM settings WHERE key = 'personal_marked'").get()) {
     db.exec("UPDATE cost_centers SET is_personal = 1 WHERE name LIKE 'Личн%' OR name LIKE 'личн%' OR name LIKE 'Особист%'");
     db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('personal_marked', '1')").run();
   }
-  return db;
+  return;
 }
 
 /**

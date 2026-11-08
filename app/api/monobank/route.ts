@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { bearer, ingestTokenOk } from "@/lib/auth.ts";
+import { bearer } from "@/lib/auth.ts";
+import { tenantForKey } from "@/lib/accounts.ts";
+import { currentTenant, runAs } from "@/lib/tenant.ts";
 import { saveMonoItem } from "@/lib/monobank.ts";
 import { revalidatePath } from "next/cache";
 import { notifyNewTx } from "@/lib/telegram.ts";
@@ -12,12 +14,17 @@ import { matchPlanForTx } from "@/lib/plans.ts";
 // { type: "StatementItem", data: { account, statementItem: { id, time, description, mcc, amount, currencyCode, ... } } }
 
 export async function GET(req: Request) {
-  if (!ingestTokenOk(bearer(req))) return new NextResponse("unauthorized", { status: 401 });
+  if (!tenantForKey(bearer(req))) return new NextResponse("unauthorized", { status: 401 });
   return new NextResponse("ok");
 }
 
 export async function POST(req: Request) {
-  if (!ingestTokenOk(bearer(req))) return new NextResponse("unauthorized", { status: 401 });
+  const tenant = tenantForKey(bearer(req));
+  if (!tenant) return new NextResponse("unauthorized", { status: 401 });
+  return runAs(tenant, () => handle(req));
+}
+
+async function handle(req: Request) {
   let body: {
     type?: string;
     data?: {
@@ -49,10 +56,11 @@ export async function POST(req: Request) {
     matchPlanForTx(saved.id);
     // Monobank ждёт быстрый ответ: подсказку ИИ и уведомление делаем в фоне.
     const id = saved.id;
-    void (async () => {
+    const tenant = currentTenant();
+    void runAs(tenant, async () => {
       await suggestForTx(id).catch(() => {});
       await notifyNewTx(id).catch(() => {});
-    })();
+    });
   }
   revalidatePath("/", "layout");
   return new NextResponse("ok");

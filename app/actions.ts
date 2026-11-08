@@ -19,6 +19,7 @@ import { addCategory, renameCategory, setCategoryEnabled, setTxDetails } from "@
 import { addOtherIncome, createSalary, creditDueSalaries } from "@/lib/income.ts";
 import { createTransit, deleteTransit, finishTransit, linkTxToTransit } from "@/lib/transit.ts";
 import { getDb } from "@/lib/db.ts";
+import { createAccount, currentIngestKey, deleteAccount, isOwner, resetPassword } from "@/lib/accounts.ts";
 import { redirect } from "next/navigation";
 import { toKop, parseAmount } from "@/lib/money.ts";
 import {
@@ -211,7 +212,7 @@ export async function disconnectTelegramAction() {
 export async function connectMonobankAction(f: FormData) {
   const token = str(f, "token");
   if (token.length < 20) backToSettings("mono_error", "Вставьте токен Monobank целиком.");
-  const key = process.env.DN_INGEST_TOKEN;
+  const key = currentIngestKey();
   if (!key) backToSettings("mono_error", "На сервере не задан DN_INGEST_TOKEN.");
   const base = await publicBase();
   if (!base.startsWith("https://")) backToSettings("mono_error", "Monobank присылает операции только на сайт по https — подключите после размещения в интернете.");
@@ -637,4 +638,41 @@ export async function setTxCardAction(f: FormData) {
   if (id && f.has("cardId")) setTxCard(id, num(f, "cardId") || null);
   refresh();
   redirect(`/inbox/${id}?card_ok=1`);
+}
+
+// ---------- Аккаунты для других (только владелец) ----------
+async function flashAccount(text: string) {
+  // Пароль показываем один раз: кладём в короткоживущую cookie, а не в адрес страницы.
+  (await cookies()).set("dn_flash", text, { path: "/settings", maxAge: 120, httpOnly: true, sameSite: "lax" });
+}
+
+export async function createAccountAction(f: FormData) {
+  if (!isOwner()) throw new Error("Создавать аккаунты может только владелец");
+  const { account, password } = createAccount(str(f, "name"), str(f, "login"));
+  await flashAccount(JSON.stringify({ login: account.login, name: account.name, password }));
+  refresh();
+  redirect("/settings?acc=1#accounts");
+}
+
+export async function resetAccountAction(f: FormData) {
+  if (!isOwner()) throw new Error("Только владелец");
+  const id = str(f, "id");
+  const login = str(f, "login");
+  const password = resetPassword(id);
+  await flashAccount(JSON.stringify({ login, name: str(f, "name"), password }));
+  refresh();
+  redirect("/settings?acc=1#accounts");
+}
+
+export async function deleteAccountAction(f: FormData) {
+  if (!isOwner()) throw new Error("Только владелец");
+  deleteAccount(str(f, "id"));
+  refresh();
+  redirect("/settings?acc=1#accounts");
+}
+
+export async function finishWelcomeAction(f: FormData) {
+  setSetting("welcome_seen", "1");
+  refresh();
+  redirect(str(f, "next") || "/");
 }
