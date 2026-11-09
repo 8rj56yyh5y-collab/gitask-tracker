@@ -6,6 +6,8 @@ import { parseAccount } from "@/lib/cash.ts";
 import {
   addItem,
   closeList,
+  closeListPlain,
+  reopenList,
   createList,
   deleteItem,
   deleteList,
@@ -17,6 +19,27 @@ import {
 
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const refresh = () => revalidatePath("/", "layout");
+
+/** Новый пустой список одним нажатием. */
+export async function quickListAction() {
+  const id = createList("");
+  refresh();
+  redirect(`/shopping/${id}?new=1`);
+}
+
+export async function closePlainAction(f: FormData) {
+  const id = Number(f.get("id"));
+  const next = closeListPlain(id, f.get("carryOver") === "on");
+  refresh();
+  redirect(next ? `/shopping/${next}?from=${id}` : "/shopping?done=1");
+}
+
+export async function reopenListAction(f: FormData) {
+  const id = Number(f.get("id"));
+  reopenList(id);
+  refresh();
+  redirect(`/shopping/${id}`);
+}
 
 export async function createListAction(f: FormData) {
   // По одному товару в строке (запятая — часть числа: «0,5 кг»).

@@ -849,3 +849,40 @@ body { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 .shop-card-items { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .shop-textarea { width: 100%; font: inherit; font-size: 16px; padding: 11px 14px; border-radius: 12px; border: 1.5px solid transparent; background: var(--field); color: var(--text); resize: vertical; }
 .shop-textarea:focus { outline: none; border-color: var(--accent); background: var(--card); }
+
+/* Список покупок — чистый чек-лист */
+.shop-progress { margin: 2px 2px 12px; font-size: 14px; color: var(--muted); }
+.shop-progress b { color: var(--text); }
+.shop-progress-track { display: block; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; margin-top: 6px; }
+.shop-progress-track i { display: block; height: 100%; border-radius: 3px; background: var(--green); transition: width 0.3s ease; }
+.shop-list { padding: 2px 16px; }
+.shop-row { min-height: 56px; gap: 14px; }
+.shop-check {
+  width: 28px; height: 28px; border: 2px solid color-mix(in srgb, var(--muted) 55%, transparent); background: transparent; color: transparent;
+  transition: background 0.18s, border-color 0.18s, color 0.18s, transform 0.12s;
+}
+.shop-check:active { transform: scale(0.88); }
+.is-bought .shop-check { background: var(--green); border-color: var(--green); color: #fff; box-shadow: 0 0 0 4px color-mix(in srgb, var(--green) 18%, transparent); }
+.shop-main { padding: 10px 0; cursor: pointer; user-select: none; flex-direction: row; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.shop-name { font-size: 17px; font-weight: 500; transition: color 0.18s; }
+.is-bought .shop-name { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 70%, transparent); }
+.shop-qty { font-size: 13px; color: var(--muted); }
+.shop-price { background: none; border: 0; font: inherit; font-weight: 700; color: var(--text); padding: 6px 0 6px 8px; cursor: pointer; }
+.is-bought .shop-price { color: var(--muted); }
+.shop-money { width: 32px; height: 32px; flex: none; border-radius: 50%; border: 0; background: transparent; color: color-mix(in srgb, var(--muted) 70%, transparent); font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+.shop-money:hover, .shop-money:focus-visible { background: var(--field); color: var(--accent); }
+.shop-edit { padding: 2px 0 14px 42px; }
+.shop-hint { grid-column: 1 / -1; font-size: 13px; color: var(--accent); font-weight: 600; }
+.shop-new .shop-row { gap: 14px; }
+.shop-plus { width: 28px; height: 28px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 600; color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.shop-new input { flex: 1; min-width: 0; min-height: 44px; border: 0; background: transparent; padding: 8px 0; font-size: 17px; box-shadow: none; }
+.shop-new input:focus { box-shadow: none; background: transparent; }
+.new-list { width: 100%; display: flex; align-items: center; gap: 14px; text-align: left; padding: 14px 16px; margin-bottom: 12px; border-radius: var(--radius); border: 0; background: var(--card); box-shadow: var(--shadow); font: inherit; color: var(--text); cursor: pointer; }
+.new-list > span:last-child { display: flex; flex-direction: column; gap: 2px; }
+.new-list-plus { width: 44px; height: 44px; flex: none; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 26px; color: #fff; background: linear-gradient(135deg, var(--hero1), var(--hero2)); }
+.finish-opts { display: flex; flex-direction: column; gap: 12px; }
+.finish-opt { display: flex; flex-direction: column; gap: 8px; }
+.finish-opt > .muted { text-align: center; }
+.finish-money > summary { list-style: none; text-align: center; }
+.finish-money > summary::-webkit-details-marker { display: none; }
+.finish-money[open] > summary { display: none; }

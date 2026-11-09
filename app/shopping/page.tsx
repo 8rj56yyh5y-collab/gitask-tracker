@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { createListAction } from "./actions.ts";
+import { quickListAction } from "./actions.ts";
 import { formatMoney } from "@/lib/money.ts";
 import { listLists, listSum } from "@/lib/shopping.ts";
 
 const when = (iso: string | null) =>
   iso ? new Date(iso.includes("T") ? iso : `${iso.replace(" ", "T")}Z`).toLocaleDateString("ru-RU", { day: "numeric", month: "long" }) : "";
 
-export default async function Shopping({ searchParams }: { searchParams: Promise<{ closed?: string }> }) {
-  const { closed } = await searchParams;
+export default async function Shopping({ searchParams }: { searchParams: Promise<{ closed?: string; done?: string }> }) {
+  const { closed, done: plainDone } = await searchParams;
   const open = listLists("open");
   const done = listLists("closed", 15);
   return (
@@ -19,17 +19,38 @@ export default async function Shopping({ searchParams }: { searchParams: Promise
         </Link>
       </div>
       <p className="page-hint">
-        Составьте список перед магазином, в магазине отмечайте купленное и вписывайте цены. «Закрыть чек» — и покупка сразу записана как расход.
+        Обычный список покупок: впишите товары, в магазине отмечайте купленное. Если хотите — впишите цены или итог чека, и покупка запишется
+        расходом.
       </p>
+      {plainDone && <div className="card ok-note">Список закрыт ✓</div>}
       {closed && (
         <div className="card ok-note">
-          Чек закрыт и записан ✓{" "}
+          Покупка записана как расход ✓{" "}
           <Link href={`/inbox/${closed}`} className="link">
             открыть расход
           </Link>
         </div>
       )}
 
+      <form action={quickListAction}>
+        <button className="new-list">
+          <span className="new-list-plus" aria-hidden>
+            +
+          </span>
+          <span>
+            <strong>Новый список</strong>
+            <span className="muted small">Откроется сразу — пишите товары</span>
+          </span>
+        </button>
+      </form>
+
+      {open.length === 0 && done.length === 0 && (
+        <div className="empty">
+          <div className="empty-icon">🛒</div>
+          <strong>Списков пока нет</strong>
+          <p>Нажмите «Новый список» и впишите, что купить. В магазине отмечайте купленное — и ничего не забудете.</p>
+        </div>
+      )}
       {open.map((l) => {
         const bought = l.items.filter((i) => i.bought).length;
         const sum = listSum(l);
@@ -53,24 +74,11 @@ export default async function Shopping({ searchParams }: { searchParams: Promise
         );
       })}
 
-      <details className="card settings-fold add-fold" open={open.length === 0}>
-        <summary>+ Новый список</summary>
-        <form action={createListAction} className="form" style={{ marginTop: 14 }}>
-          <label>
-            Название (необязательно)
-            <input name="title" placeholder="например, Продукты на неделю" />
-          </label>
-          <label>
-            Что купить — по одному в строке
-            <textarea name="items" rows={5} placeholder={"Яйца 10 шт\nФарш 0,5 кг\nМолоко 2\nХлеб"} className="shop-textarea" />
-          </label>
-          <button className="btn btn-primary btn-big">Создать список</button>
-        </form>
-      </details>
+
 
       {done.length > 0 && (
         <section>
-          <h2>Закрытые чеки</h2>
+          <h2>Закрытые списки</h2>
           <div className="card plan-list">
             {done.map((l) => (
               <Link key={l.id} href={`/shopping/${l.id}`} className="plan-row">
@@ -81,7 +89,7 @@ export default async function Shopping({ searchParams }: { searchParams: Promise
                     {when(l.closed_at)} · {l.items.filter((i) => i.bought).length} товаров{l.store && ` · ${l.store}`}
                   </span>
                 </span>
-                <strong className="plan-amount">{formatMoney(l.total ?? 0)}</strong>
+                <strong className="plan-amount">{l.total ? formatMoney(l.total) : <span className="muted small">без суммы</span>}</strong>
               </Link>
             ))}
           </div>
