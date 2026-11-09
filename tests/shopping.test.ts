@@ -62,3 +62,18 @@ test("товары списка — обычные объекты (их можн
   const item = shop.getList(id)!.items[0];
   assert.equal(Object.getPrototypeOf(item), Object.prototype);
 });
+
+test("список можно просто закрыть без денег и открыть снова", () => {
+  const before = repo.listRecent(500).length;
+  const id = shop.createList("Просто список", ["Батарейки", "Лампочка"]);
+  const [a] = shop.getList(id)!.items;
+  shop.updateItem(a.id, { bought: true });
+  const next = shop.closeListPlain(id, true);
+  assert.equal(repo.listRecent(500).length, before, "расход не создаётся");
+  assert.equal(shop.getList(id)!.status, "closed");
+  assert.deepEqual(shop.getList(next!)!.items.map((i) => i.name), ["Лампочка"]);
+  shop.reopenList(id);
+  assert.equal(shop.getList(id)!.status, "open");
+  // порядок товаров не меняется после отметки
+  assert.deepEqual(shop.getList(id)!.items.map((i) => i.name), ["Батарейки", "Лампочка"]);
+});

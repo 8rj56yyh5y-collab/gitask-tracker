@@ -54,7 +54,7 @@ export function getList(id: number): ShoppingList | null {
   const l = db.prepare("SELECT * FROM shopping_lists WHERE id = ?").get(id) as unknown as Omit<ShoppingList, "items"> | undefined;
   if (!l) return null;
   // Обычные объекты (а не строки SQLite) — их можно передать в браузерный компонент.
-  const items = (db.prepare("SELECT * FROM shopping_items WHERE list_id = ? ORDER BY bought, sort, id").all(id) as unknown as ShoppingItem[]).map((i) => ({
+  const items = (db.prepare("SELECT * FROM shopping_items WHERE list_id = ? ORDER BY sort, id").all(id) as unknown as ShoppingItem[]).map((i) => ({
     ...i,
   }));
   return { ...l, items };
@@ -142,6 +142,25 @@ export function closeList(
     }
   }
   return { txId, nextListId };
+}
+
+/** Просто закрыть список — без расхода. Некупленное можно перенести в новый список. */
+export function closeListPlain(id: number, carryOver = false): number | null {
+  const l = getList(id);
+  if (!l || l.status !== "open") throw new Error("Список уже закрыт");
+  getDb().prepare("UPDATE shopping_lists SET status = 'closed', closed_at = ? WHERE id = ?").run(new Date().toISOString(), id);
+  const left = l.items.filter((i) => !i.bought);
+  if (!carryOver || !left.length) return null;
+  const next = createList("");
+  for (const i of left) {
+    getDb().prepare("INSERT INTO shopping_items (list_id, name, qty, unit, sort) VALUES (?, ?, ?, ?, ?)").run(next, i.name, i.qty, i.unit, i.sort);
+  }
+  return next;
+}
+
+/** Снова открыть закрытый без расхода список. */
+export function reopenList(id: number) {
+  getDb().prepare("UPDATE shopping_lists SET status = 'open', closed_at = NULL WHERE id = ? AND tx_id IS NULL").run(id);
 }
 
 /** Прошлая цена товара (за единицу, если есть количество) — подсказка в магазине. */
