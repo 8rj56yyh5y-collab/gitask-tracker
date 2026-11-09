@@ -16,6 +16,7 @@ export const NAV_ITEMS = [
   { id: "centers", href: "/centers", label: "Направл.", icon: "tag" },
   { id: "categories", href: "/categories", label: "Категории", icon: "grid" },
   { id: "transit", href: "/transit", label: "Чужие", icon: "swap" },
+  { id: "shopping", href: "/shopping", label: "Покупки", icon: "cart" },
 ] as const;
 
 export type NavId = (typeof NAV_ITEMS)[number]["id"];

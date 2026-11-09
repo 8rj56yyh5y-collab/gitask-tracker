@@ -75,6 +75,29 @@ CREATE TABLE IF NOT EXISTS accounts (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Список покупок: товары, отметки «купил», цены. Закрытый чек становится расходом (tx_id).
+CREATE TABLE IF NOT EXISTS shopping_lists (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  store TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'open', -- open | closed
+  tx_id INTEGER,
+  total INTEGER,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  closed_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS shopping_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  list_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  qty REAL,
+  unit TEXT NOT NULL DEFAULT '',
+  price INTEGER, -- за всю строку, копейки
+  bought INTEGER NOT NULL DEFAULT 0,
+  sort INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS transits (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL,
