@@ -53,7 +53,7 @@ export function Nav({ pending, items }: { pending: number; items: NavId[] }) {
   const inBar = new Set<string>(chosen.map((i) => i.href));
   const moreActive =
     isActive(path, "/more") ||
-    ["/inbox", "/analytics", "/centers", "/settings", "/norms", "/income", "/transit", "/help", "/categories", "/history", "/cash", "/cards", "/plans", "/sales"]
+    ["/inbox", "/analytics", "/centers", "/settings", "/norms", "/income", "/transit", "/help", "/categories", "/shopping", "/history", "/cash", "/cards", "/plans", "/sales"]
       .filter((h) => !inBar.has(h))
       .some((h) => isActive(path, h));
   const tab = (i: (typeof NAV_ITEMS)[number]) => (
@@ -119,6 +119,9 @@ export function Nav({ pending, items }: { pending: number; items: NavId[] }) {
         </Link>
         <Link href="/income" className={cls("/income")}>
           <Icon name="income" /> Доходы
+        </Link>
+        <Link href="/shopping" className={cls("/shopping")}>
+          <Icon name="cart" /> Покупки
         </Link>
         <Link href="/transit" className={cls("/transit")}>
           <Icon name="swap" /> Чужие деньги

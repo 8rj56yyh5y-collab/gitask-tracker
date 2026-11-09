@@ -17,6 +17,7 @@ export default function More() {
       [
         { href: "/inbox", icon: "inbox", title: "Без направления", note: count ? `${count} ждут — выберите, на что ушли деньги` : "Всё записано ✓" },
         { href: "/history", icon: "history", title: "История", note: "Все операции, новые сверху" },
+        { href: "/shopping", icon: "cart", title: "Список покупок", note: "Что купить, цены товаров, чек → расход" },
         { href: "/transit", icon: "swap", title: "Чужие деньги", note: transit ? `У вас сейчас ${formatMoney(transit)} — нужно передать` : "Деньги, которые нужно кому-то отдать" },
       ],
     ],
