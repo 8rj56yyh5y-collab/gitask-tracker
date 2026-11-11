@@ -294,6 +294,13 @@ function migrate(db: DatabaseSync, tenant: string) {
   const centerCols = (db.prepare("PRAGMA table_info(cost_centers)").all() as { name: string }[]).map((c) => c.name);
   // Личное направление: только его доходы и расходы входят в «Мои деньги за месяц».
   // Пароль дополнительного аккаунта в зашифрованном виде — чтобы владелец мог снова его посмотреть и переслать.
+  // Чек по фото: группа товара (мясо, молочное…), откуда список и дата чека.
+  const shopItemCols = (db.prepare("PRAGMA table_info(shopping_items)").all() as { name: string }[]).map((c) => c.name);
+  if (!shopItemCols.includes("grp")) db.exec("ALTER TABLE shopping_items ADD COLUMN grp TEXT NOT NULL DEFAULT ''");
+  const shopListCols = (db.prepare("PRAGMA table_info(shopping_lists)").all() as { name: string }[]).map((c) => c.name);
+  if (!shopListCols.includes("source")) db.exec("ALTER TABLE shopping_lists ADD COLUMN source TEXT NOT NULL DEFAULT ''");
+  if (!shopListCols.includes("receipt_date")) db.exec("ALTER TABLE shopping_lists ADD COLUMN receipt_date TEXT");
+  if (!shopListCols.includes("receipt_total")) db.exec("ALTER TABLE shopping_lists ADD COLUMN receipt_total INTEGER");
   const accCols = (db.prepare("PRAGMA table_info(accounts)").all() as { name: string }[]).map((c) => c.name);
   if (!accCols.includes("pass_enc")) db.exec("ALTER TABLE accounts ADD COLUMN pass_enc TEXT");
   if (!centerCols.includes("is_personal")) db.exec("ALTER TABLE cost_centers ADD COLUMN is_personal INTEGER NOT NULL DEFAULT 0");

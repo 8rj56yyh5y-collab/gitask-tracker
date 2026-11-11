@@ -153,3 +153,92 @@ export async function suggestCategory(
     return null;
   }
 }
+
+// ---------- Чек по фото ----------
+
+export { RECEIPT_GROUPS } from "./groups.ts";
+import { RECEIPT_GROUPS } from "./groups.ts";
+
+const RECEIPT_SYSTEM = `Ты читаешь фото кассового чека из магазина (обычно Украина, гривны; чек может быть на украинском или русском).
+Выпиши каждую позицию: понятное название по-русски (коротко, как человек назвал бы товар: «Молоко 2,5%», «Фарш свиной»),
+количество и единицу (шт, кг, г, л, мл, уп — если видно на чеке), итоговую цену позиции (за всё количество, в гривнах) и группу товара.
+Скидки по позиции учитывай в её цене. Пакеты отнеси к «other». Не выдумывай позиции, которых не видно.
+Также найди название магазина, дату покупки (YYYY-MM-DD, если видна) и итоговую сумму чека («СУМА», «ВСЬОГО», «ДО СПЛАТИ»).
+Если фото не похоже на чек или его нельзя прочитать — верни пустой список позиций и total 0.`;
+
+export interface ReceiptItem {
+  name: string;
+  qty: number | null;
+  unit: string;
+  price: number; // гривны
+  group: string;
+}
+
+export interface ReceiptData {
+  store: string;
+  date: string | null;
+  total: number; // гривны
+  items: ReceiptItem[];
+}
+
+/** Прочитать чек по фото. Бросает понятную ошибку, если ИИ не подключён или не справился. */
+export async function readReceipt(imageBase64: string, mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif"): Promise<ReceiptData> {
+  if (!aiConfigured()) throw new Error("ИИ не подключён — фото чека прочитать нельзя. Можно ввести товары вручную.");
+  const client = new Anthropic({ timeout: 90_000, maxRetries: 1 });
+  const response = await client.beta.messages.create({
+    model: MODEL,
+    max_tokens: 16000,
+    betas: ["server-side-fallback-2026-07-01"],
+    fallbacks: "default",
+    system: RECEIPT_SYSTEM,
+    output_config: {
+      effort: "medium",
+      format: {
+        type: "json_schema",
+        schema: {
+          type: "object",
+          properties: {
+            store: { type: "string" },
+            date: { type: ["string", "null"] },
+            total: { type: "number" },
+            items: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  qty: { type: ["number", "null"] },
+                  unit: { type: "string", enum: ["шт", "кг", "г", "л", "мл", "уп", ""] },
+                  price: { type: "number" },
+                  group: { type: "string", enum: RECEIPT_GROUPS.map((g) => g.id) },
+                },
+                required: ["name", "qty", "unit", "price", "group"],
+                additionalProperties: false,
+              },
+            },
+          },
+          required: ["store", "date", "total", "items"],
+          additionalProperties: false,
+        },
+      },
+    },
+    messages: [
+      {
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: mediaType, data: imageBase64 } },
+          { type: "text", text: "Прочитай этот чек." },
+        ],
+      },
+    ],
+  });
+  if (response.stop_reason === "refusal") throw new Error("ИИ не смог прочитать этот чек. Попробуйте другое фото или введите вручную.");
+  const text = response.content
+    .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("")
+    .trim();
+  const data = JSON.parse(text) as ReceiptData;
+  if (!data.items?.length) throw new Error("На фото не получилось найти товары. Сфотографируйте чек ближе и ровнее, при хорошем свете.");
+  return data;
+}

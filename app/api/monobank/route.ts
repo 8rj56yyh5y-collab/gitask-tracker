@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { notifyNewTx } from "@/lib/telegram.ts";
 import { suggestForTx } from "@/lib/suggest.ts";
 import { matchPlanForTx } from "@/lib/plans.ts";
+import { matchReceiptForTx } from "@/lib/shopping.ts";
 
 // Вебхук Monobank (личный API, https://api.monobank.ua/docs/).
 // Регистрируется на адрес https://<домен>/api/monobank?key=<DN_INGEST_TOKEN>.
@@ -54,6 +55,10 @@ async function handle(req: Request) {
   const saved = saveMonoItem(body.data?.account, item);
   if (saved && !saved.duplicate) {
     matchPlanForTx(saved.id);
+    if (matchReceiptForTx(saved.id)) {
+      revalidatePath("/", "layout");
+      return new NextResponse("ok");
+    }
     // Monobank ждёт быстрый ответ: подсказку ИИ и уведомление делаем в фоне.
     const id = saved.id;
     const tenant = currentTenant();

@@ -3,9 +3,11 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addItemAction, deleteItemAction, updateItemAction } from "../actions.ts";
 import type { ShoppingItem } from "@/lib/shopping.ts";
+import { groupById } from "@/lib/groups.ts";
 
 const UNITS = ["шт", "кг", "г", "л", "мл", "уп"];
-const money = (kop: number) => `${(kop / 100).toLocaleString("ru-RU", { maximumFractionDigits: 2 })} ₴`;
+const money = (kop: number) =>
+  `${(kop / 100).toLocaleString("ru-RU", { minimumFractionDigits: kop % 100 ? 2 : 0, maximumFractionDigits: 2 })} ₴`;
 const qtyText = (i: Pick<ShoppingItem, "qty" | "unit">) => (i.qty ? `${i.qty.toLocaleString("ru-RU")} ${i.unit || "шт"}` : "");
 const key = (n: string) => n.trim().toLocaleLowerCase("ru").replace(/ё/g, "е");
 
@@ -94,7 +96,10 @@ export function ShoppingEditor({
                   className="shop-main"
                   onClick={() => !readOnly && patch(i.id, { bought: i.bought ? 0 : 1 }, { bought: !i.bought })}
                 >
-                  <span className="shop-name">{i.name}</span>
+                  <span className="shop-name">
+                    {groupById(i.grp)?.emoji && <span className="shop-grp" title={groupById(i.grp)!.name}>{groupById(i.grp)!.emoji} </span>}
+                    {i.name}
+                  </span>
                   {qtyText(i) && <span className="shop-qty">{qtyText(i)}</span>}
                 </span>
                 {i.price ? (

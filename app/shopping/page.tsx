@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { quickListAction } from "./actions.ts";
+import { ReceiptButton } from "./ReceiptButton.tsx";
 import { formatMoney } from "@/lib/money.ts";
 import { listLists, listSum } from "@/lib/shopping.ts";
 
@@ -19,8 +20,8 @@ export default async function Shopping({ searchParams }: { searchParams: Promise
         </Link>
       </div>
       <p className="page-hint">
-        Обычный список покупок: впишите товары, в магазине отмечайте купленное. Если хотите — впишите цены или итог чека, и покупка запишется
-        расходом.
+        Обычный список покупок: впишите товары, в магазине отмечайте купленное. Или просто сфотографируйте чек — ИИ сам запишет товары, цены и
+        разложит их по группам.
       </p>
       {plainDone && <div className="card ok-note">Список закрыт ✓</div>}
       {closed && (
@@ -43,6 +44,7 @@ export default async function Shopping({ searchParams }: { searchParams: Promise
           </span>
         </button>
       </form>
+      <ReceiptButton big />
 
       {open.length === 0 && done.length === 0 && (
         <div className="empty">

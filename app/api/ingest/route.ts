@@ -11,6 +11,7 @@ import { revalidatePath } from "next/cache";
 import { notifyNewTx } from "@/lib/telegram.ts";
 import { suggestForTx } from "@/lib/suggest.ts";
 import { matchPlanForTx } from "@/lib/plans.ts";
+import { matchReceiptForTx } from "@/lib/shopping.ts";
 import { noteShortcutSignal } from "@/lib/setup.ts";
 
 // Приём операций из «Команд» iOS.
@@ -106,8 +107,11 @@ async function handle(req: Request) {
   if (!duplicate) {
     // Это оплата запланированного платежа? Тогда он закроется сам и операция получит его категорию.
     matchPlanForTx(id);
-    await suggestForTx(id).catch(() => {}); // подсказка категории (история или ИИ)
-    await notifyNewTx(id);
+    // Чек этой покупки уже записан по фото — оплата просто прицепляется к нему, без дубля и без вопросов.
+    if (!matchReceiptForTx(id)) {
+      await suggestForTx(id).catch(() => {}); // подсказка категории (история или ИИ)
+      await notifyNewTx(id);
+    }
   }
   revalidatePath("/", "layout");
   const base = process.env.DN_PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || new URL(req.url).origin;

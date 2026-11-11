@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { formatMoney } from "@/lib/money.ts";
-import { itemStats } from "@/lib/shopping.ts";
+import { groupStats, itemStats } from "@/lib/shopping.ts";
+import { groupById } from "@/lib/groups.ts";
 
 export default async function Prices({ searchParams }: { searchParams: Promise<{ p?: string }> }) {
   const { p } = await searchParams;
   const period = p === "90" ? 90 : p === "365" ? 365 : 30;
-  const stats = itemStats(new Date(Date.now() - period * 864e5).toISOString());
+  const since = new Date(Date.now() - period * 864e5).toISOString();
+  const stats = itemStats(since);
+  const groups = groupStats(since);
+  const gMax = Math.max(1, ...groups.map((g) => g.sum));
   const total = stats.reduce((a, s) => a + s.spent, 0);
   const max = Math.max(1, ...stats.map((s) => s.spent));
   return (
@@ -33,7 +37,30 @@ export default async function Prices({ searchParams }: { searchParams: Promise<{
           <p>Вписывайте цены в списке покупок и закрывайте чек — здесь появится, сколько стоят ваши товары.</p>
         </div>
       ) : (
+        <>
+        {groups.some((g) => g.grp) && (
+          <section className="card">
+            <h2>По группам</h2>
+            <ul className="cat-bars">
+              {groups.map((g) => {
+                const meta = groupById(g.grp);
+                return (
+                  <li key={g.grp || "none"}>
+                    <div className="row-between">
+                      <span>{meta ? `${meta.emoji} ${meta.name}` : "Без группы"}</span>
+                      <strong>{formatMoney(g.sum)}</strong>
+                    </div>
+                    <span className="cat-bar">
+                      <i style={{ width: `${(g.sum / gMax) * 100}%` }} />
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
         <section className="card">
+          <h2>По товарам</h2>
           <div className="row-between" style={{ marginBottom: 10 }}>
             <span className="muted small">Всего по товарам</span>
             <strong>{formatMoney(total)}</strong>
@@ -59,6 +86,7 @@ export default async function Prices({ searchParams }: { searchParams: Promise<{
             ))}
           </ul>
         </section>
+        </>
       )}
     </div>
   );
