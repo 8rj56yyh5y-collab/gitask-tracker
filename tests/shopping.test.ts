@@ -77,3 +77,71 @@ test("список можно просто закрыть без денег и �
   // порядок товаров не меняется после отметки
   assert.deepEqual(shop.getList(id)!.items.map((i) => i.name), ["Батарейки", "Лампочка"]);
 });
+
+const RECEIPT = {
+  store: "Сильпо",
+  date: new Date().toISOString().slice(0, 10),
+  total: 452.4,
+  items: [
+    { name: "Молоко 2,5% 900 мл", qty: 1, unit: "шт", price: 42.9, group: "dairy" },
+    { name: "Фарш свиной", qty: 0.6, unit: "кг", price: 219.5, group: "meat" },
+    { name: "Яйца С1", qty: 10, unit: "шт", price: 64, group: "eggs" },
+    { name: "Бананы", qty: 1.2, unit: "кг", price: 126, group: "fruit" },
+  ],
+};
+
+test("чек по фото: новый список с ценами и группами; в готовый список — цены к своим товарам", () => {
+  const id = shop.applyReceipt(RECEIPT);
+  const l = shop.getList(id)!;
+  assert.equal(l.source, "receipt");
+  assert.equal(l.receipt_total, 452_40);
+  assert.equal(l.items.length, 4);
+  assert.ok(l.items.every((i) => i.bought && i.price));
+  const groups = shop.groupTotals(l);
+  assert.equal(groups[0].grp, "meat");
+  assert.match(l.title, /Сильпо/);
+
+  const mine = shop.createList("Мой список", ["Молоко", "Яйца 10 шт", "Хлеб"]);
+  shop.applyReceipt(RECEIPT, mine);
+  const m = shop.getList(mine)!;
+  const by = (n: string) => m.items.find((i) => i.name.startsWith(n))!;
+  assert.equal(by("Молоко").price, 42_90, "цена встала к «Молоко» из списка");
+  assert.equal(by("Яйца").price, 64_00);
+  assert.equal(by("Хлеб").bought, 0, "не купленный хлеб остался некупленным");
+  assert.ok(m.items.some((i) => i.name === "Бананы" && i.bought), "чего не было в списке — добавилось");
+  assert.equal(m.items.length, 5);
+});
+
+test("чек + оплата Apple Pay на ту же сумму: объединяются в один расход", () => {
+  const center = repo.listCenters().find((c) => c.name === "Личные")!.id;
+  const pay = repo.insertTx({ amountKop: -452_40, source: "applepay", counterparty: "SILPO" }).id;
+  const id = shop.applyReceipt(RECEIPT);
+  const matches = shop.paymentMatches(452_40, RECEIPT.date);
+  assert.equal(matches[0].id, pay);
+  const before = repo.listRecent(500).length;
+  const { txId } = shop.closeList(id, { centerId: center, mergeTxId: pay });
+  assert.equal(txId, pay);
+  assert.equal(repo.listRecent(500).length, before, "второй расход не создан");
+  assert.equal(repo.getTx(pay)!.cost_center_id, center);
+  assert.match(repo.getTx(pay)!.description, /Молоко/);
+  assert.equal(shop.paymentMatches(452_40, RECEIPT.date).length, 0, "уже привязанная оплата больше не предлагается");
+});
+
+test("обратный порядок: чек записан раньше, оплата пришла позже — прицепляется, без дубля", () => {
+  const center = repo.listCenters().find((c) => c.name === "Личные")!.id;
+  const id = shop.applyReceipt({ ...RECEIPT, total: 333.33 });
+  const { txId: manual } = shop.closeList(id, { centerId: center, total: 333_33 });
+  const pay = repo.insertTx({ amountKop: -333_33, source: "monobank", counterparty: "SILPO" }).id;
+  assert.equal(shop.matchReceiptForTx(pay), true);
+  assert.equal(repo.getTx(manual), null, "ручной расход убран");
+  assert.equal(repo.getTx(pay)!.cost_center_id, center);
+  assert.equal(shop.getList(id)!.tx_id, pay);
+  const other = repo.insertTx({ amountKop: -10_00, source: "applepay" }).id;
+  assert.equal(shop.matchReceiptForTx(other), false, "другая сумма — не трогаем");
+});
+
+test("без ключа ИИ фото чека не читается, а понятная ошибка", async () => {
+  delete process.env.ANTHROPIC_API_KEY;
+  const { readReceipt } = await import("../lib/ai.ts");
+  await assert.rejects(readReceipt("AAAA", "image/jpeg"), /ИИ не подключён/);
+});

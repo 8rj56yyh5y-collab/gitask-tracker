@@ -3,8 +3,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { parseAmount, toKop } from "@/lib/money.ts";
 import { parseAccount } from "@/lib/cash.ts";
+import { readReceipt } from "@/lib/ai.ts";
 import {
   addItem,
+  applyReceipt,
   closeList,
   closeListPlain,
   reopenList,
@@ -96,7 +98,25 @@ export async function closeListAction(f: FormData) {
     cardId: acc && "card" in acc ? acc.card : null,
     cashboxId: acc && "cashbox" in acc ? acc.cashbox : null,
     carryOver: f.get("carryOver") === "on",
+    mergeTxId: Number(f.get("merge")) || null,
   });
   refresh();
   redirect(nextListId ? `/shopping/${nextListId}?from=${id}` : `/shopping?closed=${txId}`);
+}
+
+/** Прочитать фото чека и разложить в список (существующий или новый). */
+export async function scanReceiptAction(f: FormData): Promise<{ listId?: number; error?: string }> {
+  const file = f.get("photo");
+  if (!(file instanceof File) || file.size === 0) return { error: "Выберите фото чека" };
+  if (file.size > 7 * 1024 * 1024) return { error: "Фото слишком большое — попробуйте ещё раз" };
+  const type = (["image/jpeg", "image/png", "image/webp", "image/gif"] as const).find((t) => t === file.type) ?? "image/jpeg";
+  try {
+    const data = await readReceipt(Buffer.from(await file.arrayBuffer()).toString("base64"), type);
+    const listId = applyReceipt(data, Number(f.get("listId")) || null);
+    refresh();
+    return { listId };
+  } catch (e) {
+    console.error("Receipt scan failed:", e);
+    return { error: e instanceof Error && /[а-яё]/i.test(e.message) ? e.message : "Не получилось прочитать чек. Попробуйте ещё раз или введите вручную." };
+  }
 }
