@@ -22,7 +22,7 @@ function when(d: Date): string {
 
 export function TxRow({ tx, children, hidePending }: { tx: Tx; children?: React.ReactNode; hidePending?: boolean }) {
   const d = new Date(tx.occurred_at);
-  const src = SOURCE[tx.source] ?? tx.source;
+  void SOURCE;
   return (
     <div className="tx">
       <span className={`tx-avatar ${tx.amount > 0 ? "is-in" : ""}`} style={{ "--tc": tx.center_color ?? "var(--accent)" } as React.CSSProperties} aria-hidden>
@@ -35,25 +35,32 @@ export function TxRow({ tx, children, hidePending }: { tx: Tx; children?: React.
       </span>
       <div className="tx-main">
         <div className="tx-title">{tx.counterparty || tx.description || "Без описания"}</div>
-        <div className="muted small">
-          {when(d)}
-          {tx.card_label ? <> · {tx.card_label}</> : tx.cashbox_name ? <> · касса «{tx.cashbox_name}»</> : null}
-          {src && <> · {src}</>}
-          {tx.for_whom && <> · для: {tx.for_whom}</>}
+        {/* Одна строка смысла: что это и откуда — как в банковских приложениях. */}
+        <div className="tx-meta">
+          {[
+            tx.category_name
+              ? tx.category_name
+              : tx.transit_id
+                ? "Чужие деньги"
+                : tx.kind === "internal"
+                  ? tx.sale_id
+                    ? "Деньги компании"
+                    : "Перевод"
+                  : tx.income_kind
+                    ? tx.income_kind === "salary"
+                      ? "Ставка"
+                      : "Доход"
+                    : null,
+            tx.center_name && !tx.transit_id && tx.kind !== "internal" ? tx.center_name : null,
+            tx.card_label ?? (tx.cashbox_name ? `касса «${tx.cashbox_name}»` : null),
+            when(d),
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         </div>
-        {tx.assigned_at && tx.counterparty && tx.description && tx.description !== tx.counterparty && !tx.needs_note && <div className="tx-note">💬 {tx.description}</div>}
-        {tx.category_name && <span className="chip">{tx.category_emoji} {tx.category_name}</span>}
-        {tx.center_name && (
-          <span className="chip" style={{ borderColor: tx.center_color ?? undefined, color: tx.center_color ?? undefined }}>
-            {tx.center_name}
-          </span>
+        {tx.assigned_at && tx.counterparty && tx.description && tx.description !== tx.counterparty && !tx.needs_note && (
+          <div className="tx-note">{tx.description}</div>
         )}
-        {tx.transit_id ? (
-          <span className="chip">чужие деньги</span>
-        ) : (
-          tx.kind === "internal" && <span className="chip">{tx.sale_id ? "деньги компании" : "перевод"}</span>
-        )}
-        {tx.income_kind && <span className="chip chip-in">{tx.income_kind === "salary" ? "ставка" : "доход"}</span>}
         {tx.plan_id && <span className="chip">по платежу</span>}
         {!hidePending && tx.cost_center_id === null && tx.kind !== "internal" && !tx.income_kind && <span className="chip chip-pending">без направления</span>}
       </div>

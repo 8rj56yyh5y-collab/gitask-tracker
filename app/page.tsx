@@ -134,11 +134,15 @@ export default function Home() {
       })()}
 
       <section className="card">
-        <h2>Траты по направлениям · {month}</h2>
-        <div className="big">{formatMoney(total)}</div>
-        {spend.length === 0 && <p className="muted">Пока нет расходов.</p>}
+        <div className="row-between">
+          <h2 style={{ margin: 0 }}>Куда ушли деньги</h2>
+          <Link href="/centers" className="link-quiet">
+            Все ›
+          </Link>
+        </div>
+        {spend.every((st) => st.spent === 0) && <p className="muted small">В этом месяце расходов пока нет.</p>}
         <ul className="bars">
-          {spend.map((st) => (
+          {spend.filter((st) => st.spent > 0 || st.budget > 0).map((st) => (
             <li key={st.id}>
               <BudgetLine s={st} total={total} href={`/centers/${st.id}`} />
             </li>
