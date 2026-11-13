@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { monthMoney } from "@/lib/income.ts";
 import { formatMoney } from "@/lib/money.ts";
+import { Icon } from "./Icon.tsx";
 
 /** Главная карточка: мои деньги за месяц — итог крупно, доходы и расходы, сколько можно отложить. */
 export function HomeHero() {
@@ -41,17 +42,17 @@ export function HomeHero() {
 /** Быстрые действия под главной карточкой. */
 export function QuickActions() {
   const items = [
-    { href: "/new", icon: "−", label: "Расход" },
-    { href: "/new?type=in", icon: "+", label: "Доход" },
-    { href: "/new?type=move", icon: "⇄", label: "Перевод" },
-    { href: "/plans?new=1#new", icon: "📅", label: "Платёж" },
+    { href: "/new", icon: "minus", label: "Расход" },
+    { href: "/new?type=in", icon: "plus", label: "Доход" },
+    { href: "/new?type=move", icon: "swap", label: "Перевод" },
+    { href: "/plans?new=1#new", icon: "calendar", label: "Платёж" },
   ];
   return (
     <nav className="quick-actions span-all" aria-label="Быстрые действия">
       {items.map((i) => (
         <Link key={i.label} href={i.href} className="qa">
           <span className="qa-icon" aria-hidden>
-            {i.icon}
+            <Icon name={i.icon} size={24} />
           </span>
           <span>{i.label}</span>
         </Link>

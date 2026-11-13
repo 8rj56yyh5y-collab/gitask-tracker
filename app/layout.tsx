@@ -21,8 +21,20 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0f172a",
+  themeColor: "#f4f5f2",
 };
+
+/** Шрифт Onest (как в маркетплейсе Gobsek). */
+function Fonts() {
+  return (
+    <>
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" />
+    </>
+  );
+}
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +52,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     // Страница входа: без меню и без данных.
     return (
       <html lang="ru" data-theme={themeAttr}>
+        <head>
+          <Fonts />
+        </head>
         <body>
           <header className="top">
             <span className="brand">D&amp;N</span>
@@ -63,6 +78,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const accName = currentAccountName();
   return (
     <html lang="ru" data-theme={themeAttr}>
+      <head>
+        <Fonts />
+      </head>
       <body>
         <header className="top">
           <Link href="/" className="brand">

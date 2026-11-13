@@ -3,6 +3,7 @@ const PATHS: Record<string, string> = {
   home: "M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",
   history: "M12 7v5l3 2M3.05 11a9 9 0 1 1 .5 4M3 4v5h5",
   plus: "M12 5v14M5 12h14",
+  minus: "M5 12h14",
   chart: "M4 20V10M10 20V4M16 20v-7M22 20H2",
   more: "M4 6h16M4 12h16M4 18h16",
   inbox: "M3 13h5l1.5 3h5L16 13h5M5 5h14l2 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6z",
