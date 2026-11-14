@@ -110,3 +110,31 @@ test("голос: числа словами → цифры, слова не тр
   assert.equal(spokenToText("кофе 75"), "кофе 75");
   assert.equal(quick.parseQuick(spokenToText("обед двести тридцать")).amount, 230_00);
 });
+
+test("лимиты по категориям: в норме → почти → перелимит; убрать лимит", async () => {
+  const { categoryBudgets, setCategoryBudget } = await import("../lib/catbudget.ts");
+  const { lookOf, normalizeTheme } = await import("../lib/theme.ts");
+  const now = new Date(2026, 7, 20, 12);
+  const cafe = cat("Кафе и рестораны");
+  setCategoryBudget(cafe, 1_000_00);
+  spend(500_00, "Кафе", new Date(2026, 7, 5, 12), "Кафе и рестораны", "обед");
+  let b = categoryBudgets(now).find((x) => x.categoryId === cafe)!;
+  assert.equal(b.level, "ok");
+  assert.equal(b.left, 500_00);
+  spend(350_00, "Кафе", new Date(2026, 7, 6, 12), "Кафе и рестораны", "ужин");
+  assert.equal(categoryBudgets(now).find((x) => x.categoryId === cafe)!.level, "near");
+  spend(300_00, "Кафе", new Date(2026, 7, 7, 12), "Кафе и рестораны", "кофе", work());
+  assert.equal(categoryBudgets(now).find((x) => x.categoryId === cafe)!.level, "near", "траты по работе в мой лимит не входят");
+  assert.equal(categoryBudgets(now, true).find((x) => x.categoryId === cafe)!.level, "over", "в простом режиме считаются все");
+  spend(200_00, "Кафе", new Date(2026, 7, 8, 12), "Кафе и рестораны", "кофе");
+  b = categoryBudgets(now).find((x) => x.categoryId === cafe)!;
+  assert.equal(b.level, "over");
+  assert.equal(b.left, -50_00);
+  setCategoryBudget(cafe, null);
+  assert.equal(categoryBudgets(now).length, 0);
+  // оформления
+  assert.equal(lookOf(normalizeTheme(undefined)), "glass");
+  assert.equal(lookOf("graphite"), "flat");
+  assert.equal(normalizeTheme("classic"), "classic");
+  assert.equal(normalizeTheme("бред"), "system");
+});

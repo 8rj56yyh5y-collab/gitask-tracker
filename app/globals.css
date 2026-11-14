@@ -1517,3 +1517,198 @@ body { padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
 .ql-mic { width: 44px; height: 44px; border-radius: 14px; border: 0; background: var(--field); color: var(--accent); display: grid; place-items: center; cursor: pointer; flex: none; }
 .ql-mic.is-on { background: var(--red); color: #fff; animation: dn-pulse 1.1s ease-in-out infinite; }
 @keyframes dn-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--red) 45%, transparent); } 50% { box-shadow: 0 0 0 10px transparent; } }
+
+/* ==========================================================================
+   D&N 5.0 — «Стекло»: полупрозрачные карточки на мягком цветном фоне,
+   чёрная карточка дня со свечением, меню-капсула. Inter / Inter Tight.
+   Ещё два оформления на выбор: «Графит и золото» и «Классика» (вид 4.0).
+   ========================================================================== */
+:root, :root[data-theme="light"] {
+  --bg: #eef0f6; --card: rgba(255, 255, 255, 0.68); --card-solid: #ffffff; --field: rgba(110, 110, 140, 0.09); --field-2: rgba(110, 110, 140, 0.16);
+  --text: #0b0b10; --muted: #5e6270; --faint: #9a9eab; --line: rgba(15, 15, 35, 0.08);
+  --primary: #0b0b10; --primary-text: #ffffff;
+  --accent: #6d4aff; --accent-2: #ff5fa2; --soft: rgba(109, 74, 255, 0.11);
+  --btn: #0b0b10; --btn-hover: #262630; --btn-text: #ffffff;
+  --hl: #ffffff; --hl-text: #0b0b10;
+  --ink: #0d0d12; --ink-2: #1b1830; --ink-text: #ffffff; --ink-muted: rgba(255, 255, 255, 0.66); --glow2: rgba(157, 135, 255, 0.4);
+  --green: #10a35a; --red: #e5484d; --orange: #e37c12; --yellow: #b7791f;
+  --good-soft: rgba(16, 163, 90, 0.12); --warn-soft: rgba(227, 124, 18, 0.13); --bad-soft: rgba(229, 72, 77, 0.12);
+  --radius: 26px;
+  --shadow: 0 1px 1px rgba(16, 16, 30, 0.03), 0 10px 30px rgba(16, 16, 30, 0.07);
+  --shadow-lg: 0 24px 60px rgba(13, 13, 18, 0.32);
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-num: "Inter Tight", "Inter", -apple-system, sans-serif;
+  --mesh-1: rgba(167, 139, 250, 0.55); --mesh-2: rgba(251, 182, 214, 0.55); --mesh-3: rgba(134, 239, 172, 0.45); --mesh-4: rgba(147, 197, 253, 0.5);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg: #07070a; --card: rgba(30, 30, 38, 0.6); --card-solid: #18181f; --field: rgba(255, 255, 255, 0.07); --field-2: rgba(255, 255, 255, 0.12);
+    --text: #f4f4f7; --muted: #a0a3ad; --faint: #6b6e78; --line: rgba(255, 255, 255, 0.08);
+    --primary: #f4f4f7; --primary-text: #0b0b10;
+    --accent: #a08bff; --accent-2: #ff7bb5; --soft: rgba(160, 139, 255, 0.16);
+    --btn: #f4f4f7; --btn-hover: #ffffff; --btn-text: #0b0b10;
+    --hl: #ffffff; --hl-text: #0b0b10;
+    --ink: #121218; --ink-2: #221b40; --ink-text: #ffffff; --ink-muted: rgba(255, 255, 255, 0.64); --glow2: rgba(160, 139, 255, 0.35);
+    --green: #3ddc84; --red: #ff6b70; --orange: #f5a524; --yellow: #e8ad4a;
+    --good-soft: rgba(61, 220, 132, 0.14); --warn-soft: rgba(245, 165, 36, 0.15); --bad-soft: rgba(255, 107, 112, 0.15);
+    --shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 30px rgba(0, 0, 0, 0.35); --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.6);
+    --mesh-1: rgba(91, 61, 196, 0.45); --mesh-2: rgba(150, 40, 110, 0.32); --mesh-3: rgba(16, 110, 90, 0.3); --mesh-4: rgba(30, 80, 160, 0.38);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #07070a; --card: rgba(30, 30, 38, 0.6); --card-solid: #18181f; --field: rgba(255, 255, 255, 0.07); --field-2: rgba(255, 255, 255, 0.12);
+  --text: #f4f4f7; --muted: #a0a3ad; --faint: #6b6e78; --line: rgba(255, 255, 255, 0.08);
+  --primary: #f4f4f7; --primary-text: #0b0b10;
+  --accent: #a08bff; --accent-2: #ff7bb5; --soft: rgba(160, 139, 255, 0.16);
+  --btn: #f4f4f7; --btn-hover: #ffffff; --btn-text: #0b0b10;
+  --hl: #ffffff; --hl-text: #0b0b10;
+  --ink: #121218; --ink-2: #221b40; --ink-text: #ffffff; --ink-muted: rgba(255, 255, 255, 0.64); --glow2: rgba(160, 139, 255, 0.35);
+  --green: #3ddc84; --red: #ff6b70; --orange: #f5a524; --yellow: #e8ad4a;
+  --good-soft: rgba(61, 220, 132, 0.14); --warn-soft: rgba(245, 165, 36, 0.15); --bad-soft: rgba(255, 107, 112, 0.15);
+  --shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 30px rgba(0, 0, 0, 0.35); --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.6);
+  --mesh-1: rgba(91, 61, 196, 0.45); --mesh-2: rgba(150, 40, 110, 0.32); --mesh-3: rgba(16, 110, 90, 0.3); --mesh-4: rgba(30, 80, 160, 0.38);
+  color-scheme: dark;
+}
+/* «Графит и золото» — тёмное, спокойное, как карта премиум-банка */
+:root[data-theme="graphite"] {
+  --bg: #0c0c0e; --card: #17171a; --card-solid: #17171a; --field: #212125; --field-2: #2a2a2f;
+  --text: #f3efe6; --muted: #a39e93; --faint: #6f6b63; --line: #29292d;
+  --primary: #d4b06a; --primary-text: #141210;
+  --accent: #d4b06a; --accent-2: #e8cf98; --soft: rgba(212, 176, 106, 0.14);
+  --btn: #d4b06a; --btn-hover: #e0c084; --btn-text: #141210;
+  --hl: #d4b06a; --hl-text: #141210;
+  --ink: #1b1914; --ink-2: #2e2718; --ink-text: #f8f2e4; --ink-muted: rgba(248, 242, 228, 0.62); --glow2: rgba(212, 176, 106, 0.3);
+  --green: #6fcf97; --red: #ef6b6b; --orange: #e9a03b; --yellow: #d4b06a;
+  --good-soft: rgba(111, 207, 151, 0.13); --warn-soft: rgba(233, 160, 59, 0.14); --bad-soft: rgba(239, 107, 107, 0.14);
+  --radius: 22px; --shadow: 0 0 0 1px #232327; --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.55);
+  --font: "Inter", -apple-system, sans-serif; --font-num: "Inter Tight", "Inter", sans-serif;
+  color-scheme: dark;
+}
+/* «Классика» — вид 4.0: белые карточки, синий акцент */
+:root[data-theme="classic"] {
+  --bg: #f3f5f8; --card: #ffffff; --card-solid: #ffffff; --field: #f0f2f6; --field-2: #e4e8ef;
+  --text: #10131a; --muted: #687080; --faint: #9aa1ad; --line: #e6e9ef;
+  --primary: #3654ff; --primary-text: #ffffff;
+  --accent: #3654ff; --accent-2: #6a3bff; --soft: #eaeeff;
+  --btn: #3654ff; --btn-hover: #2a45e6; --btn-text: #ffffff;
+  --hl: #ffffff; --hl-text: #2a45e6;
+  --ink: #3654ff; --ink-2: #6a3bff; --ink-text: #ffffff; --ink-muted: rgba(255, 255, 255, 0.78); --glow2: rgba(255, 255, 255, 0.18);
+  --green: #12a150; --red: #e0383e; --orange: #d97706; --yellow: #b7791f;
+  --good-soft: #e3f6ea; --warn-soft: #fdf1df; --bad-soft: #fdeaea;
+  --radius: 22px; --shadow: 0 1px 2px rgba(16, 19, 26, 0.04), 0 8px 24px rgba(16, 19, 26, 0.06); --shadow-lg: 0 18px 48px rgba(54, 84, 255, 0.28);
+  --font: "Manrope", -apple-system, sans-serif; --font-num: "Unbounded", "Manrope", sans-serif;
+  color-scheme: light;
+}
+:root[data-theme="redblack"], :root[data-theme="redwhite"] { --card-solid: var(--card); --accent-2: var(--accent); }
+
+body { font-family: var(--font); background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+h1 { font-family: var(--font-num); font-weight: 800; letter-spacing: -0.035em; }
+
+/* ---- Стекло ---- */
+/* Цветной фон — прямо фоном страницы (слой «под» страницей Chrome не рисует под прокручиваемыми полосами). */
+html[data-look="glass"] {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(38vmax 38vmax at 8% 6%, var(--mesh-1), transparent 70%),
+    radial-gradient(34vmax 34vmax at 96% 12%, var(--mesh-2), transparent 70%),
+    radial-gradient(40vmax 40vmax at 80% 92%, var(--mesh-3), transparent 70%),
+    radial-gradient(36vmax 36vmax at 6% 80%, var(--mesh-4), transparent 70%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  min-height: 100%;
+}
+[data-look="glass"] body { background: transparent; }
+[data-look="glass"] .card, [data-look="glass"] .summary-hero, [data-look="glass"] .wallet-sum > div, [data-look="glass"] .note-card,
+[data-look="glass"] .quickline, [data-look="glass"] .tpl, [data-look="glass"] .search-box, [data-look="glass"] .top-search,
+[data-look="glass"] .report-link, [data-look="glass"] .cal-arrow, [data-look="glass"] .top-btn, [data-look="glass"] .cf, [data-look="glass"] .ptab,
+[data-look="glass"] .stack-more, [data-look="glass"] .mode-opt {
+  background: var(--card);
+  -webkit-backdrop-filter: blur(22px) saturate(1.7); backdrop-filter: blur(22px) saturate(1.7);
+  border: 1px solid color-mix(in srgb, #ffffff 55%, transparent);
+  box-shadow: var(--shadow);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme])[data-look="glass"] .card, :root:not([data-theme])[data-look="glass"] .quickline, :root:not([data-theme])[data-look="glass"] .tpl, :root:not([data-theme])[data-look="glass"] .search-box, :root:not([data-theme])[data-look="glass"] .top-search, :root:not([data-theme])[data-look="glass"] .cf, :root:not([data-theme])[data-look="glass"] .note-card, :root:not([data-theme])[data-look="glass"] .wallet-sum > div, :root:not([data-theme])[data-look="glass"] .summary-hero { border-color: rgba(255, 255, 255, 0.07); } }
+:root[data-theme="dark"][data-look="glass"] .card, :root[data-theme="dark"][data-look="glass"] .quickline, :root[data-theme="dark"][data-look="glass"] .tpl, :root[data-theme="dark"][data-look="glass"] .search-box, :root[data-theme="dark"][data-look="glass"] .top-search, :root[data-theme="dark"][data-look="glass"] .cf, :root[data-theme="dark"][data-look="glass"] .note-card, :root[data-theme="dark"][data-look="glass"] .wallet-sum > div, :root[data-theme="dark"][data-look="glass"] .summary-hero { border-color: rgba(255, 255, 255, 0.07); }
+[data-look="glass"] .top { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
+[data-look="glass"] input, [data-look="glass"] select, [data-look="glass"] textarea { background: color-mix(in srgb, var(--card-solid) 75%, transparent); }
+[data-look="glass"] .sidebar { background: var(--card); -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6); border-right: 1px solid var(--line); }
+
+/* Карточки и кнопки — мягче и крупнее */
+.card { border-radius: var(--radius); }
+.btn-primary { box-shadow: 0 8px 20px color-mix(in srgb, var(--btn) 22%, transparent); }
+.chip-opt:has(input:checked), .chip-check:has(input:checked) { background: var(--primary); color: var(--primary-text) !important; border-color: var(--primary); box-shadow: none; }
+.cat-tile:has(input:checked) { background: var(--primary); color: var(--primary-text); border-color: var(--primary); }
+.cf.is-on { background: var(--primary); color: var(--primary-text); border-color: var(--primary); }
+.count-pill { background: var(--accent); }
+
+/* Главная карточка — чёрная со свечением (в «Классике» остаётся синей) */
+.hero, .day-hero, .home-cta {
+  background:
+    radial-gradient(120% 140% at 100% 0%, color-mix(in srgb, var(--accent) 55%, transparent), transparent 52%),
+    radial-gradient(100% 120% at 0% 110%, color-mix(in srgb, var(--accent-2) 30%, transparent), transparent 55%),
+    linear-gradient(160deg, var(--ink-2), var(--ink));
+  color: var(--ink-text); box-shadow: var(--shadow-lg); border: 1px solid rgba(255, 255, 255, 0.06);
+}
+:root[data-theme="classic"] .hero, :root[data-theme="classic"] .day-hero, :root[data-theme="classic"] .home-cta { background: linear-gradient(135deg, var(--ink), var(--ink-2)); border: 0; }
+.hero::before, .hero::after { display: none; }
+.day-sum, .day-foot b { color: var(--ink-text); }
+.day-ring-text { fill: var(--ink-text); }
+.day-foot { border-top-color: rgba(255, 255, 255, 0.12); }
+
+/* Меню-капсула */
+.tabbar {
+  left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); border-radius: 30px; border: 1px solid color-mix(in srgb, #ffffff 45%, transparent);
+  background: color-mix(in srgb, var(--card-solid) 72%, transparent); -webkit-backdrop-filter: blur(24px) saturate(1.8); backdrop-filter: blur(24px) saturate(1.8);
+  box-shadow: 0 14px 40px rgba(10, 10, 20, 0.16); padding: 6px 6px; min-height: 66px;
+}
+.tabbar .nav-item { color: var(--faint); border-radius: 22px; }
+.tabbar .nav-item.is-active { color: var(--text); background: var(--field) !important; }
+.nav-plus, .tabbar .nav-plus { background: var(--primary); color: var(--primary-text); border-radius: 50%; width: 54px; height: 54px; box-shadow: 0 10px 24px color-mix(in srgb, var(--primary) 35%, transparent); }
+body { padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
+@media (min-width: 960px) { body { padding-bottom: 0; } }
+:root[data-theme="graphite"] .tabbar, :root[data-theme="dark"] .tabbar { border-color: rgba(255, 255, 255, 0.07); }
+
+/* Числа — Inter Tight, плотные */
+.num, .hero-value, .amount-field .amount-input, .big-num, .day-sum, .pad-display .num, .rc-big, .donut-sum, .summary-value, .spend-facts b { font-family: var(--font-num); letter-spacing: -0.035em; }
+.greet-hi { font-family: var(--font-num); font-size: 26px; letter-spacing: -0.03em; }
+.top-ava { background: var(--primary); color: var(--primary-text); border-radius: 50%; }
+.ql-plus { background: var(--primary); color: var(--primary-text); border-radius: 50%; }
+.ql-go.is-ready { background: var(--primary); color: var(--primary-text); }
+.tpl-ico { border-radius: 50%; }
+.toast-row { border-radius: 18px; }
+/* Неделя в карточке дня */
+.week-bars { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; height: 64px; margin-top: 12px; align-items: end; }
+.wb { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; }
+.wb i { width: 100%; max-width: 22px; border-radius: 7px; background: rgba(255, 255, 255, 0.22); transform-origin: bottom; animation: dn-grow 0.7s cubic-bezier(.2,.8,.2,1) both; }
+.wb:nth-child(2) i { animation-delay: 0.04s; } .wb:nth-child(3) i { animation-delay: 0.08s; } .wb:nth-child(4) i { animation-delay: 0.12s; }
+.wb:nth-child(5) i { animation-delay: 0.16s; } .wb:nth-child(6) i { animation-delay: 0.2s; } .wb:nth-child(7) i { animation-delay: 0.24s; }
+.wb.is-today i { background: linear-gradient(180deg, #ffffff, color-mix(in srgb, #ffffff 70%, var(--accent))); }
+.wb.is-over i { background: #ff8a8a; }
+.wb small { font-size: 10.5px; color: var(--ink-muted); text-transform: lowercase; }
+.wb.is-today small { color: var(--ink-text); font-weight: 700; }
+@keyframes dn-grow { from { transform: scaleY(0); } }
+@media (prefers-reduced-motion: reduce) { .wb i { animation: none; } }
+/* Лимиты по категориям */
+.cf-lim.lvl-ok { color: var(--green) !important; }
+.cf-lim.lvl-near { color: var(--orange) !important; }
+.cf-lim.lvl-over { color: var(--red) !important; }
+.budget-panel { display: flex; flex-direction: column; gap: 10px; margin: 8px 0; }
+.budget-panel .row-between > span { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; }
+.budget-track { height: 10px; border-radius: 99px; background: var(--field); overflow: hidden; }
+.budget-track i { display: block; height: 100%; border-radius: 99px; background: var(--green); transition: width 0.5s ease; }
+.budget-panel.lvl-near .budget-track i { background: var(--orange); }
+.budget-panel.lvl-over .budget-track i { background: var(--red); }
+.budget-form { display: flex; gap: 8px; align-items: center; }
+.budget-form input { flex: 1; min-width: 0; min-height: 40px; }
+.install-hint { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; margin-top: 14px; }
+.install-ico { font-size: 26px; }
+.install-text { display: flex; flex-direction: column; gap: 2px; }
+.install-text .small { color: var(--muted); }
+.install-actions { grid-column: 1 / -1; display: flex; gap: 8px; justify-content: flex-end; }
+/* В горизонтально прокручиваемых полосах размытие даёт серую подложку — там плашки просто полупрозрачные. */
+[data-look="glass"] .tpl, [data-look="glass"] .cf { -webkit-backdrop-filter: none; backdrop-filter: none; background: color-mix(in srgb, var(--card-solid) 86%, transparent); box-shadow: none; }
+/* Тень внутри прокручиваемой полосы обрезается по её краю и выглядит как серая плашка — там тени нет. */
+.tpl, .cf { box-shadow: none !important; }
+[data-look="glass"] .cf.is-on { background: var(--primary); }

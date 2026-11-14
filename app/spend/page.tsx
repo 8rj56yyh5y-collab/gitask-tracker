@@ -4,6 +4,8 @@ import { catColor } from "@/lib/categories.ts";
 import { formatMoney } from "@/lib/money.ts";
 import { isSimple } from "@/lib/mode.ts";
 import { TxRow } from "../components/TxRow.tsx";
+import { categoryBudgets } from "@/lib/catbudget.ts";
+import { setCategoryBudgetAction } from "../actions.ts";
 
 type SP = { m?: string; cat?: string; q?: string; who?: string; type?: string };
 
@@ -111,6 +113,9 @@ export default async function Spend({ searchParams }: { searchParams: Promise<SP
     return `/spend${s ? `?${s}` : ""}`;
   };
   const selected = cat ? byCat.get(cat) : null;
+  // Лимиты по категориям — только для расходов и текущего месяца (за прошлые месяцы — просто траты).
+  const budgets = type === "out" && isCurrent ? new Map(categoryBudgets(now, simple).map((b) => [String(b.categoryId), b])) : new Map();
+  const selBudget = cat ? budgets.get(cat) : undefined;
 
   return (
     <div className="narrow-wide spend">
@@ -181,7 +186,11 @@ export default async function Spend({ searchParams }: { searchParams: Promise<SP
             >
               <i aria-hidden />
               {c.emoji} {c.name}
-              <b>{total ? Math.round((c.s / total) * 100) : 0}%</b>
+              {budgets.get(c.key) ? (
+                <b className={`cf-lim lvl-${budgets.get(c.key)!.level}`}>{budgets.get(c.key)!.pct}% лимита</b>
+              ) : (
+                <b>{total ? Math.round((c.s / total) * 100) : 0}%</b>
+              )}
             </Link>
           ))}
         </div>
@@ -210,6 +219,40 @@ export default async function Spend({ searchParams }: { searchParams: Promise<SP
             Сбросить
           </Link>
         </div>
+      )}
+
+      {type === "out" && isCurrent && cat && cat !== "none" && (
+        <section className={`card budget-panel ${selBudget ? `lvl-${selBudget.level}` : ""}`}>
+          {selBudget ? (
+            <>
+              <div className="row-between">
+                <span>
+                  <b>Лимит на месяц: {formatMoney(selBudget.limit)}</b>
+                  <span className="muted small">
+                    {selBudget.left >= 0 ? ` · осталось ${formatMoney(selBudget.left)}` : ` · перелимит ${formatMoney(-selBudget.left)}`}
+                  </span>
+                </span>
+                <b className="num">{selBudget.pct}%</b>
+              </div>
+              <div className="budget-track">
+                <i style={{ width: `${Math.min(100, selBudget.pct)}%` }} />
+              </div>
+            </>
+          ) : (
+            <span className="muted small">Хотите тратить на это не больше определённой суммы в месяц? Поставьте лимит — D&amp;N предупредит на 80%.</span>
+          )}
+          <form action={setCategoryBudgetAction} className="budget-form">
+            <input type="hidden" name="categoryId" value={cat} />
+            <input type="hidden" name="next" value={link({})} />
+            <input name="amount" inputMode="decimal" placeholder={selBudget ? String(selBudget.limit / 100) : "например, 3000"} aria-label="Лимит на месяц, ₴" />
+            <button className="btn btn-sm btn-primary">{selBudget ? "Изменить" : "Поставить лимит"}</button>
+            {selBudget && (
+              <button className="btn btn-sm btn-ghost" name="clear" value="1">
+                Убрать
+              </button>
+            )}
+          </form>
+        </section>
       )}
 
       {list.length === 0 ? (

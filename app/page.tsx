@@ -5,6 +5,8 @@ import { getDb } from "@/lib/db.ts";
 import { formatMoney } from "@/lib/money.ts";
 import { budgetAlerts, centerTree, getTx, listRecent, listTxOn, listUnassigned, personalCenterIds } from "@/lib/repo.ts";
 import { isSimple } from "@/lib/mode.ts";
+import { categoryBudgets } from "@/lib/catbudget.ts";
+import { InstallHint } from "./components/InstallHint.tsx";
 import { DayRing } from "./components/DayRing.tsx";
 import { listPlans, ymd } from "@/lib/plans.ts";
 import { readyToAccept } from "@/lib/suggest.ts";
@@ -49,14 +51,29 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
   // Сегодняшние траты: в простом режиме — все, в расширенном — только мои (как в «Можно потратить»).
   const mine = new Set(personalCenterIds());
   const simple = isSimple();
-  const todaySpent = listTxOn(today)
-    .filter((t) => t.kind === "expense" && !t.transit_id && (simple || t.cost_center_id === null || mine.has(t.cost_center_id)))
-    .reduce((a, t) => a - t.amount, 0);
+  const counts = (t: { kind: string; transit_id?: number | null; cost_center_id: number | null }) =>
+    t.kind === "expense" && !t.transit_id && (simple || t.cost_center_id === null || mine.has(t.cost_center_id));
+  const todaySpent = listTxOn(today).filter(counts).reduce((a, t) => a - (t as { amount: number }).amount, 0);
+  // Неделя: столбики за 7 дней (сегодня — последний).
+  const week7 = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6 + i);
+    const key = ymd(d);
+    return { key, wd: d.toLocaleDateString("ru-RU", { weekday: "short" }), s: key === today ? todaySpent : listTxOn(key).filter(counts).reduce((a, t) => a - t.amount, 0) };
+  });
+  const weekMax = Math.max(1, ...week7.map((d) => d.s));
   // Норма на день: что осталось на месяц (вместе с сегодняшними тратами), поровну на оставшиеся дни.
   const dayLimit = safe.known ? Math.max(0, Math.floor((safe.left + todaySpent) / safe.daysLeft / 100) * 100) : 0;
 
   // «D&N заметил»: необычные траты, перелимиты, найденные подписки, копилки.
   const notes: { href: string; icon: string; title: string; text: string; tone: "warn" | "info" | "good" }[] = [];
+  for (const b of categoryBudgets(now, simple).filter((b) => b.level !== "ok"))
+    notes.push({
+      href: `/spend?cat=${b.categoryId}`,
+      icon: b.emoji || "🎯",
+      title: b.level === "over" ? `${b.name}: перелимит` : `${b.name}: ${b.pct}% лимита`,
+      text: b.level === "over" ? `на ${formatMoney(-b.left)} больше, чем вы себе разрешили` : `осталось ${formatMoney(b.left)} до конца месяца`,
+      tone: "warn",
+    });
   for (const u of unusualSpending(now))
     notes.push({ href: "/analytics", icon: u.emoji || "📈", title: `${u.name}: +${u.pct}%`, text: `${formatMoney(u.now)} с начала месяца — обычно к этому дню ${formatMoney(u.usual)}`, tone: "warn" });
   for (const a of budgetAlerts(now).slice(0, 2))
@@ -126,6 +143,14 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
                 : "в этом месяце уже всё потрачено"
               : `за ${month} — ${formatMoney(safe.spent)}`}
           </span>
+        </div>
+        <div className="week-bars" aria-label="Траты за 7 дней">
+          {week7.map((d) => (
+            <span key={d.key} className={`wb ${d.key === today ? "is-today" : ""} ${dayLimit > 0 && d.s > dayLimit ? "is-over" : ""}`} title={`${d.wd}: ${formatMoney(d.s)}`}>
+              <i style={{ height: `${Math.max(6, Math.round((d.s / weekMax) * 100))}%` }} />
+              <small>{d.wd}</small>
+            </span>
+          ))}
         </div>
         <div className="day-foot">
           {safe.known ? (
@@ -249,6 +274,8 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
           </div>
         </section>
       )}
+
+      <InstallHint />
 
       {/* Последние */}
       <section className="today-sec">
