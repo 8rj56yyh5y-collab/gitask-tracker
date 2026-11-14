@@ -1095,3 +1095,30 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); backgro
 .tx-amount { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
 .tx-amount.pos { color: var(--green); }
 .chip-pending { color: var(--red); border-color: color-mix(in srgb, var(--red) 35%, transparent); background: color-mix(in srgb, var(--red) 7%, transparent); }
+
+/* Быстрый разбор */
+.review-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.review-item { padding-bottom: 14px; }
+.review-sugg { margin-top: 6px; padding: 12px; border-radius: 16px; background: var(--soft); display: flex; flex-direction: column; gap: 10px; }
+.review-sugg-text { display: flex; flex-direction: column; gap: 2px; }
+.review-sugg-src { font-size: 12px; font-weight: 700; color: var(--accent); text-transform: none; }
+.review-sugg-what { font-size: 15px; font-weight: 600; color: var(--text); }
+.review-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.review-actions form { display: contents; }
+.review-yes { width: 100%; min-height: 48px; font-size: 16px; }
+.review-edit { min-height: 48px; display: inline-flex; align-items: center; background: var(--card); }
+.toast-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 14px; margin-bottom: 12px; border-radius: 16px; background: var(--ink); color: var(--ink-text); font-size: 14px; animation: dn-rise 0.25s ease both; }
+.toast-undo { background: none; border: 0; color: var(--hl); font: inherit; font-weight: 700; cursor: pointer; padding: 4px 6px; }
+
+/* Короткая форма: направление и карта — как в прошлый раз, одной строкой */
+.quick-defaults { border: 1px solid var(--line); border-radius: 14px; background: var(--field); }
+.quick-defaults > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; padding: 12px 14px; align-items: center; }
+.quick-defaults > summary::-webkit-details-marker { display: none; }
+.quick-defaults[open] > summary .link { visibility: hidden; }
+.quick-defaults > .form { padding: 0 14px 14px; }
+.home-cta { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; border-radius: 18px; background: var(--ink); color: #fff; text-decoration: none; margin-bottom: 14px; }
+.home-cta b { font-size: 1.1rem; }
+.home-cta .home-cta-go { background: var(--hl); color: #0e1511; border-radius: 999px; padding: 8px 14px; font-weight: 700; white-space: nowrap; }
+.quick-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+.quick-row a { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 4px; border-radius: 14px; background: var(--card); border: 1px solid var(--line); text-decoration: none; color: var(--text); font-size: .85rem; text-align: center; }
+.quick-row a span:first-child { font-size: 1.3rem; }

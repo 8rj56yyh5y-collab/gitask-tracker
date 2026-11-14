@@ -96,3 +96,23 @@ test("карта из Apple Pay: не узнали → выбрали вручн
   assert.equal(repo.cardUsage().get(card), 30_000, "оплата попала в лимит карты");
   assert.equal(repo.findCard({ hint: "rada  gold" })!.id, card, "в следующий раз карта узнаётся по названию");
 });
+
+test("разбор одним нажатием: подсказка «как в прошлый раз» и её отмена-по-шагам", async () => {
+  const { fullSuggestion, acceptSuggestion } = await import("../lib/suggest.ts");
+  const personal = repo.listCenters().find((c) => c.name === "Личные")!.id;
+  const food = cats.listCategories().find((c) => c.name === "Продукты")!.id;
+  const a = repo.insertTx({ amountKop: -40_000, source: "applepay", counterparty: "Сильпо" }).id;
+  repo.assignTx(a, personal, "", "еда на неделю");
+  cats.setTxDetails(a, { categoryId: food, note: "еда на неделю" });
+  const b = repo.insertTx({ amountKop: -15_000, source: "applepay", counterparty: "Сильпо" }).id;
+  const s = fullSuggestion(repo.getTx(b)!)!;
+  assert.equal(s.source, "history");
+  assert.equal(s.centerId, personal);
+  assert.equal(s.categoryId, food);
+  assert.equal(s.note, "еда на неделю");
+  assert.equal(acceptSuggestion(b, s), true);
+  assert.ok(!repo.listUnassigned().some((t) => t.id === b));
+  // незнакомое место без ИИ — подсказки нет, выбираем руками
+  const c = repo.insertTx({ amountKop: -15_000, source: "applepay", counterparty: "Совсем новое место" }).id;
+  assert.equal(fullSuggestion(repo.getTx(c)!), null);
+});

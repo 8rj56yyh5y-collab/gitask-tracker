@@ -19,6 +19,7 @@ import { addCategory, renameCategory, setCategoryEnabled, setTxDetails } from "@
 import { addOtherIncome, createSalary, creditDueSalaries } from "@/lib/income.ts";
 import { createTransit, deleteTransit, finishTransit, linkTxToTransit } from "@/lib/transit.ts";
 import { getDb } from "@/lib/db.ts";
+import { acceptSuggestion, fullSuggestion } from "@/lib/suggest.ts";
 import { createAccount, currentIngestKey, deleteAccount, isOwner, resetPassword, updateAccount } from "@/lib/accounts.ts";
 import { redirect } from "next/navigation";
 import { toKop, parseAmount } from "@/lib/money.ts";
@@ -26,6 +27,8 @@ import {
   archiveCard,
   deleteCard,
   setTxCard,
+  listUnassigned,
+  needsCard,
   archiveCenter,
   assignTx,
   createCard,
@@ -82,8 +85,13 @@ export async function addTransaction(f: FormData) {
     source: "manual",
   });
   setTxDetails(created.id, { categoryId: num(f, "categoryId") });
+  // Запоминаем выбор — в следующий раз форма подставит его сама.
+  if (direction < 0) {
+    setSetting("last_center", num(f, "centerId") ? String(num(f, "centerId")) : null);
+    setSetting("last_account", str(f, "account") || null);
+  }
   refresh();
-  redirect(str(f, "next") || "/");
+  redirect(str(f, "next") || (str(f, "again") ? "/new?saved=1" : "/?saved=1"));
 }
 
 export async function assignTransaction(f: FormData) {
@@ -674,4 +682,39 @@ export async function updateAccountAction(f: FormData) {
   updateAccount(str(f, "id"), str(f, "name"), str(f, "login"));
   refresh();
   redirect("/settings?acc=1&acc_saved=1#accounts");
+}
+
+// ---------- Быстрый разбор ----------
+/** «✓ Верно» под операцией: принять подсказку (как в прошлый раз или от ИИ). */
+export async function acceptOneAction(f: FormData) {
+  const id = num(f, "id");
+  const tx = id ? getTx(id) : null;
+  const s = tx ? fullSuggestion(tx) : null;
+  if (!tx || !s) {
+    redirect(id ? `/inbox/${id}` : "/inbox");
+  }
+  const complete = acceptSuggestion(tx.id, s);
+  refresh();
+  // Без комментария — сразу открываем операцию, чтобы дописать его.
+  redirect(complete ? `${str(f, "next") || "/inbox"}${(str(f, "next") || "/inbox").includes("?") ? "&" : "?"}done=${tx.id}` : `/inbox/${tx.id}`);
+}
+
+/** «Подтвердить все подсказки»: все операции, у которых есть полная подсказка с комментарием. */
+export async function acceptAllAction() {
+  let n = 0;
+  for (const tx of listUnassigned()) {
+    if (needsCard(tx)) continue;
+    const s = fullSuggestion(tx);
+    if (s && s.note.trim() && acceptSuggestion(tx.id, s)) n++;
+  }
+  refresh();
+  redirect(`/inbox?all=${n}`);
+}
+
+/** Отменить быстрое подтверждение — операция снова ждёт записи. */
+export async function undoAcceptAction(f: FormData) {
+  const id = num(f, "id");
+  if (id) getDb().prepare("UPDATE transactions SET cost_center_id = NULL, category_id = NULL, assigned_at = NULL, needs_note = 0, kind = CASE WHEN amount < 0 THEN 'expense' ELSE 'income' END WHERE id = ?").run(id);
+  refresh();
+  redirect("/inbox");
 }
