@@ -3,6 +3,7 @@ import { formatMoney } from "./money.ts";
 import { assignTx, centerTree, getTx, suggestCenters, type Tx } from "./repo.ts";
 import { getSetting, setSetting } from "./settings.ts";
 import { canAutoCredit } from "./income.ts";
+import { acceptSuggestion, fullSuggestion } from "./suggest.ts";
 import { cardHintOf, listCards, listMainCards, needsCard, setTxCard } from "./repo.ts";
 import { getCategory, label, listCategories, markNeedsNote, setTxDetails, suggestedCategories } from "./categories.ts";
 import { createTransit, linkTxToTransit, listTransits } from "./transit.ts";
@@ -148,6 +149,28 @@ function childKeyboard(tx: Tx, parentId: number): Button[][] {
   return rows;
 }
 
+/**
+ * Первый экран уведомления. Есть полная подсказка (как в прошлый раз / от ИИ) — одна кнопка «✓ Верно»;
+ * иначе — шаг 1 из 3 (направление).
+ */
+function firstStep(tx: Tx): { text: string; keyboard: Button[][] } {
+  const sug = fullSuggestion(tx);
+  const center = sug ? centerTree().find((c) => c.id === sug.centerId) : undefined;
+  if (sug && center) {
+    const cat = getCategory(sug.categoryId);
+    const card = sug.cardId ? listCards().find((c) => c.id === sug.cardId) : undefined;
+    const what = `${cat ? `${label(cat)} · ` : ""}${center.name}${sug.note ? ` · «${sug.note}»` : ""}${card ? ` · 💳 ${card.bank} •${card.last4}` : ""}`;
+    return {
+      text: `${txText(tx)}\n\n${sug.source === "history" ? "Как в прошлый раз" : "✨ Подсказка ИИ"}: <b>${esc(what)}</b>`,
+      keyboard: [
+        [{ text: sug.note ? "✓ Верно" : "✓ Верно, допишу комментарий", callback_data: `y:${tx.id}` }],
+        [{ text: "Изменить", callback_data: `b:${tx.id}` }],
+      ],
+    };
+  }
+  return { text: `${txText(tx)}${aiHint(tx)}\n\n<b>1 из 3.</b> Чьи это деньги?`, keyboard: suggestKeyboard(tx) };
+}
+
 /** Вопрос «с какой карты?», когда Wallet прислал название, которое D&N ещё не знает. */
 function cardQuestion(tx: Tx): string {
   const hint = cardHintOf(tx);
@@ -230,13 +253,13 @@ export async function notifyNewTx(txId: number): Promise<void> {
   const tx = getTx(txId);
   if (!tx || tx.cost_center_id !== null || tx.kind === "internal") return;
   try {
-    const hint = aiHint(tx);
-    const askCard = needsCard(tx) && listMainCards().length > 0;
+    const askCard = needsCard(tx) && listMainCards().length > 0 && !fullSuggestion(tx)?.cardId;
+    const first = askCard ? { text: cardQuestion(tx), keyboard: cardKeyboard(tx) } : firstStep(tx);
     await call(token, "sendMessage", {
       chat_id: chat,
-      text: askCard ? cardQuestion(tx) : `${txText(tx)}${hint}\n\n<b>1 из 3.</b> Чьи это деньги?`,
+      text: first.text,
       parse_mode: "HTML",
-      reply_markup: { inline_keyboard: askCard ? cardKeyboard(tx) : suggestKeyboard(tx) },
+      reply_markup: { inline_keyboard: first.keyboard },
     });
   } catch (e) {
     console.error("Telegram notify failed:", e);
@@ -414,12 +437,34 @@ export async function handleUpdate(update: Update): Promise<void> {
     const cardId = Number(centerRaw) || null;
     setTxCard(tx.id, cardId);
     await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: cardId ? "Карта запомнена ✓" : "Без карты" });
-    const fresh = getTx(tx.id)!;
+    const step = firstStep(getTx(tx.id)!);
+    await call(token, "editMessageText", { ...target, text: step.text, parse_mode: "HTML", reply_markup: { inline_keyboard: step.keyboard } });
+    return;
+  }
+  if (action === "y") {
+    // «✓ Верно» — записать как подсказано (как в прошлый раз или по подсказке ИИ).
+    const sug = fullSuggestion(tx);
+    if (!sug) {
+      await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: "Подсказки нет — выберите вручную" });
+      return;
+    }
+    const complete = acceptSuggestion(tx.id, sug);
+    await call(token, "answerCallbackQuery", { callback_query_id: q.id, text: "Записано ✓" });
+    if (complete) {
+      await call(token, "editMessageText", { ...target, text: doneText(getTx(tx.id)!), parse_mode: "HTML" });
+    } else {
+      await askNote(token, chatId, target, getTx(tx.id)!);
+    }
+    return;
+  }
+  if (action === "b") {
+    // «Изменить» — к обычным шагам: сначала направление.
+    await call(token, "answerCallbackQuery", { callback_query_id: q.id });
     await call(token, "editMessageText", {
       ...target,
-      text: `${txText(fresh)}${aiHint(fresh)}\n\n<b>1 из 3.</b> Чьи это деньги?`,
+      text: `${txText(tx)}${aiHint(tx)}\n\n<b>1 из 3.</b> Чьи это деньги?`,
       parse_mode: "HTML",
-      reply_markup: { inline_keyboard: suggestKeyboard(fresh) },
+      reply_markup: { inline_keyboard: suggestKeyboard(tx) },
     });
     return;
   }
@@ -473,9 +518,9 @@ export async function handleUpdate(update: Update): Promise<void> {
     } else {
       await askNote(token, chatId, target, fresh);
     }
-  } else if (action === "m" || action === "b" || action === "c") {
+  } else if (action === "m" || action === "c") {
     await call(token, "answerCallbackQuery", { callback_query_id: q.id });
-    const kb = action === "m" ? rootsKeyboard(tx) : action === "c" ? childKeyboard(tx, Number(centerRaw)) : suggestKeyboard(tx);
+    const kb = action === "m" ? rootsKeyboard(tx) : childKeyboard(tx, Number(centerRaw));
     await call(token, "editMessageReplyMarkup", { ...target, reply_markup: { inline_keyboard: kb } });
   }
 }

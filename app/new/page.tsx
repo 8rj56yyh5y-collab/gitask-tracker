@@ -5,6 +5,22 @@ import { popularCategories } from "@/lib/categories.ts";
 import { AccountSelect } from "../components/AccountSelect.tsx";
 import { CashCenterLink } from "../components/CashCenterLink.tsx";
 import { OTHER_INCOME_KINDS } from "@/lib/income.ts";
+import { getSetting } from "@/lib/settings.ts";
+import { centerTree, listCards } from "@/lib/repo.ts";
+import { listCashboxes } from "@/lib/cash.ts";
+
+/** Что выбрали в прошлый раз: направление и карту/кассу — чтобы не выбирать их каждый раз заново. */
+function lastChoice() {
+  const centerId = Number(getSetting("last_center")) || null;
+  const center = centerId ? centerTree().find((c) => c.id === centerId && !c.is_internal) : undefined;
+  const account = getSetting("last_account") ?? "";
+  const [kind, idRaw] = account.split(":");
+  const id = Number(idRaw);
+  const card = kind === "card" ? listCards().find((c) => c.id === id) : undefined;
+  const box = kind === "cash" ? listCashboxes().find((b) => b.id === id) : undefined;
+  const accountLabel = card ? `${card.bank} •${card.last4}` : box ? `касса «${box.name}»` : "наличные без кассы";
+  return { center, account: card || box ? account : "", accountLabel };
+}
 
 const TABS = [
   { id: "out", label: "Расход", href: "/new" },
@@ -33,42 +49,44 @@ function More({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default async function NewTx({ searchParams }: { searchParams: Promise<{ type?: string }> }) {
-  const { type } = await searchParams;
+export default async function NewTx({ searchParams }: { searchParams: Promise<{ type?: string; saved?: string }> }) {
+  const { type, saved } = await searchParams;
   const tab = type === "in" || type === "move" ? type : "out";
+  const last = lastChoice();
 
   return (
     <div className="narrow">
       <h1>Новая операция</h1>
       <SegTabs tabs={TABS} active={tab} />
-      {tab === "out" && (
-        <div className="explain">
-          <span>🧭</span>
-          <span>
-            <b>Направление</b> — чьи это деньги (личные, работа). По нему видно, сколько ушло за месяц.
-          </span>
-          <span>💵</span>
-          <span>
-            <b>Касса</b> — где лежали наличные. Её остаток меняется, только если выбрать её в пункте 4.
-          </span>
-        </div>
-      )}
-
+      {saved && <div className="toast-row">✓ Записано. Можно вводить следующую.</div>}
       {tab === "out" && (
         <form action={addTransaction} className="card form form-big">
           <input type="hidden" name="direction" value="out" />
           <Amount />
-          <CenterChips required label="1. Чьи это деньги — направление" includeInternal={false} />
-          <CategoryChips required label="2. На что именно — категория" suggested={popularCategories(6)} />
+          <CategoryChips required label="На что — категория" suggested={popularCategories(6)} />
           <label>
-            3. Комментарий
+            Комментарий
             <input name="description" required placeholder="например, продукты на неделю" />
           </label>
-          <AccountChips
-            label="4. Откуда списались деньги"
-            none="Наличными, без кассы"
-            hint="Выберите кассу — расход появится в её истории, а остаток уменьшится. Карту — трата попадёт в её лимит."
-          />
+          {last.center ? (
+            <details className="quick-defaults">
+              <summary>
+                <span>
+                  <b>{last.center.name}</b> · {last.accountLabel}
+                </span>
+                <span className="link">изменить</span>
+              </summary>
+              <div className="form">
+                <CenterChips required label="Чьи это деньги — направление" includeInternal={false} defaultValue={last.center.id} />
+                <AccountChips label="Откуда списались деньги" none="Наличными, без кассы" defaultValue={last.account} hint="Касса — расход уменьшит её остаток. Карта — трата попадёт в её лимит." />
+              </div>
+            </details>
+          ) : (
+            <>
+              <CenterChips required label="Чьи это деньги — направление" includeInternal={false} />
+              <AccountChips label="Откуда списались деньги" none="Наличными, без кассы" hint="Касса — расход уменьшит её остаток. Карта — трата попадёт в её лимит." />
+            </>
+          )}
           <CashCenterLink />
           <More>
             <label>
@@ -84,7 +102,10 @@ export default async function NewTx({ searchParams }: { searchParams: Promise<{ 
               <input name="date" type="datetime-local" />
             </label>
           </More>
-          <button className="btn btn-primary btn-big">Записать расход</button>
+          <div className="review-actions">
+            <button className="btn btn-primary btn-big">Записать расход</button>
+            <button className="btn btn-big" name="again" value="1">Записать и ещё одну</button>
+          </div>
         </form>
       )}
 

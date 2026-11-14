@@ -252,3 +252,34 @@ test("telegram: plan reminder once a day after 9:00, «✓ Оплачено» pa
   assert.equal(plans.getPlan(id)!.paid, 500_000);
   assert.match(calls.find((c) => c.path.endsWith("/editMessageText"))!.body.text, /Отменено/);
 });
+
+test("telegram: тот же магазин снова — «Как в прошлый раз» и одна кнопка «✓ Верно»", async () => {
+  const prev = repo.listRecent(50).find((t) => t.counterparty === "OKKO" && t.description === "подписка на кино")!;
+  assert.ok(prev, "первая OKKO уже записана в тесте выше");
+  const { id } = repo.insertTx({ amountKop: -125000, source: "applepay", counterparty: "OKKO" });
+  calls.length = 0;
+  await tg.notifyNewTx(id);
+  // карту D&N берёт как в прошлый раз у этого магазина — вопрос «С какой карты?» не нужен
+  const sent = calls.find((c) => c.path.endsWith("/sendMessage"))!.body;
+  assert.match(sent.text, /💳/);
+  assert.match(sent.text, /Как в прошлый раз/);
+  assert.match(sent.text, /подписка на кино/);
+  const kb = sent.reply_markup.inline_keyboard.flat();
+  assert.ok(kb.some((b: any) => b.callback_data === `y:${id}` && b.text === "✓ Верно"));
+  assert.ok(kb.some((b: any) => b.callback_data === `b:${id}`), "можно изменить");
+
+  // «Изменить» — обычный шаг 1
+  calls.length = 0;
+  await tg.handleUpdate({ callback_query: { id: "qb", data: `b:${id}`, message: { chat: { id: 42 }, message_id: 11 } } });
+  assert.match(calls.find((c) => c.path.endsWith("/editMessageText"))!.body.text, /1 из 3/);
+
+  // «✓ Верно» — записано целиком
+  calls.length = 0;
+  await tg.handleUpdate({ callback_query: { id: "qy", data: `y:${id}`, message: { chat: { id: 42 }, message_id: 11 } } });
+  const tx = repo.getTx(id)!;
+  assert.equal(tx.cost_center_id, prev.cost_center_id);
+  assert.equal(tx.category_id, prev.category_id);
+  assert.equal(tx.description, "подписка на кино");
+  assert.ok(!repo.listUnassigned().some((t) => t.id === id));
+  assert.match(calls.find((c) => c.path.endsWith("/editMessageText"))!.body.text, /Записано/);
+});

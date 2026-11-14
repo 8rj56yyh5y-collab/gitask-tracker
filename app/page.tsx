@@ -15,8 +15,11 @@ import { HomeHero, QuickActions } from "./components/HomeHero.tsx";
 import { TxRow } from "./components/TxRow.tsx";
 import { cardStyle } from "@/lib/banks.ts";
 import { transitOpenSum } from "@/lib/transit.ts";
+import { fullSuggestion } from "@/lib/suggest.ts";
+import { listUnassigned } from "@/lib/repo.ts";
 
-export default function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
+  const { saved } = await searchParams;
   // Новый человек без единой операции — сначала короткое знакомство.
   if (!getSetting("welcome_seen") && !getDb().prepare("SELECT 1 FROM transactions LIMIT 1").get()) redirect("/welcome");
   const un = unassignedSummary();
@@ -37,22 +40,28 @@ export default function Home() {
 
   return (
     <div className="grid grid-home">
+      {saved && <div className="toast-row span-all">✓ Расход записан</div>}
+      {un.count > 0 && (() => {
+        const ready = listUnassigned().filter((t) => fullSuggestion(t)).length;
+        return (
+          <Link href="/inbox" className="home-cta span-all">
+            <span>
+              <b>
+                Разобрать {un.count} {un.count === 1 ? "операцию" : un.count < 5 ? "операции" : "операций"}
+              </b>
+              <br />
+              <span className="small" style={{ opacity: 0.8 }}>
+                на {formatMoney(un.sum)}
+                {ready > 0 ? ` · ${ready} можно подтвердить одним нажатием` : " — укажите, на что ушли деньги"}
+              </span>
+            </span>
+            <span className="home-cta-go">Разобрать ›</span>
+          </Link>
+        );
+      })()}
       <HomeHero />
       <QuickActions />
       <SetupCard />
-
-      {un.count > 0 && (
-        <Link href="/inbox" className="todo span-all">
-          <span className="todo-dot" aria-hidden>
-            {un.count}
-          </span>
-          <span className="todo-text">
-            <strong>{un.count === 1 ? "Операция ждёт записи" : "Операции ждут записи"}</strong>
-            <span>на {formatMoney(un.sum)} — укажите, на что ушли деньги</span>
-          </span>
-          <span className="todo-go">›</span>
-        </Link>
-      )}
 
       {alerts.length > 0 && (
         <section className="card span-all alert-budget">
