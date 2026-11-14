@@ -199,3 +199,41 @@ export function weekSummary(now = new Date()): WeekSummary {
   };
 }
 
+
+/* ---------------- Серия: сколько дней подряд всё записано ---------------- */
+
+/**
+ * Дни подряд (до сегодня включительно), когда все траты записаны: у каждой есть направление и комментарий.
+ * Дни без трат серию не рвут и не считаются. Сегодня с неразобранным — серия считается до вчера.
+ */
+export function streakDays(now = new Date()): number {
+  const since = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 90);
+  const rows = getDb()
+    .prepare(
+      `SELECT occurred_at, (cost_center_id IS NULL AND kind != 'internal' AND income_kind IS NULL) OR needs_note = 1 AS pending
+       FROM transactions WHERE occurred_at >= ? AND amount < 0`,
+    )
+    .all(since.toISOString()) as { occurred_at: string; pending: number }[];
+  const days = new Map<string, boolean>();
+  for (const r of rows) {
+    const k = ymd(new Date(r.occurred_at));
+    days.set(k, (days.get(k) ?? false) || Boolean(Number(r.pending)));
+  }
+  let n = 0;
+  for (let i = 0; i <= 90; i++) {
+    const k = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() - i));
+    if (!days.has(k)) continue;
+    if (days.get(k)) {
+      if (i === 0) continue; // сегодня ещё можно разобрать
+      break;
+    }
+    n++;
+  }
+  return n;
+}
+
+/** «Доброе утро» / «Добрый день» / «Добрый вечер» / «Доброй ночи». */
+export function greeting(now = new Date()): string {
+  const h = now.getHours();
+  return h < 5 ? "Доброй ночи" : h < 12 ? "Доброе утро" : h < 18 ? "Добрый день" : "Добрый вечер";
+}

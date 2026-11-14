@@ -738,3 +738,11 @@ export function searchTx(q: string, limit = 30): Tx[] {
   }
   return out;
 }
+
+/** Операции за один день (YYYY-MM-DD, местное время), новые сверху. */
+export function listTxOn(day: string): Tx[] {
+  const [y, m, d] = day.split("-").map(Number);
+  const from = new Date(y, m - 1, d).toISOString();
+  const to = new Date(y, m - 1, d + 1).toISOString();
+  return rows<Tx>(getDb().prepare(`${TX_SELECT} WHERE t.occurred_at >= ? AND t.occurred_at < ? ORDER BY t.occurred_at DESC`).all(from, to));
+}

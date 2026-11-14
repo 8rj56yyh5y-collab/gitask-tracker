@@ -20,6 +20,7 @@ import { addOtherIncome, createSalary, creditDueSalaries } from "@/lib/income.ts
 import { createTransit, deleteTransit, finishTransit, linkTxToTransit } from "@/lib/transit.ts";
 import { getDb } from "@/lib/db.ts";
 import { addToGoal, archiveGoal, createGoal } from "@/lib/goals.ts";
+import { guessQuick, quickTemplates } from "@/lib/quick.ts";
 import { detectSubscriptions, hideSubscription } from "@/lib/insights.ts";
 import { acceptSuggestion, fullSuggestion, readyToAccept } from "@/lib/suggest.ts";
 import { createAccount, currentIngestKey, deleteAccount, isOwner, resetPassword, updateAccount } from "@/lib/accounts.ts";
@@ -776,4 +777,65 @@ export async function hideSubscriptionAction(f: FormData) {
   hideSubscription(str(f, "counterparty"));
   refresh();
   redirect(str(f, "next") || "/plans");
+}
+
+/* ---------------- D&N 3.0: запись одной строкой и быстрые траты ---------------- */
+
+/** Предпросмотр для строки «кофе 75»: что D&N поймёт, ещё до нажатия. */
+export async function quickPreviewAction(text: string) {
+  const g = guessQuick(String(text ?? "").slice(0, 120));
+  return { amount: g.amount, note: g.note, category: g.category, centerName: g.centerName, how: g.how };
+}
+
+function recordQuick(g: { amount: number; note: string; categoryId: number; centerId: number | null; account: string }) {
+  const a = parseAccount(g.account);
+  const created = insertTx({
+    amountKop: -g.amount,
+    cardId: a && "card" in a ? a.card : null,
+    cashboxId: a && "cashbox" in a ? a.cashbox : null,
+    costCenterId: g.centerId,
+    description: g.note,
+    source: "manual",
+  });
+  setTxDetails(created.id, { categoryId: g.categoryId, note: g.note });
+  return created.id;
+}
+
+/** «кофе 75» → расход. Если не поняли сумму или категорию — открываем обычную форму с тем, что поняли. */
+export async function quickAddAction(f: FormData) {
+  const text = str(f, "q").slice(0, 120);
+  const g = guessQuick(text);
+  const back = str(f, "next") || "/";
+  if (!g.amount || !g.categoryId || !g.note) {
+    const qs = new URLSearchParams();
+    if (g.amount) qs.set("amount", String(g.amount / 100));
+    if (g.note) qs.set("note", g.note);
+    if (g.categoryId) qs.set("cat", String(g.categoryId));
+    redirect(`/new?${qs.toString()}`);
+  }
+  const id = recordQuick({ amount: g.amount, note: g.note, categoryId: g.categoryId as number, centerId: g.centerId, account: g.account });
+  refresh();
+  redirect(`${back}${back.includes("?") ? "&" : "?"}added=${id}`);
+}
+
+/** Быстрая трата в одно касание: та же сумма, категория, направление и карта, что обычно. */
+export async function templateAction(f: FormData) {
+  const t = quickTemplates(20).find((x) => x.key === str(f, "key"));
+  if (!t) throw new Error("Быстрая трата не найдена — обновите страницу");
+  const id = recordQuick({ amount: t.amount, note: t.note, categoryId: t.categoryId, centerId: t.centerId, account: t.account });
+  refresh();
+  const back = str(f, "next") || "/";
+  redirect(`${back}${back.includes("?") ? "&" : "?"}added=${id}`);
+}
+
+/** Отменить только что записанное (из всплывашки «Записано»). */
+export async function undoAddedAction(f: FormData) {
+  const id = num(f, "id");
+  const tx = id ? getTx(id) : null;
+  if (tx && tx.source === "manual") {
+    deleteTx(tx.id);
+    afterTxDeleted(tx.plan_id);
+  }
+  refresh();
+  redirect(str(f, "next") || "/");
 }
