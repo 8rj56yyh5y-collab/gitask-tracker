@@ -8,6 +8,7 @@ import { CardChips, CategoryChips, CenterChips } from "../../components/Pickers.
 import { getCategory, label, suggestedCategories } from "@/lib/categories.ts";
 import { cardHintOf, getTx, listCards, needsCard, suggestCenters } from "@/lib/repo.ts";
 import { isSimple, personalCenterId } from "@/lib/mode.ts";
+import { inWorkTime } from "@/lib/hours.ts";
 
 // Экран «Куда ушли деньги?» — его открывает «Команда» iOS сразу после оплаты.
 export default async function AssignOne({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ c?: string; cat?: string; card_ok?: string }> }) {
@@ -31,6 +32,7 @@ export default async function AssignOne({ params, searchParams }: { params: Prom
       {card_ok && <div className="card ok-note">Карта сохранена ✓</div>}
       <div className="card">
         <TxRow tx={tx} />
+        {tx.amount < 0 && inWorkTime(tx.amount) && <div className="tx-hours">⏱ {inWorkTime(tx.amount)}</div>}
         {!tx.cashbox_id && listCards().length > 0 && (
           <details className={`card-edit ${needsCard(tx) ? "is-ask" : ""}`} open={needsCard(tx)}>
             <summary>

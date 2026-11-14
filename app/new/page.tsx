@@ -11,6 +11,7 @@ import { AddedToast } from "../components/AddedToast.tsx";
 import { OTHER_INCOME_KINDS } from "@/lib/income.ts";
 import { getSetting } from "@/lib/settings.ts";
 import { isSimple, personalCenterId } from "@/lib/mode.ts";
+import { hourRate } from "@/lib/hours.ts";
 import { centerTree, listCards } from "@/lib/repo.ts";
 import { listCashboxes } from "@/lib/cash.ts";
 
@@ -58,7 +59,7 @@ export default async function NewTx({ searchParams }: { searchParams: Promise<{ 
       {tab === "out" && (
         <form action={addTransaction} className="card form form-big quick-add">
           <input type="hidden" name="direction" value="out" />
-          <AmountPad initial={preAmount ?? ""}>
+          <AmountPad initial={preAmount ?? ""} hourRate={hourRate()}>
             <CategoryChips required tiles label="На что" suggested={popularCategories(8)} defaultValue={Number(preCat) || null} />
             <input name="description" required placeholder="Комментарий: на что именно" aria-label="Комментарий" maxLength={200} defaultValue={preNote ?? ""} />
             {simple ? (

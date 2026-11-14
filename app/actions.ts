@@ -11,7 +11,7 @@ import { THEME_COOKIE, normalizeTheme } from "@/lib/theme.ts";
 import { NAV_COOKIE, NAV_ITEMS, parseNav } from "@/lib/nav.ts";
 import { BANK_NAMES } from "@/lib/banks.ts";
 import { archiveCashbox, cashMove, createCashbox, parseAccount, transfer, updateCashbox } from "@/lib/cash.ts";
-import { afterTxDeleted, cancelPlan, createPlan, payPlan, restorePlan, undoPlanPayment, updatePlan } from "@/lib/plans.ts";
+import { afterTxDeleted, cancelPlan, createPlan, listPlans, payPlan, restorePlan, undoPlanPayment, updatePlan } from "@/lib/plans.ts";
 import { archiveGroup, archiveProduct, createSale, deleteSale, payCompany, saveGroup, saveProduct, setSalesBase } from "@/lib/sales.ts";
 import { acceptNorms, extendNorm, restartNorm } from "@/lib/norms.ts";
 import { setSetting } from "@/lib/settings.ts";
@@ -23,6 +23,10 @@ import { addToGoal, archiveGoal, createGoal } from "@/lib/goals.ts";
 import { guessQuick, quickTemplates } from "@/lib/quick.ts";
 import { setUiMode } from "@/lib/mode.ts";
 import { setCategoryBudget } from "@/lib/catbudget.ts";
+import { askAssistant } from "@/lib/assistant.ts";
+import { saveFopSettings } from "@/lib/fop.ts";
+import { setForecastStart } from "@/lib/forecast.ts";
+import { setHourRate } from "@/lib/hours.ts";
 import { detectSubscriptions, hideSubscription } from "@/lib/insights.ts";
 import { acceptSuggestion, fullSuggestion, readyToAccept } from "@/lib/suggest.ts";
 import { createAccount, currentIngestKey, deleteAccount, isOwner, resetPassword, updateAccount } from "@/lib/accounts.ts";
@@ -857,4 +861,52 @@ export async function setCategoryBudgetAction(f: FormData) {
   setCategoryBudget(id, str(f, "clear") ? null : amount ? toKop(amount) : null);
   refresh();
   redirect(str(f, "next") || "/spend");
+}
+
+/* ---------------- D&N 6.0: ИИ-помощник ---------------- */
+
+/** Вопрос помощнику. Ошибки возвращаем текстом — их покажет чат. */
+export async function askAction(history: { role: "user" | "assistant"; text: string }[], question: string): Promise<{ answer?: string; error?: string }> {
+  try {
+    const safe = Array.isArray(history) ? history.filter((t) => (t?.role === "user" || t?.role === "assistant") && typeof t.text === "string") : [];
+    return { answer: await askAssistant(safe, String(question ?? "")) };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Не получилось ответить. Попробуйте ещё раз." };
+  }
+}
+
+/* ---------------- D&N 6.0: ФОП, прогноз, цена часа ---------------- */
+
+export async function saveFopAction(f: FormData) {
+  const mw = parseAmount(str(f, "minWage"));
+  saveFopSettings({ group: num(f, "group") || null, minWage: mw ? toKop(mw) : null, rate: Number(str(f, "rate").replace(",", ".")) || null });
+  refresh();
+  redirect("/fop?saved=1");
+}
+
+/** Платёж ФОП → в «Платежи»: D&N напомнит в день срока (и в Telegram). */
+export async function fopToPlanAction(f: FormData) {
+  const title = str(f, "title");
+  const amount = num(f, "amount");
+  const due = str(f, "due");
+  if (!title || !amount || !/^\d{4}-\d{2}-\d{2}$/.test(due)) throw new Error("Не хватает данных платежа");
+  const exists = listPlans("open", 500, "out").some((p) => p.title === title && p.due_date === due);
+  if (!exists) createPlan({ title, total: amount, dueDate: due, note: "налоги ФОП", centerId: num(f, "centerId") || null });
+  refresh();
+  redirect("/fop?added=1");
+}
+
+export async function setForecastStartAction(f: FormData) {
+  const v = str(f, "amount");
+  const a = parseAmount(v.replace(/^-/, ""));
+  setForecastStart(v.trim() === "" ? null : (v.trim().startsWith("-") ? -1 : 1) * toKop(a ?? 0));
+  refresh();
+  redirect("/forecast");
+}
+
+export async function setHourRateAction(f: FormData) {
+  const a = str(f, "reset") ? null : parseAmount(str(f, "rate"));
+  setHourRate(a ? toKop(a) : null);
+  refresh();
+  redirect(str(f, "next") || "/settings");
 }

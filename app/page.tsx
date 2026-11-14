@@ -3,7 +3,10 @@ import { redirect } from "next/navigation";
 import { getSetting } from "@/lib/settings.ts";
 import { getDb } from "@/lib/db.ts";
 import { formatMoney } from "@/lib/money.ts";
-import { budgetAlerts, centerTree, getTx, listRecent, listTxOn, listUnassigned, personalCenterIds } from "@/lib/repo.ts";
+import { budgetAlerts, centerTree, getTx, groupUsage, listMainCards, listRecent, listTxOn, listTxRange, listUnassigned, personalCenterIds } from "@/lib/repo.ts";
+import { catColor, shortName } from "@/lib/categories.ts";
+import { cardStyle } from "@/lib/banks.ts";
+import { cashBalances, listCashboxes } from "@/lib/cash.ts";
 import { isSimple } from "@/lib/mode.ts";
 import { categoryBudgets } from "@/lib/catbudget.ts";
 import { InstallHint } from "./components/InstallHint.tsx";
@@ -61,6 +64,21 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
     return { key, wd: d.toLocaleDateString("ru-RU", { weekday: "short" }), s: key === today ? todaySpent : listTxOn(key).filter(counts).reduce((a, t) => a - t.amount, 0) };
   });
   const weekMax = Math.max(1, ...week7.map((d) => d.s));
+  // Кружки категорий: на что ушли мои деньги в этом месяце.
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const byCat = new Map<number, { id: number; name: string; emoji: string; s: number }>();
+  for (const t of listTxRange(monthStart, new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()).filter(counts)) {
+    if (!t.category_id) continue;
+    const c = byCat.get(t.category_id) ?? { id: t.category_id, name: t.category_name ?? "", emoji: t.category_emoji ?? "•", s: 0 };
+    c.s -= t.amount;
+    byCat.set(t.category_id, c);
+  }
+  const topCats = [...byCat.values()].sort((a, b) => b.s - a.s).slice(0, 8);
+  // Карты-градиенты: сколько списано и сколько осталось лимита.
+  const cards = listMainCards();
+  const usage = groupUsage();
+  const boxes = simple ? [] : listCashboxes();
+  const boxBal = cashBalances();
   // Норма на день: что осталось на месяц (вместе с сегодняшними тратами), поровну на оставшиеся дни.
   const dayLimit = safe.known ? Math.max(0, Math.floor((safe.left + todaySpent) / safe.daysLeft / 100) * 100) : 0;
 
@@ -167,6 +185,21 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
         </div>
       </Link>
 
+      <nav className="act-row" aria-label="Быстрые действия">
+        <Link href="/new" className="act is-main">
+          <i aria-hidden>＋</i>Записать
+        </Link>
+        <Link href="/spend" className="act">
+          <i aria-hidden>📊</i>Траты
+        </Link>
+        <Link href="/forecast" className="act">
+          <i aria-hidden>🔮</i>Прогноз
+        </Link>
+        <Link href="/ask" className="act">
+          <i aria-hidden>✨</i>Спросить
+        </Link>
+      </nav>
+
       <QuickLine next="/" />
       <QuickTemplates next="/" />
 
@@ -221,6 +254,71 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
             {(done || all) && <Confetti id={`clear-${today}`} />}
           </>
         )
+      )}
+
+      {/* На что ушли деньги — цветные кружки */}
+      {topCats.length > 0 && (
+        <section className="today-sec">
+          <div className="today-head">
+            <h2>На что в {month.replace(/ь$/, "е").replace(/й$/, "е").replace(/т$/, "те")}</h2>
+            <Link href="/spend" className="link small">
+              Все ›
+            </Link>
+          </div>
+          <div className="bubbles">
+            {topCats.map((c) => (
+              <Link key={c.id} href={`/spend?cat=${c.id}`} className="bubble" style={{ "--bc": catColor(c.name) } as React.CSSProperties}>
+                <i aria-hidden>{c.emoji}</i>
+                <span>{shortName(c.name)}</span>
+                <b>{formatMoney(c.s).replace(/,\d+/, "")}</b>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Карты и наличные */}
+      {(cards.length > 0 || boxes.length > 0) && (
+        <section className="today-sec">
+          <div className="today-head">
+            <h2>Карты{boxes.length > 0 ? " и наличные" : ""}</h2>
+            <Link href="/wallets" className="link small">
+              Деньги ›
+            </Link>
+          </div>
+          <div className="gcards">
+            {cards.map((c) => {
+              const used = usage.get(c.id) ?? 0;
+              const lim = c.monthly_limit;
+              return (
+                <Link key={c.id} href={`/cards/${c.id}`} className="gcard" style={{ "--gc": cardStyle(c).color } as React.CSSProperties}>
+                  <span className="gcard-top">
+                    {c.bank}
+                    <small>•• {c.last4}</small>
+                  </span>
+                  <span>
+                    <span className="gcard-sum">{lim > 0 ? formatMoney(Math.max(0, lim - used)) : formatMoney(used)}</span>
+                    <span className="gcard-sub">{lim > 0 ? ` осталось из ${formatMoney(lim)}` : " списано в этом месяце"}</span>
+                    {lim > 0 && (
+                      <span className="gcard-track" style={{ display: "block" }}>
+                        <i style={{ width: `${Math.min(100, (used / lim) * 100)}%` }} />
+                      </span>
+                    )}
+                  </span>
+                </Link>
+              );
+            })}
+            {boxes.map((b) => (
+              <Link key={`b${b.id}`} href={`/cash/${b.id}`} className="gcard is-cash" style={{ "--gc": b.color || "#16a34a" } as React.CSSProperties}>
+                <span className="gcard-top">
+                  {b.name}
+                  <small>наличные</small>
+                </span>
+                <span className="gcard-sum">{formatMoney(boxBal.get(b.id) ?? 0)}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* D&N заметил */}

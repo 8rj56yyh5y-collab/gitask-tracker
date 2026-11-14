@@ -6,6 +6,7 @@ import {
   deleteAccountAction,
   disconnectTelegramAction,
   setUiModeAction,
+  setHourRateAction,
   toggleWeekSummaryAction,
   resetAccountAction,
   setNavAction,
@@ -21,6 +22,8 @@ import { telegramState } from "@/lib/telegram.ts";
 import { getSetting } from "@/lib/settings.ts";
 import { uiMode } from "@/lib/mode.ts";
 import { FaceIdToggle } from "../components/AppLock.tsx";
+import { hourRate } from "@/lib/hours.ts";
+import { formatMoney } from "@/lib/money.ts";
 import { MAX_BACKFILL_DAYS } from "@/lib/monobank.ts";
 import { publicBase } from "@/lib/url.ts";
 import { cookies } from "next/headers";
@@ -61,6 +64,8 @@ export default async function Settings({
   const theme = normalizeTheme((await cookies()).get(THEME_COOKIE)?.value);
   const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const mode = uiMode();
+  const rate = hourRate();
+  const ownRate = Boolean(getSetting("hour_rate"));
   const today = ymd(new Date());
   const minDay = ymd(new Date(Date.now() - MAX_BACKFILL_DAYS * 864e5));
   const monoOn = monobankConnected();
@@ -73,6 +78,26 @@ export default async function Settings({
       <HashOpen />
 
       <FaceIdToggle />
+
+      <form action={setHourRateAction} className="card hour-card" id="hours">
+        <span>
+          <strong>⏱ Цена часа вашей работы</strong>
+          <span className="muted small">
+            {rate
+              ? ` Сейчас: ${formatMoney(rate)} в час${ownRate ? "" : " — посчитано из ставки (÷ 168 часов)"}. Под тратами D&N пишет, сколько это часов работы.`
+              : " Впишите — и под тратами появится «≈ 2,5 ч работы». Или добавьте ставку в «Доходах»: посчитается сама."}
+          </span>
+        </span>
+        <span className="fc-start-row">
+          <input name="rate" inputMode="decimal" placeholder={rate ? String(Math.round(rate / 100)) : "например, 250"} aria-label="Цена часа, ₴" />
+          <button className="btn btn-sm">Сохранить</button>
+          {ownRate && (
+            <button className="btn btn-sm btn-ghost" name="reset" value="1">
+              По ставке
+            </button>
+          )}
+        </span>
+      </form>
 
       <section className="card mode-card" id="mode">
         <div className="mode-head">
