@@ -716,3 +716,25 @@ export function dailyTotals(d: Date): { day: number; date: string; expense: numb
 function rows_<T>(r: unknown): T[] {
   return r as T[];
 }
+
+/**
+ * Поиск операций: по магазину, комментарию, категории, направлению, карте и сумме.
+ * Регистр и «ё» не важны. Берём последние 3000 операций — этого хватает на годы.
+ */
+export function searchTx(q: string, limit = 30): Tx[] {
+  const norm = (s: string) => s.toLocaleLowerCase("ru").replace(/ё/g, "е");
+  const words = norm(q.trim()).split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const all = rows<Tx>(getDb().prepare(`${TX_SELECT} ORDER BY t.occurred_at DESC LIMIT 3000`).all());
+  const out: Tx[] = [];
+  for (const t of all) {
+    const hay = norm(
+      [t.counterparty, t.description, t.category_name, t.center_name, t.card_label, t.cashbox_name, t.for_whom, String(Math.abs(t.amount) / 100)].join(" "),
+    );
+    if (words.every((w) => hay.includes(w.replace(",", ".")))) {
+      out.push(t);
+      if (out.length >= limit) break;
+    }
+  }
+  return out;
+}

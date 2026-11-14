@@ -1,6 +1,6 @@
-// Фоновые задачи сервера: зачисление ставок и напоминания в Telegram. Запускается один раз при старте.
+// Фоновые задачи сервера: зачисление ставок, напоминания и итог недели в Telegram. Запускается один раз при старте.
 import { creditDueSalaries } from "./income.ts";
-import { sendPlanReminders } from "./telegram.ts";
+import { sendPlanReminders, sendWeekSummary } from "./telegram.ts";
 import { listAccounts } from "./accounts.ts";
 import { MAIN, runAs } from "./tenant.ts";
 
@@ -25,6 +25,7 @@ export function startScheduler() {
           console.error(`Scheduler (income, ${t}):`, e);
         }
         sendPlanReminders().catch((e) => console.error(`Scheduler (${t}):`, e));
+        sendWeekSummary().catch((e) => console.error(`Scheduler (week, ${t}):`, e));
       });
     }
   };

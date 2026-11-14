@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { createPlanAction, payCompanyAction } from "../actions.ts";
+import { addSubscriptionAction, createPlanAction, hideSubscriptionAction, payCompanyAction } from "../actions.ts";
+import { detectSubscriptions } from "@/lib/insights.ts";
 import { AccountChips, CenterChips } from "../components/Pickers.tsx";
 import { formatMoney } from "@/lib/money.ts";
 import { listPlans, ymd, type Plan } from "@/lib/plans.ts";
@@ -65,8 +66,8 @@ const TABS = [
   { id: "company", name: "Долг компании" },
 ] as const;
 
-export default async function Plans({ searchParams }: { searchParams: Promise<{ tab?: string; new?: string }> }) {
-  const { tab: rawTab, new: openNew } = await searchParams;
+export default async function Plans({ searchParams }: { searchParams: Promise<{ tab?: string; new?: string; sub?: string }> }) {
+  const { tab: rawTab, new: openNew, sub: subAdded } = await searchParams;
   const tab = TABS.find((t) => t.id === rawTab)?.id ?? "out";
   const today = ymd(new Date());
   const week = ymd(new Date(Date.now() + 7 * DAY));
@@ -105,6 +106,10 @@ export default async function Plans({ searchParams }: { searchParams: Promise<{ 
           </Link>
         ))}
       </nav>
+
+      {subAdded && <div className="toast-row">✓ Подписка добавлена: D&amp;N напомнит о ней и сам отметит оплату, когда придёт списание.</div>}
+
+      {tab === "out" && <FoundSubs />}
 
       {tab === "company" ? (
         <form action={payCompanyAction} className="card form form-big">
@@ -209,5 +214,46 @@ export default async function Plans({ searchParams }: { searchParams: Promise<{ 
         </>
       )}
     </div>
+  );
+}
+
+/** Регулярные списания, которых ещё нет в платежах: одной кнопкой — в ежемесячный платёж. */
+function FoundSubs() {
+  const subs = detectSubscriptions();
+  if (!subs.length) return null;
+  const total = subs.reduce((a, x) => a + x.amount, 0);
+  return (
+    <section className="card subs-card">
+      <div className="subs-head">
+        <span className="subs-icon" aria-hidden>
+          🔁
+        </span>
+        <span>
+          <strong>Похоже на подписки · {formatMoney(total)} в месяц</strong>
+          <span className="muted small">D&amp;N заметил одинаковые списания каждый месяц. Добавьте — и он напомнит заранее и отметит оплату сам.</span>
+        </span>
+      </div>
+      {subs.map((x) => (
+        <div key={x.counterparty} className="subs-row">
+          <span className="subs-main">
+            <strong>{x.counterparty}</strong>
+            <span className="muted small">
+              {formatMoney(x.amount)} · {x.months} мес. подряд · следующее ≈ {x.next.split("-").reverse().slice(0, 2).join(".")}
+            </span>
+          </span>
+          <form action={addSubscriptionAction}>
+            <input type="hidden" name="counterparty" value={x.counterparty} />
+            <button className="btn btn-primary btn-sm">Добавить</button>
+          </form>
+          <form action={hideSubscriptionAction}>
+            <input type="hidden" name="counterparty" value={x.counterparty} />
+            <input type="hidden" name="next" value="/plans" />
+            <button className="btn btn-ghost btn-sm" aria-label={`${x.counterparty} — это не подписка`}>
+              Не то
+            </button>
+          </form>
+        </div>
+      ))}
+    </section>
   );
 }

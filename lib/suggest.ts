@@ -1,7 +1,7 @@
 import { getDb } from "./db.ts";
 import { suggestCategory } from "./ai.ts";
 import { categoriesFromHistory, listCategories } from "./categories.ts";
-import { getTx } from "./repo.ts";
+import { getTx, needsCard } from "./repo.ts";
 
 /**
  * Подсказка категории для новой операции: сначала по истории (так уже записывали этот магазин),
@@ -96,4 +96,12 @@ export function acceptSuggestion(txId: number, s: FullSuggestion): boolean {
   }
   db.prepare("UPDATE transactions SET needs_note = 1 WHERE id = ?").run(txId);
   return false;
+}
+
+/** Можно записать одной кнопкой целиком: есть подсказка с комментарием, а карта известна или угадана. */
+export function readyToAccept(tx: Parameters<typeof fullSuggestion>[0] & { source: string }): FullSuggestion | null {
+  const s = fullSuggestion(tx);
+  if (!s || !s.note.trim()) return null;
+  if (needsCard(tx) && !s.cardId) return null;
+  return s;
 }

@@ -190,6 +190,29 @@ CREATE TABLE IF NOT EXISTS ai_reports (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Копилки: цель, сколько нужно и к какому сроку. Пополнения — отдельными записями.
+CREATE TABLE IF NOT EXISTS goals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  emoji TEXT NOT NULL DEFAULT '🎯',
+  target INTEGER NOT NULL, -- копейки
+  deadline TEXT, -- YYYY-MM-DD
+  archived INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS goal_moves (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  goal_id INTEGER NOT NULL REFERENCES goals(id),
+  amount INTEGER NOT NULL, -- копейки, «+» отложили, «−» взяли
+  note TEXT NOT NULL DEFAULT '',
+  at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Подписки, которые человек скрыл («это не подписка»).
+CREATE TABLE IF NOT EXISTS subs_hidden (
+  counterparty TEXT PRIMARY KEY
+);
+
 CREATE INDEX IF NOT EXISTS idx_tx_unassigned ON transactions(cost_center_id, kind);
 CREATE INDEX IF NOT EXISTS idx_tx_card_date ON transactions(card_id, occurred_at);
 `;

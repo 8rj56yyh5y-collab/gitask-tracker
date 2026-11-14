@@ -21,17 +21,17 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#f4f5f2",
+  themeColor: "#f3f5f8",
 };
 
-/** Шрифт Onest (как в маркетплейсе Gobsek). */
+/** Шрифты D&N 2.0: Manrope — текст, Unbounded — крупные суммы. */
 function Fonts() {
   return (
     <>
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
       {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap" />
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;600;700&display=swap" />
     </>
   );
 }
@@ -82,12 +82,21 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Fonts />
       </head>
       <body>
-        <header className="top">
+        <header className="top top-v2">
           <Link href="/" className="brand">
             D&amp;N
           </Link>
-          {accName && <span className="acc-badge" title="Вы вошли в аккаунт">👤 {accName}</span>}
+          <Link href="/search" className="top-search" aria-label="Поиск">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
+              <circle cx="11" cy="11" r="7" />
+              <path d="M20 20l-3.5-3.5" />
+            </svg>
+            <span>Поиск по всему</span>
+          </Link>
           <TopNav />
+          <Link href="/more" className="top-ava" aria-label="Профиль и все разделы" title={accName ? `Аккаунт: ${accName}` : "Профиль и все разделы"}>
+            {(accName || "Я").trim().charAt(0).toUpperCase()}
+          </Link>
         </header>
         <main className="wrap">{children}</main>
         <Nav pending={count} items={parseNav(jar.get(NAV_COOKIE)?.value)} />

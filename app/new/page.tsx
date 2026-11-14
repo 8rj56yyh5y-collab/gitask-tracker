@@ -4,6 +4,8 @@ import { AccountChips, CategoryChips, CenterChips, ChipPicker, SegTabs } from ".
 import { popularCategories } from "@/lib/categories.ts";
 import { AccountSelect } from "../components/AccountSelect.tsx";
 import { CashCenterLink } from "../components/CashCenterLink.tsx";
+import { AmountPad } from "../components/AmountPad.tsx";
+import { SubmitButton } from "../components/SubmitButton.tsx";
 import { OTHER_INCOME_KINDS } from "@/lib/income.ts";
 import { getSetting } from "@/lib/settings.ts";
 import { centerTree, listCards } from "@/lib/repo.ts";
@@ -28,18 +30,6 @@ const TABS = [
   { id: "move", label: "Перевод", href: "/new?type=move" },
 ];
 
-function Amount({ autoFocus = true }: { autoFocus?: boolean }) {
-  return (
-    <label className="amount-field">
-      <span className="sr-only">Сумма, ₴</span>
-      <input name="amount" inputMode="decimal" required autoFocus={autoFocus} placeholder="0" className="amount-input" aria-label="Сумма в гривнах" />
-      <span className="amount-cur" aria-hidden>
-        ₴
-      </span>
-    </label>
-  );
-}
-
 function More({ children }: { children: React.ReactNode }) {
   return (
     <details className="more-fields">
@@ -56,62 +46,62 @@ export default async function NewTx({ searchParams }: { searchParams: Promise<{ 
 
   return (
     <div className="narrow">
-      <h1>Новая операция</h1>
+      <h1 className="sr-only">Новая операция</h1>
       <SegTabs tabs={TABS} active={tab} />
       {saved && <div className="toast-row">✓ Записано. Можно вводить следующую.</div>}
       {tab === "out" && (
-        <form action={addTransaction} className="card form form-big">
+        <form action={addTransaction} className="card form form-big quick-add">
           <input type="hidden" name="direction" value="out" />
-          <Amount />
-          <CategoryChips required label="На что — категория" suggested={popularCategories(6)} />
-          <label>
-            Комментарий
-            <input name="description" required placeholder="например, продукты на неделю" />
-          </label>
-          {last.center ? (
-            <details className="quick-defaults">
-              <summary>
-                <span>
-                  <b>{last.center.name}</b> · {last.accountLabel}
-                </span>
-                <span className="link">изменить</span>
-              </summary>
-              <div className="form">
-                <CenterChips required label="Чьи это деньги — направление" includeInternal={false} defaultValue={last.center.id} />
-                <AccountChips label="Откуда списались деньги" none="Наличными, без кассы" defaultValue={last.account} hint="Касса — расход уменьшит её остаток. Карта — трата попадёт в её лимит." />
-              </div>
-            </details>
-          ) : (
-            <>
-              <CenterChips required label="Чьи это деньги — направление" includeInternal={false} />
-              <AccountChips label="Откуда списались деньги" none="Наличными, без кассы" hint="Касса — расход уменьшит её остаток. Карта — трата попадёт в её лимит." />
-            </>
-          )}
-          <CashCenterLink />
-          <More>
-            <label>
-              Где или кому
-              <input name="counterparty" placeholder="например, АТБ" />
-            </label>
-            <label>
-              Для кого
-              <input name="forWhom" placeholder="например, для семьи" />
-            </label>
-            <label>
-              Дата и время
-              <input name="date" type="datetime-local" />
-            </label>
-          </More>
+          <AmountPad>
+            <CategoryChips required tiles label="На что" suggested={popularCategories(8)} />
+            <input name="description" required placeholder="Комментарий: на что именно" aria-label="Комментарий" maxLength={200} />
+            {last.center ? (
+              <details className="quick-defaults">
+                <summary>
+                  <span>
+                    <b>{last.center.name}</b> · {last.accountLabel}
+                  </span>
+                  <span className="link">изменить</span>
+                </summary>
+                <div className="form">
+                  <CenterChips required label="Чьи это деньги" includeInternal={false} defaultValue={last.center.id} />
+                  <AccountChips label="Откуда списались" none="Наличными, без кассы" defaultValue={last.account} hint="Касса — расход уменьшит её остаток. Карта — трата попадёт в её лимит." />
+                </div>
+              </details>
+            ) : (
+              <>
+                <CenterChips required label="Чьи это деньги" includeInternal={false} />
+                <AccountChips label="Откуда списались" none="Наличными, без кассы" hint="Касса — расход уменьшит её остаток. Карта — трата попадёт в её лимит." />
+              </>
+            )}
+            <CashCenterLink />
+            <More>
+              <label>
+                Где или кому
+                <input name="counterparty" placeholder="например, АТБ" />
+              </label>
+              <label>
+                Для кого
+                <input name="forWhom" placeholder="например, для семьи" />
+              </label>
+              <label>
+                Дата и время
+                <input name="date" type="datetime-local" />
+              </label>
+            </More>
+          </AmountPad>
           <div className="review-actions">
-            <button className="btn btn-primary btn-big">Записать расход</button>
-            <button className="btn btn-big" name="again" value="1">Записать и ещё одну</button>
+            <SubmitButton className="btn btn-primary btn-big">Записать</SubmitButton>
+            <SubmitButton className="btn btn-big" name="again" value="1" pending="…">
+              + ещё одну
+            </SubmitButton>
           </div>
         </form>
       )}
 
       {tab === "in" && (
         <form action={addIncomeAction} className="card form form-big">
-          <Amount />
+          <AmountPad />
           <ChipPicker name="kind" label="Что это" defaultValue="Ставка" options={["Ставка", ...OTHER_INCOME_KINDS].map((k) => ({ value: k, label: k }))} />
           <AccountChips label="Куда пришли деньги" none="Наличными, без кассы" hint="Выберите кассу — приход появится в её истории, а остаток вырастет." />
           <More>
@@ -139,7 +129,7 @@ export default async function NewTx({ searchParams }: { searchParams: Promise<{ 
       {tab === "move" && (
         <form action={transferAction} className="card form form-big">
           <input type="hidden" name="next" value="/" />
-          <Amount />
+          <AmountPad />
           <div className="grid-2-tight">
             <label>
               Откуда

@@ -1,10 +1,12 @@
-// Нижнее меню на телефоне: человек сам выбирает пункты (до 5). «＋» и «Ещё» есть всегда.
+// Нижнее меню на телефоне: четыре раздела, человек может заменить любой. «＋» есть всегда, остальное — через поиск и профиль.
 
-export const NAV_COOKIE = "dn_nav";
-export const NAV_MAX = 5;
+// В 2.0 меню новое — старый выбор не переносим, поэтому другое имя cookie.
+export const NAV_COOKIE = "dn_nav2";
+export const NAV_MAX = 4;
 
 export const NAV_ITEMS = [
-  { id: "home", href: "/", label: "Главная", icon: "home" },
+  { id: "home", href: "/", label: "Сегодня", icon: "home" },
+  { id: "wallets", href: "/wallets", label: "Кошельки", icon: "wallet" },
   { id: "cards", href: "/cards", label: "Карты", icon: "card" },
   { id: "cash", href: "/cash", label: "Кассы", icon: "wallet" },
   { id: "plans", href: "/plans", label: "Платежи", icon: "calendar" },
@@ -12,7 +14,7 @@ export const NAV_ITEMS = [
   { id: "history", href: "/history", label: "История", icon: "history" },
   { id: "inbox", href: "/inbox", label: "Записать", icon: "inbox" },
   { id: "income", href: "/income", label: "Доходы", icon: "income" },
-  { id: "analytics", href: "/analytics", label: "Аналитика", icon: "chart" },
+  { id: "analytics", href: "/analytics", label: "Отчёты", icon: "chart" },
   { id: "centers", href: "/centers", label: "Направл.", icon: "tag" },
   { id: "categories", href: "/categories", label: "Категории", icon: "grid" },
   { id: "transit", href: "/transit", label: "Чужие", icon: "swap" },
@@ -20,7 +22,7 @@ export const NAV_ITEMS = [
 ] as const;
 
 export type NavId = (typeof NAV_ITEMS)[number]["id"];
-export const DEFAULT_NAV: NavId[] = ["home", "cards", "cash", "plans", "sales"];
+export const DEFAULT_NAV: NavId[] = ["home", "wallets", "plans", "analytics"];
 
 export function parseNav(raw: string | null | undefined): NavId[] {
   if (!raw) return DEFAULT_NAV;
