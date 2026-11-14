@@ -6,7 +6,12 @@ import { formatMoney } from "@/lib/money.ts";
 import { budgetAlerts, centerTree, getTx, listRecent, listUnassigned } from "@/lib/repo.ts";
 import { listPlans, ymd } from "@/lib/plans.ts";
 import { readyToAccept } from "@/lib/suggest.ts";
-import { detectSubscriptions, safeToSpend, unusualSpending } from "@/lib/insights.ts";
+import { detectSubscriptions, greeting, safeToSpend, streakDays, unusualSpending } from "@/lib/insights.ts";
+import { currentAccountName } from "@/lib/accounts.ts";
+import { QuickLine } from "./components/QuickLine.tsx";
+import { QuickTemplates } from "./components/QuickTemplates.tsx";
+import { AddedToast } from "./components/AddedToast.tsx";
+import { Confetti, CountUp, Swipe } from "./components/Motion.tsx";
 import { listGoals } from "@/lib/goals.ts";
 import { acceptAllAction, undoAcceptAction } from "./actions.ts";
 import { SetupCard } from "./components/SetupCard.tsx";
@@ -20,8 +25,8 @@ const plural = (n: number, one: string, few: string, many: string) => {
 };
 
 /** «Сегодня»: сколько можно тратить, что разобрать, что заметил D&N и что скоро оплатить. */
-export default async function Today({ searchParams }: { searchParams: Promise<{ saved?: string; done?: string; all?: string }> }) {
-  const { saved, done, all } = await searchParams;
+export default async function Today({ searchParams }: { searchParams: Promise<{ saved?: string; done?: string; all?: string; added?: string }> }) {
+  const { saved, done, all, added } = await searchParams;
   // Новый человек без единой операции — сначала короткое знакомство.
   if (!getSetting("welcome_seen") && !getDb().prepare("SELECT 1 FROM transactions LIMIT 1").get()) redirect("/welcome");
 
@@ -36,6 +41,9 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
   const week = ymd(new Date(now.getTime() + 7 * 864e5));
   const soon = listPlans("open", 200, "out").filter((p) => p.due_date && p.due_date <= week);
   const recent = listRecent(6);
+  const streak = streakDays(now);
+  const name = currentAccountName();
+  const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
   // «D&N заметил»: необычные траты, перелимиты, найденные подписки, копилки.
   const notes: { href: string; icon: string; title: string; text: string; tone: "warn" | "info" | "good" }[] = [];
@@ -63,7 +71,22 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
 
   return (
     <div className="today">
-      {saved && <div className="toast-row">✓ Расход записан</div>}
+      <div className="greet">
+        <div>
+          <strong className="greet-hi">
+            {greeting(now)}
+            {name ? `, ${name}` : ""}
+          </strong>
+          <span className="muted small">{now.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" })}</span>
+        </div>
+        {streak >= 2 && (
+          <span className="streak" title="Столько дней подряд все траты записаны">
+            🔥 {streak} {plural(streak, "день", "дня", "дней")}
+          </span>
+        )}
+      </div>
+      <AddedToast id={added} next="/" />
+      {saved && <div className="toast-row toast-pop">✓ Расход записан</div>}
       {doneTx && (
         <form action={undoAcceptAction} className="toast-row">
           <input type="hidden" name="id" value={doneTx.id} />
@@ -84,7 +107,9 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
               <span>Можно потратить до конца месяца</span>
               <span className="hero-chip">{safe.daysLeft} {plural(safe.daysLeft, "день", "дня", "дней")}</span>
             </div>
-            <div className="hero-value">{safe.left >= 0 ? formatMoney(safe.left) : `−${formatMoney(-safe.left)}`}</div>
+            <div className="hero-value">
+              <CountUp value={safe.left} format="money" />
+            </div>
             <div className="hero-note">
               {safe.left > 0 ? `≈ ${formatMoney(safe.perDay)} в день` : "Потрачено больше, чем есть на месяц"}
             </div>
@@ -116,6 +141,20 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
         )}
       </Link>
 
+      <QuickLine next="/" />
+      <QuickTemplates next="/" />
+
+      {now.getDate() <= 7 && (
+        <Link href="/recap" className="recap-teaser">
+          <span aria-hidden>✨</span>
+          <span>
+            <b>Итоги {prevMonth.toLocaleDateString("ru-RU", { day: "numeric", month: "long" }).replace(/^\d+\s/, "")} готовы</b>
+            <span className="small">Сколько ушло, на что больше всего, любимое место</span>
+          </span>
+          <span aria-hidden>›</span>
+        </Link>
+      )}
+
       <SetupCard />
 
       {/* Разбор */}
@@ -139,7 +178,9 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
             )}
           </div>
           <div className="review-stack">
-            <UnassignedItem tx={queue[0]} centers={centers} next="/" />
+            <Swipe editHref={`/inbox/${queue[0].id}`}>
+              <UnassignedItem tx={queue[0]} centers={centers} next="/" />
+            </Swipe>
             {queue.length > 1 && (
               <Link href="/inbox" className="stack-more">
                 ещё {queue.length - 1} {plural(queue.length - 1, "операция", "операции", "операций")} на {formatMoney(queue.slice(1).reduce((a, t) => a + Math.abs(t.amount), 0))} ›
@@ -148,7 +189,12 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
           </div>
         </section>
       ) : (
-        recent.length > 0 && <div className="all-clear">✓ Всё разобрано. Новые траты появятся здесь сами.</div>
+        recent.length > 0 && (
+          <>
+            <div className="all-clear">✓ Всё разобрано. Новые траты появятся здесь сами.</div>
+            {(done || all) && <Confetti id={`clear-${today}`} />}
+          </>
+        )
       )}
 
       {/* D&N заметил */}
@@ -207,9 +253,14 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
       <section className="today-sec">
         <div className="today-head">
           <h2>Последние операции</h2>
-          <Link href="/history" className="link small">
-            Вся история ›
-          </Link>
+          <span className="today-links">
+            <Link href="/calendar" className="link small">
+              Календарь
+            </Link>
+            <Link href="/history" className="link small">
+              Вся история ›
+            </Link>
+          </span>
         </div>
         {recent.length === 0 ? (
           <Link href="/new" className="card empty-row">

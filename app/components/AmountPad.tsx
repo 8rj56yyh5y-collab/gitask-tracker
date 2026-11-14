@@ -6,8 +6,8 @@ import { useEffect, useState } from "react";
  * На компьютере можно просто печатать цифры. Значение уходит в форму скрытым полем name.
  * children — то, что стоит между суммой и кнопками (категория, комментарий).
  */
-export function AmountPad({ name = "amount", label = "Сумма", children }: { name?: string; label?: string; children?: React.ReactNode }) {
-  const [v, setV] = useState("");
+export function AmountPad({ name = "amount", label = "Сумма", initial = "", children }: { name?: string; label?: string; initial?: string; children?: React.ReactNode }) {
+  const [v, setV] = useState(() => (/^\d{1,8}([.,]\d{1,2})?$/.test(initial) ? initial.replace(".", ",") : ""));
   const press = (k: string) =>
     setV((cur) => {
       if (k === "del") return cur.slice(0, -1);

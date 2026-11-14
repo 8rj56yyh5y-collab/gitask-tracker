@@ -1,6 +1,7 @@
 import { formatMoney } from "@/lib/money.ts";
 import type { Tx } from "@/lib/repo.ts";
 import { BankBadge } from "./BankBadge.tsx";
+import { catColor } from "@/lib/categories.ts";
 
 // Откуда пришла операция — показываем только автоматические источники.
 const SOURCE: Record<string, string> = {
@@ -25,7 +26,7 @@ export function TxRow({ tx, children, hidePending }: { tx: Tx; children?: React.
   void SOURCE;
   return (
     <div className="tx">
-      <span className={`tx-avatar ${tx.amount > 0 ? "is-in" : ""}`} style={{ "--tc": tx.center_color ?? "var(--accent)" } as React.CSSProperties} aria-hidden>
+      <span className={`tx-avatar ${tx.amount > 0 ? "is-in" : ""}`} style={{ "--tc": tx.category_name ? catColor(tx.category_name) : (tx.center_color ?? "var(--accent)") } as React.CSSProperties} aria-hidden>
         {tx.category_emoji ? tx.category_emoji : tx.amount > 0 ? "↓" : tx.kind === "internal" ? "⇄" : tx.cashbox_id ? "💵" : (tx.counterparty || tx.description || "₴").trim().slice(0, 1).toUpperCase()}
         {tx.card_bank && (
           <span className="tx-avatar-bank">

@@ -69,7 +69,7 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
     const top = [...totals].sort((a, b) => b.expense - a.expense)[0];
     return (
       <div className="narrow-wide">
-        <h1>Аналитика</h1>
+        <h1>Отчёты</h1>
         {tabs}
         <div className="month-switch period-switch">
           <Link href={`/analytics?v=year&y=${year - 1}`} className="btn btn-sm" aria-label="Предыдущий год">‹</Link>
@@ -129,7 +129,23 @@ export default async function Analytics({ searchParams }: { searchParams: Promis
 
   return (
     <div className="narrow-wide">
-      <h1>Аналитика</h1>
+      <h1>Отчёты</h1>
+      <div className="report-links">
+        <Link href="/calendar" className="report-link">
+          <span aria-hidden>🗓</span>
+          <span>
+            <b>Календарь трат</b>
+            <span className="muted small">каждый день цветом</span>
+          </span>
+        </Link>
+        <Link href="/recap" className="report-link">
+          <span aria-hidden>✨</span>
+          <span>
+            <b>Итоги месяца</b>
+            <span className="muted small">как прошёл месяц</span>
+          </span>
+        </Link>
+      </div>
       {tabs}
       <div className="month-switch period-switch">
         <Link href={`/analytics?m=${prevKey}`} className="btn btn-sm" aria-label="Предыдущий месяц">‹</Link>

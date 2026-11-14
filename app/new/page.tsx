@@ -6,6 +6,8 @@ import { AccountSelect } from "../components/AccountSelect.tsx";
 import { CashCenterLink } from "../components/CashCenterLink.tsx";
 import { AmountPad } from "../components/AmountPad.tsx";
 import { SubmitButton } from "../components/SubmitButton.tsx";
+import { QuickTemplates } from "../components/QuickTemplates.tsx";
+import { AddedToast } from "../components/AddedToast.tsx";
 import { OTHER_INCOME_KINDS } from "@/lib/income.ts";
 import { getSetting } from "@/lib/settings.ts";
 import { centerTree, listCards } from "@/lib/repo.ts";
@@ -39,8 +41,8 @@ function More({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default async function NewTx({ searchParams }: { searchParams: Promise<{ type?: string; saved?: string }> }) {
-  const { type, saved } = await searchParams;
+export default async function NewTx({ searchParams }: { searchParams: Promise<{ type?: string; saved?: string; amount?: string; note?: string; cat?: string; added?: string }> }) {
+  const { type, saved, amount: preAmount, note: preNote, cat: preCat, added } = await searchParams;
   const tab = type === "in" || type === "move" ? type : "out";
   const last = lastChoice();
 
@@ -49,12 +51,14 @@ export default async function NewTx({ searchParams }: { searchParams: Promise<{ 
       <h1 className="sr-only">Новая операция</h1>
       <SegTabs tabs={TABS} active={tab} />
       {saved && <div className="toast-row">✓ Записано. Можно вводить следующую.</div>}
+      <AddedToast id={added} next="/new" />
+      {tab === "out" && !preAmount && <QuickTemplates next="/new" />}
       {tab === "out" && (
         <form action={addTransaction} className="card form form-big quick-add">
           <input type="hidden" name="direction" value="out" />
-          <AmountPad>
-            <CategoryChips required tiles label="На что" suggested={popularCategories(8)} />
-            <input name="description" required placeholder="Комментарий: на что именно" aria-label="Комментарий" maxLength={200} />
+          <AmountPad initial={preAmount ?? ""}>
+            <CategoryChips required tiles label="На что" suggested={popularCategories(8)} defaultValue={Number(preCat) || null} />
+            <input name="description" required placeholder="Комментарий: на что именно" aria-label="Комментарий" maxLength={200} defaultValue={preNote ?? ""} />
             {last.center ? (
               <details className="quick-defaults">
                 <summary>
