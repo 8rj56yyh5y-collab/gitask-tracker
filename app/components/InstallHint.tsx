@@ -16,6 +16,8 @@ export function InstallHint() {
     } catch {
       return;
     }
+    // Внутри приложения для iPhone подсказка не нужна.
+    if ((window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()) return;
     const standalone = window.matchMedia("(display-mode: standalone)").matches || (navigator as unknown as { standalone?: boolean }).standalone;
     if (standalone || window.innerWidth > 900) return;
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);

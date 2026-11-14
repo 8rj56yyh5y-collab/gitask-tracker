@@ -20,6 +20,7 @@ import { aiConfigured } from "@/lib/ai.ts";
 import { telegramState } from "@/lib/telegram.ts";
 import { getSetting } from "@/lib/settings.ts";
 import { uiMode } from "@/lib/mode.ts";
+import { FaceIdToggle } from "../components/AppLock.tsx";
 import { MAX_BACKFILL_DAYS } from "@/lib/monobank.ts";
 import { publicBase } from "@/lib/url.ts";
 import { cookies } from "next/headers";
@@ -70,6 +71,8 @@ export default async function Settings({
     <div className="narrow-wide">
       <h1>Настройки</h1>
       <HashOpen />
+
+      <FaceIdToggle />
 
       <section className="card mode-card" id="mode">
         <div className="mode-head">

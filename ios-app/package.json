@@ -1,0 +1,17 @@
+{
+  "name": "dn-ios",
+  "private": true,
+  "description": "D&N для iPhone: оболочка вокруг сайта D&N (Capacitor). Собирается на Mac в Xcode.",
+  "scripts": {
+    "sync": "cap sync ios",
+    "open": "cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/cli": "8.5.3",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/ios": "8.5.3",
+    "@capacitor/splash-screen": "8.0.2",
+    "@capacitor/status-bar": "8.0.4",
+    "@capgo/capacitor-native-biometric": "8.9.1"
+  }
+}
