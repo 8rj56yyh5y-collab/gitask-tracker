@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { UnassignedItem } from "../components/UnassignedItem.tsx";
 import { acceptAllAction, undoAcceptAction } from "../actions.ts";
-import { centerTree, getTx, listUnassigned, needsCard } from "@/lib/repo.ts";
-import { fullSuggestion } from "@/lib/suggest.ts";
+import { centerTree, getTx, listUnassigned } from "@/lib/repo.ts";
+import { readyToAccept } from "@/lib/suggest.ts";
 import { formatMoney } from "@/lib/money.ts";
 
 const plural = (n: number, one: string, few: string, many: string) => {
@@ -15,7 +15,7 @@ export default async function Inbox({ searchParams }: { searchParams: Promise<{ 
   const items = listUnassigned();
   const centers = new Map(centerTree().map((c) => [c.id, c]));
   const total = items.reduce((a, t) => a + Math.abs(t.amount), 0);
-  const ready = items.filter((t) => !needsCard(t) && fullSuggestion(t)?.note.trim()).length;
+  const ready = items.filter((t) => readyToAccept(t)).length;
   const doneTx = done ? getTx(Number(done)) : null;
 
   return (

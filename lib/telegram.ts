@@ -4,6 +4,7 @@ import { assignTx, centerTree, getTx, suggestCenters, type Tx } from "./repo.ts"
 import { getSetting, setSetting } from "./settings.ts";
 import { canAutoCredit } from "./income.ts";
 import { acceptSuggestion, fullSuggestion } from "./suggest.ts";
+import { detectSubscriptions, safeToSpend, unusualSpending, weekSummary } from "./insights.ts";
 import { cardHintOf, listCards, listMainCards, needsCard, setTxCard } from "./repo.ts";
 import { getCategory, label, listCategories, markNeedsNote, setTxDetails, suggestedCategories } from "./categories.ts";
 import { createTransit, linkTxToTransit, listTransits } from "./transit.ts";
@@ -307,6 +308,47 @@ export async function sendPlanReminders(now = new Date()): Promise<number> {
     }
   }
   return n;
+}
+
+/** Текст итога недели: сколько потрачено, на что больше всего, самая крупная трата и что заметил D&N. */
+export function weekSummaryText(now = new Date()): string | null {
+  const w = weekSummary(now);
+  if (!w.count && !w.prevSpent) return null;
+  const lines = [`📊 <b>Итог недели</b>`, `Потрачено: <b>${esc(formatMoney(w.spent))}</b> · ${w.count} ${w.count === 1 ? "трата" : w.count < 5 ? "траты" : "трат"}`];
+  if (w.prevSpent > 0) {
+    const d = Math.round((w.spent / w.prevSpent - 1) * 100);
+    lines.push(d === 0 ? "Столько же, как неделей раньше" : d > 0 ? `На ${d}% больше, чем неделей раньше` : `На ${-d}% меньше, чем неделей раньше 👍`);
+  }
+  if (w.top.length) lines.push("", "Больше всего:", ...w.top.map((t) => `${t.emoji} ${esc(t.name)} — ${esc(formatMoney(t.s))}`));
+  if (w.biggest) lines.push("", `Самая крупная: ${esc(w.biggest.counterparty || "без названия")} — ${esc(formatMoney(w.biggest.amount))}`);
+  const odd = unusualSpending(now);
+  if (odd.length) lines.push("", "⚠️ Больше обычного в этом месяце:", ...odd.map((u) => `${u.emoji} ${esc(u.name)}: +${u.pct}%`));
+  const subs = detectSubscriptions(now);
+  if (subs.length) lines.push("", `🔁 Нашлись регулярные списания (${subs.length}) — посмотрите в «Платежах».`);
+  const safe = safeToSpend(now);
+  if (safe.known) lines.push("", safe.left > 0 ? `До конца месяца можно тратить ≈ ${esc(formatMoney(safe.perDay))} в день.` : `В этом месяце уже потрачено больше, чем есть, на ${esc(formatMoney(-safe.left))}.`);
+  return lines.join("\n");
+}
+
+/** Раз в неделю, в понедельник после 10:00, — итог прошедшей недели. */
+export async function sendWeekSummary(now = new Date()): Promise<boolean> {
+  const token = getSetting("tg_token");
+  const chat = getSetting("tg_chat_id");
+  if (!token || !chat || now.getDay() !== 1 || now.getHours() < 10) return false;
+  if (getSetting("week_summary") === "off") return false;
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  if (getSetting("week_sent") === today) return false;
+  setSetting("week_sent", today);
+  const text = weekSummaryText(now);
+  if (!text) return false;
+  const url = publicUrl();
+  await call(token, "sendMessage", {
+    chat_id: chat,
+    text,
+    parse_mode: "HTML",
+    ...(url ? { reply_markup: { inline_keyboard: [[{ text: "Открыть отчёты", url: `${url}/analytics` }]] } } : {}),
+  });
+  return true;
 }
 
 interface Update {

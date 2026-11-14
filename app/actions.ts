@@ -19,7 +19,9 @@ import { addCategory, renameCategory, setCategoryEnabled, setTxDetails } from "@
 import { addOtherIncome, createSalary, creditDueSalaries } from "@/lib/income.ts";
 import { createTransit, deleteTransit, finishTransit, linkTxToTransit } from "@/lib/transit.ts";
 import { getDb } from "@/lib/db.ts";
-import { acceptSuggestion, fullSuggestion } from "@/lib/suggest.ts";
+import { addToGoal, archiveGoal, createGoal } from "@/lib/goals.ts";
+import { detectSubscriptions, hideSubscription } from "@/lib/insights.ts";
+import { acceptSuggestion, fullSuggestion, readyToAccept } from "@/lib/suggest.ts";
 import { createAccount, currentIngestKey, deleteAccount, isOwner, resetPassword, updateAccount } from "@/lib/accounts.ts";
 import { redirect } from "next/navigation";
 import { toKop, parseAmount } from "@/lib/money.ts";
@@ -518,6 +520,13 @@ export async function restorePlanAction(f: FormData) {
   redirect(`/plans/${id}`);
 }
 
+/** Итог недели в Telegram: включить или выключить. */
+export async function toggleWeekSummaryAction(f: FormData) {
+  setSetting("week_summary", str(f, "on") === "1" ? null : "off");
+  refresh();
+  redirect("/settings");
+}
+
 export async function toggleSetupAction(f: FormData) {
   setSetting("setup_hidden", str(f, "hide") === "1" ? "1" : null);
   refresh();
@@ -700,15 +709,14 @@ export async function acceptOneAction(f: FormData) {
 }
 
 /** «Подтвердить все подсказки»: все операции, у которых есть полная подсказка с комментарием. */
-export async function acceptAllAction() {
+export async function acceptAllAction(f: FormData) {
   let n = 0;
   for (const tx of listUnassigned()) {
-    if (needsCard(tx)) continue;
-    const s = fullSuggestion(tx);
-    if (s && s.note.trim() && acceptSuggestion(tx.id, s)) n++;
+    const s = readyToAccept(tx);
+    if (s && acceptSuggestion(tx.id, s)) n++;
   }
   refresh();
-  redirect(`/inbox?all=${n}`);
+  redirect(`${str(f, "next") || "/inbox"}?all=${n}`);
 }
 
 /** Отменить быстрое подтверждение — операция снова ждёт записи. */
@@ -716,5 +724,56 @@ export async function undoAcceptAction(f: FormData) {
   const id = num(f, "id");
   if (id) getDb().prepare("UPDATE transactions SET cost_center_id = NULL, category_id = NULL, assigned_at = NULL, needs_note = 0, kind = CASE WHEN amount < 0 THEN 'expense' ELSE 'income' END WHERE id = ?").run(id);
   refresh();
-  redirect("/inbox");
+  redirect(str(f, "next") || "/inbox");
+}
+
+/* ---------------- D&N 2.0: копилки и подписки ---------------- */
+
+export async function createGoalAction(f: FormData) {
+  const target = parseAmount(str(f, "target"));
+  const start = parseAmount(str(f, "start"));
+  const id = createGoal({ name: str(f, "name"), emoji: str(f, "emoji"), target: target ? toKop(target) : 0, deadline: str(f, "deadline") || null, start: start ? toKop(start) : 0 });
+  refresh();
+  redirect(`/goals?saved=${id}`);
+}
+
+export async function goalMoveAction(f: FormData) {
+  const id = num(f, "id");
+  const amount = parseAmount(str(f, "amount"));
+  if (!id || !amount) throw new Error("Укажите сумму");
+  addToGoal(id, (str(f, "dir") === "take" ? -1 : 1) * toKop(amount), str(f, "note"));
+  refresh();
+  redirect(str(f, "next") || "/goals");
+}
+
+export async function archiveGoalAction(f: FormData) {
+  const id = num(f, "id");
+  if (id) archiveGoal(id);
+  refresh();
+  redirect("/goals");
+}
+
+/** «Это подписка» — заводим ежемесячный платёж: D&N напомнит и сам свяжет следующие списания. */
+export async function addSubscriptionAction(f: FormData) {
+  const name = str(f, "counterparty");
+  const sub = detectSubscriptions().find((s) => s.counterparty === name);
+  if (!sub) throw new Error("Подписка не найдена — обновите страницу");
+  createPlan({
+    title: sub.counterparty,
+    payee: sub.counterparty,
+    total: sub.amount,
+    dueDate: sub.next,
+    cardId: sub.cardId,
+    centerId: sub.centerId,
+    repeat: "month",
+    note: "подписка",
+  });
+  refresh();
+  redirect("/plans?tab=out&sub=1");
+}
+
+export async function hideSubscriptionAction(f: FormData) {
+  hideSubscription(str(f, "counterparty"));
+  refresh();
+  redirect(str(f, "next") || "/plans");
 }

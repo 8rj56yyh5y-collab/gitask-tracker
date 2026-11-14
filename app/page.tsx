@@ -3,206 +3,228 @@ import { redirect } from "next/navigation";
 import { getSetting } from "@/lib/settings.ts";
 import { getDb } from "@/lib/db.ts";
 import { formatMoney } from "@/lib/money.ts";
-import { limitState } from "@/lib/limits.ts";
-import { budgetAlerts, groupUsage, listMainCards, listRecent, monthSpendByCenter, unassignedSummary } from "@/lib/repo.ts";
-import { BudgetLine } from "./components/BudgetLine.tsx";
-import { cashBalances, listCashboxes } from "@/lib/cash.ts";
+import { budgetAlerts, centerTree, getTx, listRecent, listUnassigned } from "@/lib/repo.ts";
 import { listPlans, ymd } from "@/lib/plans.ts";
-import { companyDebt } from "@/lib/sales.ts";
-import { normState } from "@/lib/norms.ts";
+import { readyToAccept } from "@/lib/suggest.ts";
+import { detectSubscriptions, safeToSpend, unusualSpending } from "@/lib/insights.ts";
+import { listGoals } from "@/lib/goals.ts";
+import { acceptAllAction, undoAcceptAction } from "./actions.ts";
 import { SetupCard } from "./components/SetupCard.tsx";
-import { HomeHero, QuickActions } from "./components/HomeHero.tsx";
 import { TxRow } from "./components/TxRow.tsx";
-import { cardStyle } from "@/lib/banks.ts";
-import { transitOpenSum } from "@/lib/transit.ts";
-import { fullSuggestion } from "@/lib/suggest.ts";
-import { listUnassigned } from "@/lib/repo.ts";
+import { UnassignedItem } from "./components/UnassignedItem.tsx";
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
-  const { saved } = await searchParams;
+const plural = (n: number, one: string, few: string, many: string) => {
+  const m10 = n % 10,
+    m100 = n % 100;
+  return m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many;
+};
+
+/** «Сегодня»: сколько можно тратить, что разобрать, что заметил D&N и что скоро оплатить. */
+export default async function Today({ searchParams }: { searchParams: Promise<{ saved?: string; done?: string; all?: string }> }) {
+  const { saved, done, all } = await searchParams;
   // Новый человек без единой операции — сначала короткое знакомство.
   if (!getSetting("welcome_seen") && !getDb().prepare("SELECT 1 FROM transactions LIMIT 1").get()) redirect("/welcome");
-  const un = unassignedSummary();
-  const spend = monthSpendByCenter();
-  const alerts = budgetAlerts();
-  const total = spend.reduce((a, s) => a + s.spent, 0);
-  const cards = listMainCards();
-  const usage = groupUsage();
-  const limited = cards.filter((c) => c.monthly_limit > 0);
-  const totalLimit = limited.reduce((a, c) => a + c.monthly_limit, 0);
-  const totalUsed = limited.reduce((a, c) => a + (usage.get(c.id) ?? 0), 0);
-  const worst = limited
-    .map((c) => ({ c, s: limitState(usage.get(c.id) ?? 0, c.monthly_limit) }))
-    .filter((x) => x.s.level === "orange" || x.s.level === "red");
-  const month = new Date().toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
-  const recent = listRecent(5);
-  void worst;
+
+  const now = new Date();
+  const month = now.toLocaleDateString("ru-RU", { month: "long" });
+  const safe = safeToSpend(now);
+  const queue = listUnassigned();
+  const ready = queue.filter((t) => readyToAccept(t)).length;
+  const centers = new Map(centerTree().map((c) => [c.id, c]));
+  const doneTx = done ? getTx(Number(done)) : null;
+  const today = ymd(now);
+  const week = ymd(new Date(now.getTime() + 7 * 864e5));
+  const soon = listPlans("open", 200, "out").filter((p) => p.due_date && p.due_date <= week);
+  const recent = listRecent(6);
+
+  // «D&N заметил»: необычные траты, перелимиты, найденные подписки, копилки.
+  const notes: { href: string; icon: string; title: string; text: string; tone: "warn" | "info" | "good" }[] = [];
+  for (const u of unusualSpending(now))
+    notes.push({ href: "/analytics", icon: u.emoji || "📈", title: `${u.name}: +${u.pct}%`, text: `${formatMoney(u.now)} с начала месяца — обычно к этому дню ${formatMoney(u.usual)}`, tone: "warn" });
+  for (const a of budgetAlerts(now).slice(0, 2))
+    notes.push({
+      href: `/centers/${a.id}`,
+      icon: "⚠️",
+      title: a.status === "over" ? `${a.name}: перелимит` : `${a.name}: идёт к перелимиту`,
+      text: a.status === "over" ? `на ${formatMoney(a.spent - a.budget)} больше лимита` : `при таком темпе ≈ ${formatMoney(a.forecast)} при лимите ${formatMoney(a.budget)}`,
+      tone: "warn",
+    });
+  const subs = detectSubscriptions(now);
+  if (subs.length)
+    notes.push({
+      href: "/plans",
+      icon: "🔁",
+      title: `${subs.length} ${plural(subs.length, "подписка", "подписки", "подписок")} · ${formatMoney(subs.reduce((a, s) => a + s.amount, 0))}/мес`,
+      text: `${subs.slice(0, 3).map((s) => s.counterparty).join(", ")} — добавьте в платежи, и D&N напомнит заранее`,
+      tone: "info",
+    });
+  for (const g of listGoals().filter((g) => !g.done).slice(0, 2))
+    notes.push({ href: `/goals?open=${g.id}#g${g.id}`, icon: g.emoji, title: `${g.name}: ${g.pct}%`, text: g.perMonth ? `откладывайте ≈ ${formatMoney(g.perMonth)} в месяц` : `осталось ${formatMoney(g.left)}`, tone: "good" });
 
   return (
-    <div className="grid grid-home">
-      {saved && <div className="toast-row span-all">✓ Расход записан</div>}
-      {un.count > 0 && (() => {
-        const ready = listUnassigned().filter((t) => fullSuggestion(t)).length;
-        return (
-          <Link href="/inbox" className="home-cta span-all">
-            <span>
-              <b>
-                Разобрать {un.count} {un.count === 1 ? "операцию" : un.count < 5 ? "операции" : "операций"}
-              </b>
-              <br />
-              <span className="small" style={{ opacity: 0.8 }}>
-                на {formatMoney(un.sum)}
-                {ready > 0 ? ` · ${ready} можно подтвердить одним нажатием` : " — укажите, на что ушли деньги"}
+    <div className="today">
+      {saved && <div className="toast-row">✓ Расход записан</div>}
+      {doneTx && (
+        <form action={undoAcceptAction} className="toast-row">
+          <input type="hidden" name="id" value={doneTx.id} />
+          <input type="hidden" name="next" value="/" />
+          <span>
+            ✓ Записано: <b>{doneTx.counterparty || "операция"}</b> · {formatMoney(Math.abs(doneTx.amount))}
+          </span>
+          <button className="toast-undo">Отменить</button>
+        </form>
+      )}
+      {all && <div className="toast-row">✓ Записано сразу: {all}</div>}
+
+      {/* Главное: сколько можно тратить */}
+      <Link href="/income" className="hero safe-hero">
+        {safe.known ? (
+          <>
+            <div className="hero-top">
+              <span>Можно потратить до конца месяца</span>
+              <span className="hero-chip">{safe.daysLeft} {plural(safe.daysLeft, "день", "дня", "дней")}</span>
+            </div>
+            <div className="hero-value">{safe.left >= 0 ? formatMoney(safe.left) : `−${formatMoney(-safe.left)}`}</div>
+            <div className="hero-note">
+              {safe.left > 0 ? `≈ ${formatMoney(safe.perDay)} в день` : "Потрачено больше, чем есть на месяц"}
+            </div>
+            <div className="safe-meter" aria-hidden>
+              <i style={{ width: `${safe.pct}%` }} />
+            </div>
+            <div className="safe-row">
+              <span>
+                Доходы <b>+{formatMoney(safe.income + safe.expected)}</b>
               </span>
-            </span>
-            <span className="home-cta-go">Разобрать ›</span>
-          </Link>
-        );
-      })()}
-      <HomeHero />
-      <QuickActions />
+              <span>
+                Потрачено <b>−{formatMoney(safe.spent)}</b>
+              </span>
+              {safe.toPay > 0 && (
+                <span>
+                  Платежи <b>−{formatMoney(safe.toPay)}</b>
+                </span>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="hero-top">
+              <span>Мои траты · {month}</span>
+            </div>
+            <div className="hero-value">{formatMoney(safe.spent)}</div>
+            <div className="hero-note">Добавьте ставку или доход — D&amp;N посчитает, сколько можно тратить в день ›</div>
+          </>
+        )}
+      </Link>
+
       <SetupCard />
 
-      {alerts.length > 0 && (
-        <section className="card span-all alert-budget">
-          <h2>Внимание: лимиты</h2>
-          {alerts.map((a) => (
-            <Link key={a.id} href={`/centers/${a.id}`} className={`pill pill-${a.status === "over" ? "red" : "orange"} plain`}>
-              {a.name}:{" "}
-              {a.status === "over"
-                ? `перелимит ${formatMoney(a.spent - a.budget)} (лимит ${formatMoney(a.budget)})`
-                : `при таком темпе ≈ ${formatMoney(a.forecast)} при лимите ${formatMoney(a.budget)}`}
-            </Link>
-          ))}
+      {/* Разбор */}
+      {queue.length > 0 ? (
+        <section className="today-sec">
+          <div className="today-head">
+            <h2>
+              Разобрать <span className="count-pill">{queue.length}</span>
+            </h2>
+            {ready > 1 ? (
+              <form action={acceptAllAction}>
+                <input type="hidden" name="next" value="/" />
+                <button className="btn btn-sm btn-soft">✓ Все подсказки ({ready})</button>
+              </form>
+            ) : (
+              queue.length > 1 && (
+                <Link href="/inbox" className="link small">
+                  Все ›
+                </Link>
+              )
+            )}
+          </div>
+          <div className="review-stack">
+            <UnassignedItem tx={queue[0]} centers={centers} next="/" />
+            {queue.length > 1 && (
+              <Link href="/inbox" className="stack-more">
+                ещё {queue.length - 1} {plural(queue.length - 1, "операция", "операции", "операций")} на {formatMoney(queue.slice(1).reduce((a, t) => a + Math.abs(t.amount), 0))} ›
+              </Link>
+            )}
+          </div>
+        </section>
+      ) : (
+        recent.length > 0 && <div className="all-clear">✓ Всё разобрано. Новые траты появятся здесь сами.</div>
+      )}
+
+      {/* D&N заметил */}
+      {notes.length > 0 && (
+        <section className="today-sec">
+          <div className="today-head">
+            <h2>D&amp;N заметил</h2>
+          </div>
+          <div className="notes-strip">
+            {notes.map((n, i) => (
+              <Link key={i} href={n.href} className={`note-card tone-${n.tone}`}>
+                <span className="note-icon" aria-hidden>
+                  {n.icon}
+                </span>
+                <strong>{n.title}</strong>
+                <span className="muted small">{n.text}</span>
+              </Link>
+            ))}
+          </div>
         </section>
       )}
 
-      {(() => {
-        const today = ymd(new Date());
-        const week = ymd(new Date(Date.now() + 7 * 864e5));
-        const soon = listPlans("open", 200, "out").filter((p) => p.due_date && p.due_date <= week);
-        const owed = listPlans("open", 200, "in").filter((p) => p.kind !== "salary");
-        const norm = normState();
-        const boxes = listCashboxes();
-        const bal = cashBalances();
-        const debt = companyDebt();
-        const transit = transitOpenSum();
-        return (
-          <>
-            {soon.length > 0 && (
-              <Link href="/plans?tab=out" className="card alert-budget span-all">
-                <h2>Скоро оплатить</h2>
-                {soon.slice(0, 4).map((p) => (
-                  <div key={p.id} className="row-between small" style={{ padding: "3px 0" }}>
-                    <span>
-                      {p.due_date! < today ? <strong className="danger">просрочен · </strong> : p.due_date === today ? <strong className="warn-text">сегодня · </strong> : null}
-                      {p.title}
-                    </span>
-                    <strong>{formatMoney(p.total - p.paid)}</strong>
-                  </div>
-                ))}
-                {soon.length > 4 && <div className="muted small">и ещё {soon.length - 4} ›</div>}
-              </Link>
-            )}
-            {norm.ready && !norm.acceptedAt && (
-              <Link href="/norms" className="card alert-budget span-all plain">
-                <h2>Норма трат готова</h2>
-                <div className="muted small">За {norm.elapsed} дн. собрано, сколько уходит на каждое направление. Посмотрите и примите — или соберите ещё 30 дней ›</div>
-              </Link>
-            )}
-            {(boxes.length > 0 || debt > 0 || owed.length > 0 || transit > 0) && (
-              <div className="card">
-                {boxes.length > 0 && (
-                  <Link href="/cash" className="row-between plain" style={{ padding: "2px 0" }}>
-                    <span>Наличные в кассах</span>
-                    <strong>{formatMoney(boxes.reduce((a, b) => a + (bal.get(b.id) ?? 0), 0))} ›</strong>
-                  </Link>
-                )}
-                {transit > 0 && (
-                  <Link href="/transit" className="row-between plain" style={{ padding: "2px 0" }}>
-                    <span>Чужие деньги</span>
-                    <strong>{formatMoney(transit)} ›</strong>
-                  </Link>
-                )}
-                {owed.length > 0 && (
-                  <Link href="/plans?tab=in" className="row-between plain" style={{ padding: "2px 0" }}>
-                    <span>Мне должны</span>
-                    <strong className="pos-text">{formatMoney(owed.reduce((a, p) => a + p.total - p.paid, 0))} ›</strong>
-                  </Link>
-                )}
-                {debt > 0 && (
-                  <Link href="/plans?tab=company" className="row-between plain" style={{ padding: "2px 0" }}>
-                    <span>Долг компании за товар</span>
-                    <strong>{formatMoney(debt)} ›</strong>
-                  </Link>
-                )}
-              </div>
-            )}
-          </>
-        );
-      })()}
-
-      <section className="card">
-        <div className="row-between">
-          <h2 style={{ margin: 0 }}>Куда ушли деньги</h2>
-          <Link href="/centers" className="link-quiet">
-            Все ›
-          </Link>
-        </div>
-        {spend.every((st) => st.spent === 0) && <p className="muted small">В этом месяце расходов пока нет.</p>}
-        <ul className="bars">
-          {spend.filter((st) => st.spent > 0 || st.budget > 0).map((st) => (
-            <li key={st.id}>
-              <BudgetLine s={st} total={total} href={`/centers/${st.id}`} />
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="card span-all recent">
-        <div className="row-between">
-          <h2 style={{ margin: 0 }}>Последние операции</h2>
-          <Link href="/history" className="link-quiet">
-            Все ›
-          </Link>
-        </div>
-        {recent.length === 0 && <p className="muted small">Пока пусто. Нажмите «Расход» выше, чтобы записать первую.</p>}
-        {recent.map((t) => (
-          <Link key={t.id} href={`/inbox/${t.id}`} className="plain">
-            <TxRow tx={t} />
-          </Link>
-        ))}
-      </section>
-
-      {cards.length > 0 && (
-        <section className="span-all">
-          <div className="row-between strip-head">
-            <h2 style={{ margin: 0 }}>Карты</h2>
-            <Link href="/cards" className="link-quiet">
-              {limited.length ? `списано ${formatMoney(totalUsed)} из ${formatMoney(totalLimit)}` : "Все ›"}
+      {/* Скоро оплатить */}
+      {soon.length > 0 && (
+        <section className="today-sec">
+          <div className="today-head">
+            <h2>Скоро оплатить</h2>
+            <Link href="/plans" className="link small">
+              Все ›
             </Link>
           </div>
-          <div className="card-strip">
-            {cards.map((c) => {
-              const used = usage.get(c.id) ?? 0;
-              const st = c.monthly_limit > 0 ? limitState(used, c.monthly_limit) : null;
-              const cs = cardStyle(c);
+          <div className="card list-card">
+            {soon.slice(0, 4).map((p) => {
+              const over = p.due_date! < today;
+              const isToday = p.due_date === today;
+              const d = new Date(`${p.due_date}T12:00:00`);
               return (
-                <Link key={c.id} href={`/cards/${c.id}`} className="mini-card" style={{ "--c": cs.color, "--ink": cs.ink } as React.CSSProperties}>
-                  <span className="mini-card-bank">{c.bank}</span>
-                  <span className="mini-card-num">•• {c.last4}</span>
-                  <span className="mini-card-sum">{st ? (st.left >= 0 ? `осталось ${formatMoney(st.left)}` : `перелимит ${formatMoney(-st.left)}`) : `списано ${formatMoney(used)}`}</span>
-                  {st && (
-                    <span className="mini-card-track">
-                      <i style={{ width: `${Math.min(100, (used / c.monthly_limit) * 100)}%` }} className={`lvl-${st.level}`} />
-                    </span>
-                  )}
+                <Link key={p.id} href={`/plans/${p.id}`} className="wallet-row">
+                  <span className={`date-chip ${over ? "is-over" : isToday ? "is-today" : ""}`}>
+                    <b>{d.getDate()}</b>
+                    <span>{d.toLocaleDateString("ru-RU", { month: "short" }).replace(".", "")}</span>
+                  </span>
+                  <span className="wallet-main">
+                    <strong>{p.title}</strong>
+                    <span className={`small ${over ? "danger" : "muted"}`}>{over ? "просрочен" : isToday ? "сегодня" : p.repeat === "month" ? "каждый месяц" : "на этой неделе"}</span>
+                  </span>
+                  <b className="num wallet-amt">{formatMoney(p.total - p.paid)}</b>
                 </Link>
               );
             })}
           </div>
         </section>
       )}
+
+      {/* Последние */}
+      <section className="today-sec">
+        <div className="today-head">
+          <h2>Последние операции</h2>
+          <Link href="/history" className="link small">
+            Вся история ›
+          </Link>
+        </div>
+        {recent.length === 0 ? (
+          <Link href="/new" className="card empty-row">
+            ＋ <span>Пока пусто. Нажмите «+» внизу и запишите первую трату — это займёт три касания</span>
+          </Link>
+        ) : (
+          <div className="card list-card">
+            {recent.map((t) => (
+              <Link key={t.id} href={`/inbox/${t.id}`} className="plain">
+                <TxRow tx={t} />
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

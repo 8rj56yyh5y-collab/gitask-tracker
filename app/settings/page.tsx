@@ -5,6 +5,7 @@ import {
   createAccountAction,
   deleteAccountAction,
   disconnectTelegramAction,
+  toggleWeekSummaryAction,
   resetAccountAction,
   setNavAction,
   updateAccountAction,
@@ -16,6 +17,7 @@ import { SubmitButton } from "../components/SubmitButton.tsx";
 import { CopyField } from "../components/CopyField.tsx";
 import { aiConfigured } from "@/lib/ai.ts";
 import { telegramState } from "@/lib/telegram.ts";
+import { getSetting } from "@/lib/settings.ts";
 import { MAX_BACKFILL_DAYS } from "@/lib/monobank.ts";
 import { publicBase } from "@/lib/url.ts";
 import { cookies } from "next/headers";
@@ -47,6 +49,7 @@ export default async function Settings({
 }) {
   const sp = await searchParams;
   const tg = telegramState();
+  const weekOn = getSetting("week_summary") !== "off";
   const base = await publicBase();
   const https = base.startsWith("https://");
   const ingestKey = currentIngestKey();
@@ -96,7 +99,7 @@ export default async function Settings({
         </summary>
         <form action={setNavAction} className="form set-body">
           <p className="small" style={{ margin: 0 }}>
-            Выберите до {NAV_MAX} пунктов, которые нужны вам под рукой. Кнопки «＋» и «Ещё» есть всегда — через «Ещё» открывается всё остальное.
+            Выберите до {NAV_MAX} разделов, которые нужны вам под рукой. Кнопка «＋» есть всегда, а всё остальное находится через поиск сверху и профиль.
           </p>
           {sp.nav_ok && <p className="small pos-text" style={{ margin: 0 }}>Сохранено ✓ Меню внизу обновилось.</p>}
           <div className="chips">
@@ -167,6 +170,16 @@ export default async function Settings({
           <p className="small">
             <span className="ok-text">✓ Подключено</span> — уведомления приходят от <strong>@{tg.botName}</strong>.
           </p>
+        )}
+        {tg.linked && (
+          <form action={toggleWeekSummaryAction} className="row-between week-toggle">
+            <input type="hidden" name="on" value={weekOn ? "0" : "1"} />
+            <span>
+              <strong>📊 Итог недели</strong>
+              <span className="muted small"> — по понедельникам: сколько потрачено, на что больше всего, что заметил D&amp;N</span>
+            </span>
+            <button className="btn btn-sm">{weekOn ? "Выключить" : "Включить"}</button>
+          </form>
         )}
         {tg.connected && (
           <form action={disconnectTelegramAction}>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { centerTree, listCards } from "@/lib/repo.ts";
 import { listCashboxes } from "@/lib/cash.ts";
 import { cardStyle } from "@/lib/banks.ts";
-import { label as catLabel, listCategories } from "@/lib/categories.ts";
+import { label as catLabel, listCategories, shortName } from "@/lib/categories.ts";
 
 export type ChipOption = { value: string | number; label: string; color?: string | null; hint?: string; sub?: boolean };
 
@@ -132,6 +132,7 @@ export function CategoryChips({
   aiId,
   required,
   label = "Категория — на что именно",
+  tiles = false,
 }: {
   name?: string;
   defaultValue?: number | null;
@@ -139,6 +140,8 @@ export function CategoryChips({
   aiId?: number | null;
   required?: boolean;
   label?: string;
+  /** Плитки 4 в ряд: крупный значок и подпись — для быстрой записи. */
+  tiles?: boolean;
 }) {
   const all = listCategories();
   const top = [...new Set([...(aiId ? [aiId] : []), ...suggested, ...(defaultValue ? [defaultValue] : [])])]
@@ -147,7 +150,19 @@ export function CategoryChips({
     .slice(0, 8);
   const rest = all.filter((c) => !top.some((t) => t.id === c.id));
   const picked = defaultValue ?? aiId ?? null;
-  const chip = (c: (typeof all)[number]) => (
+  const chip = (c: (typeof all)[number]) =>
+    tiles ? (
+      <label key={c.id} className="cat-tile" title={c.name}>
+        <input type="radio" name={name} value={c.id} defaultChecked={picked === c.id} required={required} />
+        <span className="cat-tile-ico" aria-hidden>
+          {c.emoji || "•"}
+        </span>
+        <span className="cat-tile-name">
+          {c.id === aiId ? "✨ " : ""}
+          {shortName(c.name)}
+        </span>
+      </label>
+    ) : (
     <label key={c.id} className="chip-opt">
       <input type="radio" name={name} value={c.id} defaultChecked={picked === c.id} required={required} />
       <span>
@@ -155,15 +170,15 @@ export function CategoryChips({
         {catLabel(c)}
       </span>
     </label>
-  );
+    );
   return (
     <fieldset className="chips-field">
       <legend>{label}</legend>
-      <div className="chips">{top.map(chip)}</div>
+      <div className={tiles ? "cat-tiles" : "chips"}>{top.map(chip)}</div>
       {rest.length > 0 && (
         <details className="more-fields more-cats">
           <summary>Все категории ({all.length})</summary>
-          <div className="chips" style={{ marginTop: 10 }}>
+          <div className={tiles ? "cat-tiles" : "chips"} style={{ marginTop: 10 }}>
             {rest.map(chip)}
           </div>
           <Link href="/categories" className="muted small chips-manage">

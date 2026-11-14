@@ -4,10 +4,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useTransition } from "react";
 import { Icon } from "./Icon.tsx";
 import { NAV_ITEMS, type NavId } from "@/lib/nav.ts";
+import { SECTIONS } from "@/lib/sections.ts";
 
 const isActive = (path: string, href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(href + "/"));
 
-/** Кнопки в шапке на телефоне: Обновить, История и «Ещё». */
+/** Кнопка «Обновить» в шапке; при возвращении в приложение данные обновляются сами. */
 export function TopNav() {
   const path = usePathname();
   const router = useRouter();
@@ -34,14 +35,11 @@ export function TopNav() {
       <button type="button" className={`top-btn ${pending ? "is-spinning" : ""}`} onClick={reload} aria-label="Обновить" title="Обновить">
         <Icon name="refresh" />
       </button>
-      <Link href="/history" className={`top-btn ${isActive(path, "/history") ? "is-active" : ""}`} aria-label="История">
-        <Icon name="history" />
-      </Link>
     </nav>
   );
 }
 
-/** Нижняя панель на телефоне и боковое меню на большом экране. */
+/** Нижняя панель на телефоне (два раздела · «＋» · два раздела) и боковое меню на большом экране. */
 export function Nav({ pending, items }: { pending: number; items: NavId[] }) {
   const path = usePathname();
   const cls = (href: string) => `nav-item ${isActive(path, href) ? "is-active" : ""}`;
@@ -50,12 +48,6 @@ export function Nav({ pending, items }: { pending: number; items: NavId[] }) {
   const half = Math.ceil(chosen.length / 2);
   const left = chosen.slice(0, half);
   const right = chosen.slice(half);
-  const inBar = new Set<string>(chosen.map((i) => i.href));
-  const moreActive =
-    isActive(path, "/more") ||
-    ["/inbox", "/analytics", "/centers", "/settings", "/norms", "/income", "/transit", "/help", "/categories", "/shopping", "/history", "/cash", "/cards", "/plans", "/sales"]
-      .filter((h) => !inBar.has(h))
-      .some((h) => isActive(path, h));
   const tab = (i: (typeof NAV_ITEMS)[number]) => (
     <Link key={i.id} href={i.href} className={cls(i.href)}>
       {i.id === "home" || i.id === "inbox" ? (
@@ -69,20 +61,17 @@ export function Nav({ pending, items }: { pending: number; items: NavId[] }) {
       <span>{i.label}</span>
     </Link>
   );
+  const groups = [...new Set(SECTIONS.map((s) => s.group))];
 
   return (
     <>
       {/* Телефон */}
-      <nav className="tabbar" aria-label="Меню" style={{ gridTemplateColumns: `repeat(${chosen.length + 2}, 1fr)` }}>
+      <nav className="tabbar" aria-label="Меню" style={{ gridTemplateColumns: `repeat(${chosen.length + 1}, 1fr)` }}>
         {left.map(tab)}
-        <Link href="/new" className="nav-plus" aria-label="Новая операция">
+        <Link href="/new" className="nav-plus" aria-label="Записать расход">
           <Icon name="plus" size={28} />
         </Link>
         {right.map(tab)}
-        <Link href="/more" className={`nav-item ${moreActive ? "is-active" : ""}`}>
-          <Icon name="more" />
-          <span>Ещё</span>
-        </Link>
       </nav>
 
       {/* Ноутбук */}
@@ -91,50 +80,21 @@ export function Nav({ pending, items }: { pending: number; items: NavId[] }) {
           D&amp;N
         </Link>
         <Link href="/new" className="btn btn-primary side-new">
-          + Операция
+          + Записать
         </Link>
         <Link href="/" className={cls("/")}>
-          <Icon name="home" /> Главная
+          <Icon name="home" /> Сегодня {badge}
         </Link>
-        <Link href="/inbox" className={cls("/inbox")}>
-          <Icon name="inbox" /> Без направления {badge}
-        </Link>
-        <Link href="/history" className={cls("/history")}>
-          <Icon name="history" /> История
-        </Link>
-        <Link href="/analytics" className={cls("/analytics")}>
-          <Icon name="chart" /> Аналитика
-        </Link>
-        <Link href="/cards" className={cls("/cards")}>
-          <Icon name="card" /> Карты
-        </Link>
-        <Link href="/centers" className={cls("/centers")}>
-          <Icon name="tag" /> Направления
-        </Link>
-        <Link href="/plans" className={cls("/plans")}>
-          <Icon name="calendar" /> Платежи
-        </Link>
-        <Link href="/cash" className={cls("/cash")}>
-          <Icon name="wallet" /> Кассы
-        </Link>
-        <Link href="/income" className={cls("/income")}>
-          <Icon name="income" /> Доходы
-        </Link>
-        <Link href="/shopping" className={cls("/shopping")}>
-          <Icon name="cart" /> Покупки
-        </Link>
-        <Link href="/transit" className={cls("/transit")}>
-          <Icon name="swap" /> Чужие деньги
-        </Link>
-        <Link href="/sales" className={cls("/sales")}>
-          <Icon name="bag" /> Продажи
-        </Link>
-        <Link href="/norms" className={cls("/norms")}>
-          <Icon name="target" /> Норма трат
-        </Link>
-        <Link href="/settings" className={cls("/settings")}>
-          <Icon name="settings" /> Настройки
-        </Link>
+        {groups.map((g) => (
+          <div key={g} className="side-group">
+            <div className="side-group-title">{g}</div>
+            {SECTIONS.filter((s) => s.group === g && s.href !== "/welcome").map((s) => (
+              <Link key={s.href} href={s.href} className={cls(s.href)}>
+                <Icon name={s.icon} /> {s.title}
+              </Link>
+            ))}
+          </div>
+        ))}
       </aside>
     </>
   );

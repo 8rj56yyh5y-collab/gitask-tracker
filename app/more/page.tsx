@@ -5,56 +5,40 @@ import { unassignedSummary } from "@/lib/repo.ts";
 import { setupHidden } from "@/lib/setup.ts";
 import { transitOpenSum } from "@/lib/transit.ts";
 import { formatMoney } from "@/lib/money.ts";
-
-type Item = { href: string; icon: string; title: string; note: string };
+import { SECTIONS } from "@/lib/sections.ts";
+import { currentAccountName } from "@/lib/accounts.ts";
 
 export default function More() {
   const { count } = unassignedSummary();
   const transit = transitOpenSum();
-  const groups: [string, Item[]][] = [
-    [
-      "Каждый день",
-      [
-        { href: "/inbox", icon: "inbox", title: "Без направления", note: count ? `${count} ждут — выберите, на что ушли деньги` : "Всё записано ✓" },
-        { href: "/history", icon: "history", title: "История", note: "Все операции, новые сверху" },
-        { href: "/shopping", icon: "cart", title: "Список покупок", note: "Что купить, цены товаров, чек → расход" },
-        { href: "/transit", icon: "swap", title: "Чужие деньги", note: transit ? `У вас сейчас ${formatMoney(transit)} — нужно передать` : "Деньги, которые нужно кому-то отдать" },
-      ],
-    ],
-    [
-      "Деньги и планы",
-      [
-        { href: "/income", icon: "income", title: "Доходы", note: "Ставка, премии и ваш итог за месяц" },
-        { href: "/centers", icon: "tag", title: "Направления", note: "Чьи деньги: личные, работа, семья — и лимиты" },
-        { href: "/categories", icon: "grid", title: "Категории", note: "На что именно: продукты, такси, аренда…" },
-        { href: "/norms", icon: "target", title: "Норма трат", note: "Сколько обычно уходит в месяц — подскажет D&N" },
-        { href: "/analytics", icon: "chart", title: "Аналитика", note: "Куда уходят деньги: месяцы и сравнение" },
-      ],
-    ],
-    [
-      "Настройка и помощь",
-      [
-        { href: "/help", icon: "help", title: "Помощь", note: "Короткие ответы: что где и как" },
-        { href: "/welcome", icon: "home", title: "Знакомство с D&N", note: "4 экрана: как всё устроено" },
-        { href: "/settings", icon: "settings", title: "Настройки", note: "Telegram, Monobank, Apple Pay, тема" },
-      ],
-    ],
-  ];
+  const acc = currentAccountName();
+  // Живые подписи: сколько ждёт разбора, сколько чужих денег.
+  const live: Record<string, string> = {
+    "/inbox": count ? `${count} ждут — подтвердите или поправьте` : "Всё разобрано ✓",
+    "/transit": transit ? `У вас сейчас ${formatMoney(transit)} — нужно передать` : "Деньги, которые нужно кому-то отдать",
+  };
+  const groups = [...new Set(SECTIONS.map((s) => s.group))];
   return (
     <div className="narrow-wide">
-      <h1>Ещё</h1>
-      {groups.map(([name, items]) => (
+      <div className="profile-head card">
+        <span className="profile-ava">{(acc || "Я").charAt(0).toUpperCase()}</span>
+        <span>
+          <strong>{acc || "Мой D&N"}</strong>
+          <span className="muted small">Все разделы и настройки. Быстрее всего — через поиск сверху.</span>
+        </span>
+      </div>
+      {groups.map((name) => (
         <section key={name}>
           <div className="menu-group">{name}</div>
           <div className="card menu-list">
-            {items.map((i) => (
+            {SECTIONS.filter((x) => x.group === name).map((i) => (
               <Link key={i.href} href={i.href} className="menu-row">
                 <span className="menu-icon">
                   <Icon name={i.icon} />
                 </span>
                 <span className="menu-text">
                   <strong>{i.title}</strong>
-                  <span className="muted small">{i.note}</span>
+                  <span className="muted small">{live[i.href] ?? i.note}</span>
                 </span>
                 {i.href === "/inbox" && count > 0 && <span className="badge">{count}</span>}
                 <Icon name="chevron" size={18} />
