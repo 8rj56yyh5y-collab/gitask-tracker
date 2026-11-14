@@ -5,6 +5,7 @@ import { getSetting, setSetting } from "./settings.ts";
 import { canAutoCredit } from "./income.ts";
 import { acceptSuggestion, fullSuggestion } from "./suggest.ts";
 import { detectSubscriptions, safeToSpend, unusualSpending, weekSummary } from "./insights.ts";
+import { isSimple, personalCenterId } from "./mode.ts";
 import { cardHintOf, listCards, listMainCards, needsCard, setTxCard } from "./repo.ts";
 import { getCategory, label, listCategories, markNeedsNote, setTxDetails, suggestedCategories } from "./categories.ts";
 import { createTransit, linkTxToTransit, listTransits } from "./transit.ts";
@@ -169,7 +170,20 @@ function firstStep(tx: Tx): { text: string; keyboard: Button[][] } {
       ],
     };
   }
+  // Простой режим: «чьи деньги» не спрашиваем — это мои; сразу «на что».
+  if (isSimple() && tx.amount < 0) return simpleCategoryStep(tx);
   return { text: `${txText(tx)}${aiHint(tx)}\n\n<b>1 из 3.</b> Чьи это деньги?`, keyboard: suggestKeyboard(tx) };
+}
+
+/** Простой режим: трата сразу в «мои деньги», первый вопрос — категория. */
+function simpleCategoryStep(tx: Tx): { text: string; keyboard: Button[][] } {
+  const center = tx.cost_center_id ?? personalCenterId();
+  if (center && tx.cost_center_id !== center) {
+    assignTx(tx.id, center);
+    markNeedsNote(tx.id, true);
+  }
+  const fresh = getTx(tx.id) ?? tx;
+  return { text: `${txText(fresh)}${aiHint(fresh)}\n\n<b>На что потратили?</b>`, keyboard: categoryKeyboard(fresh) };
 }
 
 /** Вопрос «с какой карты?», когда Wallet прислал название, которое D&N ещё не знает. */
@@ -232,7 +246,7 @@ async function askNote(token: string, chatId: string, target: { chat_id: string;
     ...target,
     text:
       `${txText(tx)}\n\n✓ ${esc(tx.center_name ?? "")}${cat ? ` · ${esc(label(cat))}` : ""}\n` +
-      `<b>${tx.amount < 0 ? "3 из 3" : "2 из 2"}.</b> Напишите сообщением, на что именно${tx.amount < 0 ? " (например: продукты на неделю)" : ""}.` +
+      `<b>${isSimple() ? "Последний шаг" : tx.amount < 0 ? "3 из 3" : "2 из 2"}.</b> Напишите сообщением, на что именно${tx.amount < 0 ? " (например: продукты на неделю)" : ""}.` +
       (tx.ai_note ? " Или нажмите кнопку с подсказкой." : ""),
     parse_mode: "HTML",
     reply_markup: { inline_keyboard: buttons },
@@ -500,8 +514,13 @@ export async function handleUpdate(update: Update): Promise<void> {
     return;
   }
   if (action === "b") {
-    // «Изменить» — к обычным шагам: сначала направление.
+    // «Изменить» — к обычным шагам: сначала направление (в простом режиме — сразу категория).
     await call(token, "answerCallbackQuery", { callback_query_id: q.id });
+    if (isSimple() && tx.amount < 0) {
+      const step = simpleCategoryStep(tx);
+      await call(token, "editMessageText", { ...target, text: step.text, parse_mode: "HTML", reply_markup: { inline_keyboard: step.keyboard } });
+      return;
+    }
     await call(token, "editMessageText", {
       ...target,
       text: `${txText(tx)}${aiHint(tx)}\n\n<b>1 из 3.</b> Чьи это деньги?`,

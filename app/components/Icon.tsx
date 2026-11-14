@@ -5,6 +5,7 @@ const PATHS: Record<string, string> = {
   plus: "M12 5v14M5 12h14",
   minus: "M5 12h14",
   chart: "M4 20V10M10 20V4M16 20v-7M22 20H2",
+  list: "M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01",
   more: "M4 6h16M4 12h16M4 18h16",
   inbox: "M3 13h5l1.5 3h5L16 13h5M5 5h14l2 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6z",
   card: "M3 6h18v12H3zM3 10h18M7 15h4",

@@ -23,10 +23,11 @@ function spend(kop: number, counterparty: string, at: Date, category = "Прод
   return id;
 }
 
-test("меню 2.0: четыре раздела по умолчанию, кошельки и отчёты на месте", () => {
-  assert.deepEqual(DEFAULT_NAV, ["home", "wallets", "plans", "analytics"]);
+test("меню 4.0: Главная · Траты · Платежи · Деньги", () => {
+  assert.deepEqual(DEFAULT_NAV, ["home", "spend", "plans", "wallets"]);
   assert.equal(NAV_MAX, 4);
-  assert.equal(NAV_ITEMS.find((i) => i.id === "home")!.label, "Сегодня");
+  assert.equal(NAV_ITEMS.find((i) => i.id === "spend")!.href, "/spend");
+  assert.equal(NAV_ITEMS.find((i) => i.id === "wallets")!.label, "Деньги");
   assert.equal(parseNav("home,cards,cash,plans,sales").length, 4);
 });
 

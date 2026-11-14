@@ -208,6 +208,12 @@ CREATE TABLE IF NOT EXISTS goal_moves (
   at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Лимит на месяц по категории (копейки): «Кафе — не больше 3 000 ₴».
+CREATE TABLE IF NOT EXISTS category_budgets (
+  category_id INTEGER PRIMARY KEY REFERENCES categories(id),
+  amount INTEGER NOT NULL
+);
+
 -- Подписки, которые человек скрыл («это не подписка»).
 CREATE TABLE IF NOT EXISTS subs_hidden (
   counterparty TEXT PRIMARY KEY

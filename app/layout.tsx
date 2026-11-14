@@ -6,32 +6,33 @@ import { SwRegister } from "./sw-register.tsx";
 import { Nav, TopNav } from "./components/Nav.tsx";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE, sessionValid } from "@/lib/session.ts";
-import { THEME_COOKIE, normalizeTheme } from "@/lib/theme.ts";
+import { THEME_COOKIE, lookOf, normalizeTheme } from "@/lib/theme.ts";
 import { NAV_COOKIE, parseNav } from "@/lib/nav.ts";
+import { isSimple } from "@/lib/mode.ts";
 import { accountSessionOk, currentAccountName } from "@/lib/accounts.ts";
 
 export const metadata: Metadata = {
   title: "D&N",
   description: "Учёт денег: ни один платёж без записи",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "D&N", statusBarStyle: "default" },
-  icons: { icon: "/icon.svg", apple: "/icon.svg" },
+  appleWebApp: { capable: true, title: "D&N", statusBarStyle: "black-translucent" },
+  icons: { icon: [{ url: "/icon.svg", type: "image/svg+xml" }, { url: "/icon-192.png", sizes: "192x192" }], apple: "/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#f3f5f8",
+  themeColor: "#eef0f6",
 };
 
-/** Шрифты D&N 2.0: Manrope — текст, Unbounded — крупные суммы. */
+/** Шрифты: Inter и Inter Tight — «Стекло» и «Графит»; Manrope и Unbounded — «Классика». */
 function Fonts() {
   return (
     <>
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
       {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;600;700&display=swap" />
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Inter+Tight:wght@500;600;700;800&family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;600;700&display=swap" />
     </>
   );
 }
@@ -51,7 +52,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   if (!authed) {
     // Страница входа: без меню и без данных.
     return (
-      <html lang="ru" data-theme={themeAttr}>
+      <html lang="ru" data-theme={themeAttr} data-look={lookOf(theme)}>
         <head>
           <Fonts />
         </head>
@@ -77,7 +78,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const { count } = unassignedSummary();
   const accName = currentAccountName();
   return (
-    <html lang="ru" data-theme={themeAttr}>
+    <html lang="ru" data-theme={themeAttr} data-look={lookOf(theme)}>
       <head>
         <Fonts />
       </head>
@@ -99,7 +100,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </Link>
         </header>
         <main className="wrap">{children}</main>
-        <Nav pending={count} items={parseNav(jar.get(NAV_COOKIE)?.value)} />
+        <Nav pending={count} items={parseNav(jar.get(NAV_COOKIE)?.value)} simple={isSimple()} />
         <SwRegister />
       </body>
     </html>

@@ -5,6 +5,7 @@ import {
   createAccountAction,
   deleteAccountAction,
   disconnectTelegramAction,
+  setUiModeAction,
   toggleWeekSummaryAction,
   resetAccountAction,
   setNavAction,
@@ -18,6 +19,7 @@ import { CopyField } from "../components/CopyField.tsx";
 import { aiConfigured } from "@/lib/ai.ts";
 import { telegramState } from "@/lib/telegram.ts";
 import { getSetting } from "@/lib/settings.ts";
+import { uiMode } from "@/lib/mode.ts";
 import { MAX_BACKFILL_DAYS } from "@/lib/monobank.ts";
 import { publicBase } from "@/lib/url.ts";
 import { cookies } from "next/headers";
@@ -57,6 +59,7 @@ export default async function Settings({
   const accounts = owner ? listAccounts() : [];
   const theme = normalizeTheme((await cookies()).get(THEME_COOKIE)?.value);
   const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const mode = uiMode();
   const today = ymd(new Date());
   const minDay = ymd(new Date(Date.now() - MAX_BACKFILL_DAYS * 864e5));
   const monoOn = monobankConnected();
@@ -67,6 +70,31 @@ export default async function Settings({
     <div className="narrow-wide">
       <h1>Настройки</h1>
       <HashOpen />
+
+      <section className="card mode-card" id="mode">
+        <div className="mode-head">
+          <strong>Как пользоваться D&amp;N</strong>
+          <span className="muted small">Можно переключать в любой момент — данные не меняются.</span>
+        </div>
+        <div className="mode-opts">
+          {(["simple", "full"] as const).map((m) => (
+            <form key={m} action={setUiModeAction}>
+              <input type="hidden" name="mode" value={m} />
+              <button className={`mode-opt ${mode === m ? "is-on" : ""}`} aria-pressed={mode === m}>
+                <span className="mode-ico" aria-hidden>
+                  {m === "simple" ? "🌱" : "🧰"}
+                </span>
+                <b>{m === "simple" ? "Простой" : "Расширенный"}</b>
+                <span className="small">
+                  {m === "simple"
+                    ? "Трата — это сумма, категория и комментарий. Всё записывается в «мои деньги»."
+                    : "Плюс «чьи деньги» (мои, работы, семьи), наличные в кассах, чужие деньги, продажи, норма трат."}
+                </span>
+              </button>
+            </form>
+          ))}
+        </div>
+      </section>
 
       <details className="card set-sec" id="theme">
         <summary>

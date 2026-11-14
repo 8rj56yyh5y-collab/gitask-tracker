@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { searchTx } from "@/lib/repo.ts";
-import { findSections, SECTIONS } from "@/lib/sections.ts";
+import { findSections, visibleSections } from "@/lib/sections.ts";
+import { isSimple } from "@/lib/mode.ts";
 import { listCards } from "@/lib/repo.ts";
 import { listCashboxes } from "@/lib/cash.ts";
 import { listPlans } from "@/lib/plans.ts";
@@ -15,9 +16,10 @@ export default async function Search({ searchParams }: { searchParams: Promise<{
   const q = ((await searchParams).q ?? "").trim().slice(0, 80);
   const words = norm(q).split(/\s+/).filter(Boolean);
   const has = (s: string) => words.length > 0 && words.every((w) => norm(s).includes(w));
-  const sections = findSections(q);
+  const simple = isSimple();
+  const sections = findSections(q, simple);
   const cards = listCards().filter((c) => has(`${c.bank} ${c.last4} карта`));
-  const boxes = listCashboxes().filter((b) => has(`${b.name} касса наличные`));
+  const boxes = (simple ? [] : listCashboxes()).filter((b) => has(`${b.name} касса наличные`));
   const plans = [...listPlans("open", 200, "out"), ...listPlans("open", 200, "in")].filter((p) => has(p.title));
   const txs = q ? searchTx(q, 40) : [];
   const nothing = q && !sections.length && !cards.length && !boxes.length && !plans.length && !txs.length;
@@ -32,7 +34,7 @@ export default async function Search({ searchParams }: { searchParams: Promise<{
           <p className="muted small search-tip">Ищет всё сразу: операции (по магазину, комментарию, категории, сумме), карты, кассы, платежи и разделы.</p>
           <div className="search-group">Все разделы</div>
           <div className="card menu-list">
-            {SECTIONS.map((s) => (
+            {visibleSections(simple).map((s) => (
               <Link key={s.href} href={s.href} className="menu-row">
                 <span className="menu-icon">
                   <Icon name={s.icon} />

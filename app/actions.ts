@@ -21,6 +21,8 @@ import { createTransit, deleteTransit, finishTransit, linkTxToTransit } from "@/
 import { getDb } from "@/lib/db.ts";
 import { addToGoal, archiveGoal, createGoal } from "@/lib/goals.ts";
 import { guessQuick, quickTemplates } from "@/lib/quick.ts";
+import { setUiMode } from "@/lib/mode.ts";
+import { setCategoryBudget } from "@/lib/catbudget.ts";
 import { detectSubscriptions, hideSubscription } from "@/lib/insights.ts";
 import { acceptSuggestion, fullSuggestion, readyToAccept } from "@/lib/suggest.ts";
 import { createAccount, currentIngestKey, deleteAccount, isOwner, resetPassword, updateAccount } from "@/lib/accounts.ts";
@@ -521,6 +523,13 @@ export async function restorePlanAction(f: FormData) {
   redirect(`/plans/${id}`);
 }
 
+/** Простой или расширенный режим. */
+export async function setUiModeAction(f: FormData) {
+  setUiMode(str(f, "mode") === "full" ? "full" : "simple");
+  refresh();
+  redirect("/settings#mode");
+}
+
 /** Итог недели в Telegram: включить или выключить. */
 export async function toggleWeekSummaryAction(f: FormData) {
   setSetting("week_summary", str(f, "on") === "1" ? null : "off");
@@ -838,4 +847,14 @@ export async function undoAddedAction(f: FormData) {
   }
   refresh();
   redirect(str(f, "next") || "/");
+}
+
+/** Лимит на месяц для категории (пустое — убрать). */
+export async function setCategoryBudgetAction(f: FormData) {
+  const id = num(f, "categoryId");
+  if (!id) throw new Error("Категория не выбрана");
+  const amount = parseAmount(str(f, "amount"));
+  setCategoryBudget(id, str(f, "clear") ? null : amount ? toKop(amount) : null);
+  refresh();
+  redirect(str(f, "next") || "/spend");
 }

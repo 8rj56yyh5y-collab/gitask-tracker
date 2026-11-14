@@ -7,11 +7,13 @@ import { TxRow } from "../../components/TxRow.tsx";
 import { CardChips, CategoryChips, CenterChips } from "../../components/Pickers.tsx";
 import { getCategory, label, suggestedCategories } from "@/lib/categories.ts";
 import { cardHintOf, getTx, listCards, needsCard, suggestCenters } from "@/lib/repo.ts";
+import { isSimple, personalCenterId } from "@/lib/mode.ts";
 
 // Экран «Куда ушли деньги?» — его открывает «Команда» iOS сразу после оплаты.
-export default async function AssignOne({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ c?: string; card_ok?: string }> }) {
+export default async function AssignOne({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ c?: string; cat?: string; card_ok?: string }> }) {
   const { id } = await params;
-  const { c: pickedRaw, card_ok } = await searchParams;
+  const { c: pickedRaw, cat: catRaw, card_ok } = await searchParams;
+  const simple = isSimple();
   const tx = getTx(Number(id));
   if (!tx) notFound();
   const sugg = new Set(suggestCenters(tx));
@@ -26,12 +28,6 @@ export default async function AssignOne({ params, searchParams }: { params: Prom
   return (
     <div className="narrow-wide">
       <h1>{recorded ? "Операция" : tx.amount > 0 ? "Что это за поступление?" : "На что ушли деньги?"}</h1>
-      {tx.amount > 0 && !tx.sale_id && (
-        <Link href={`/sales/new?tx=${tx.id}`} className="card alert-budget plain" style={{ display: "block" }}>
-          <strong>Это оплата за товар компании?</strong>
-          <div className="muted small">Записать как продажу: посчитается ваша комиссия, остальное — долг компании ›</div>
-        </Link>
-      )}
       {card_ok && <div className="card ok-note">Карта сохранена ✓</div>}
       <div className="card">
         <TxRow tx={tx} />
@@ -63,16 +59,20 @@ export default async function AssignOne({ params, searchParams }: { params: Prom
             {tx.ai_note && <> — «{tx.ai_note}»</>}
           </div>
         )}
-        <CenterChips label={isIn ? "1. К какому направлению относится" : "1. Чьи это деньги"} required defaultValue={picked ?? tx.cost_center_id} first={[...sugg]} />
         {!isIn && (
-          <CategoryChips label="2. На что именно" required defaultValue={tx.category_id} aiId={tx.ai_category_id} suggested={suggestedCategories(tx, 6)} />
+          <CategoryChips tiles label="На что" required defaultValue={Number(catRaw) || tx.category_id} aiId={tx.ai_category_id} suggested={suggestedCategories(tx, 8)} />
         )}
         <label>
-          {isIn ? "2. Комментарий" : "3. Комментарий"} — обязательно
+          Комментарий
           <input name="description" required defaultValue={noteDefault} placeholder={isIn ? "например, вернул долг" : "например, продукты на неделю"} />
         </label>
+        {simple ? (
+          <input type="hidden" name="centerId" value={picked ?? tx.cost_center_id ?? personalCenterId() ?? ""} />
+        ) : (
+          <CenterChips label={isIn ? "Чьи это деньги" : "Чьи это деньги — мои, работы, семьи"} required defaultValue={picked ?? tx.cost_center_id} first={[...sugg]} />
+        )}
         <details className="more-fields">
-          <summary>Для кого</summary>
+          <summary>Для кого (необязательно)</summary>
           <div className="form">
             <label>
               Для кого
@@ -101,7 +101,16 @@ export default async function AssignOne({ params, searchParams }: { params: Prom
         </section>
       )}
 
-      {!tx.transit_id && (
+      <details className="card more-actions">
+        <summary>Ещё действия: чужие деньги, удалить</summary>
+        <div className="more-actions-body">
+      {!simple && tx.amount > 0 && !tx.sale_id && (
+        <Link href={`/sales/new?tx=${tx.id}`} className="card alert-budget plain" style={{ display: "block" }}>
+          <strong>Это оплата за товар компании?</strong>
+          <div className="muted small">Записать как продажу: посчитается ваша комиссия, остальное — долг компании ›</div>
+        </Link>
+      )}
+      {!simple && !tx.transit_id && (
         <section className="card form">
           <h2>Это чужие деньги?</h2>
           <p className="muted small" style={{ margin: 0 }}>
@@ -133,6 +142,8 @@ export default async function AssignOne({ params, searchParams }: { params: Prom
         <input type="hidden" name="id" value={tx.id} />
         <button className="btn btn-ghost btn-sm danger">Удалить операцию — если это дубль или ошибка</button>
       </form>
+        </div>
+      </details>
     </div>
   );
 }

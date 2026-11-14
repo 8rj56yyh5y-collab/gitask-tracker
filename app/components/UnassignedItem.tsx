@@ -3,7 +3,8 @@ import { acceptOneAction } from "../actions.ts";
 import { TxRow } from "./TxRow.tsx";
 import { listCards, needsCard, suggestCenters, type Tx } from "@/lib/repo.ts";
 import { fullSuggestion } from "@/lib/suggest.ts";
-import { getCategory, label } from "@/lib/categories.ts";
+import { getCategory, label, listCategories, suggestedCategories } from "@/lib/categories.ts";
+import { isSimple } from "@/lib/mode.ts";
 
 type Center = { id: number; name: string; path: string; color: string; parent_id?: number | null; is_internal?: number };
 
@@ -24,6 +25,8 @@ export function UnassignedItem({ tx, centers, next = "/inbox" }: { tx: Tx; cente
     .filter((c): c is Center => Boolean(c));
   const roots = [...centers.values()].filter((c) => !c.parent_id && !c.is_internal && !sugg.some((x) => x.id === c.id));
   const buttons = [...sugg, ...roots].slice(0, 8);
+  const all = listCategories();
+  const simpleCats = isSimple() && tx.amount < 0 ? suggestedCategories(tx, 5).map((id) => all.find((c) => c.id === id)).filter((c) => c !== undefined) : null;
 
   return (
     <div className="card review-item">
@@ -52,6 +55,19 @@ export function UnassignedItem({ tx, centers, next = "/inbox" }: { tx: Tx; cente
           </div>
         </div>
       ) : (
+        simpleCats ? (
+        <div className="quick-chips">
+          {/* Простой режим: сразу «на что», нажатие открывает операцию с выбранной категорией. */}
+          {simpleCats.map((c) => (
+            <Link key={c.id} href={`/inbox/${tx.id}?cat=${c.id}`} className="quick-chip">
+              {c.emoji} {c.name}
+            </Link>
+          ))}
+          <Link href={`/inbox/${tx.id}`} className="quick-chip quick-more">
+            Другое…
+          </Link>
+        </div>
+        ) : (
         <div className="quick-chips">
           {/* Нажатие открывает операцию с выбранным направлением: остаётся категория и комментарий. */}
           {buttons.map((c) => (
@@ -64,6 +80,7 @@ export function UnassignedItem({ tx, centers, next = "/inbox" }: { tx: Tx; cente
             Ещё…
           </Link>
         </div>
+        )
       )}
     </div>
   );
