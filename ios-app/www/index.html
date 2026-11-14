@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>D&amp;N</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0d0d12; color: #fff; font-family: -apple-system, system-ui, sans-serif; }
+  body { display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; box-sizing: border-box; }
+  .box { max-width: 320px; }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  p { color: rgba(255,255,255,.7); line-height: 1.5; }
+  button { margin-top: 16px; padding: 14px 22px; border-radius: 14px; border: 0; background: #fff; color: #0d0d12; font-size: 16px; font-weight: 700; }
+</style>
+</head>
+<body>
+  <!-- Показывается, только если нет интернета: обычно приложение сразу открывает D&N с сервера. -->
+  <div class="box">
+    <h1>Нет связи с D&amp;N</h1>
+    <p>Проверьте интернет и попробуйте ещё раз.</p>
+    <button onclick="location.reload()">Повторить</button>
+  </div>
+</body>
+</html>

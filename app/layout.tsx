@@ -3,6 +3,7 @@ import Link from "next/link";
 import "./globals.css";
 import { unassignedSummary } from "@/lib/repo.ts";
 import { SwRegister } from "./sw-register.tsx";
+import { AppLock } from "./components/AppLock.tsx";
 import { Nav, TopNav } from "./components/Nav.tsx";
 import { cookies } from "next/headers";
 import { SESSION_COOKIE, sessionValid } from "@/lib/session.ts";
@@ -102,6 +103,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <main className="wrap">{children}</main>
         <Nav pending={count} items={parseNav(jar.get(NAV_COOKIE)?.value)} simple={isSimple()} />
         <SwRegister />
+        <AppLock />
       </body>
     </html>
   );
