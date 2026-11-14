@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { getSetting } from "@/lib/settings.ts";
 import { getDb } from "@/lib/db.ts";
 import { formatMoney } from "@/lib/money.ts";
-import { budgetAlerts, centerTree, getTx, listRecent, listUnassigned } from "@/lib/repo.ts";
+import { budgetAlerts, centerTree, getTx, listRecent, listTxOn, listUnassigned, personalCenterIds } from "@/lib/repo.ts";
+import { isSimple } from "@/lib/mode.ts";
+import { DayRing } from "./components/DayRing.tsx";
 import { listPlans, ymd } from "@/lib/plans.ts";
 import { readyToAccept } from "@/lib/suggest.ts";
 import { detectSubscriptions, greeting, safeToSpend, streakDays, unusualSpending } from "@/lib/insights.ts";
@@ -40,10 +42,18 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
   const today = ymd(now);
   const week = ymd(new Date(now.getTime() + 7 * 864e5));
   const soon = listPlans("open", 200, "out").filter((p) => p.due_date && p.due_date <= week);
-  const recent = listRecent(6);
+  const recent = listRecent(5);
   const streak = streakDays(now);
   const name = currentAccountName();
   const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  // Сегодняшние траты: в простом режиме — все, в расширенном — только мои (как в «Можно потратить»).
+  const mine = new Set(personalCenterIds());
+  const simple = isSimple();
+  const todaySpent = listTxOn(today)
+    .filter((t) => t.kind === "expense" && !t.transit_id && (simple || t.cost_center_id === null || mine.has(t.cost_center_id)))
+    .reduce((a, t) => a - t.amount, 0);
+  // Норма на день: что осталось на месяц (вместе с сегодняшними тратами), поровну на оставшиеся дни.
+  const dayLimit = safe.known ? Math.max(0, Math.floor((safe.left + todaySpent) / safe.daysLeft / 100) * 100) : 0;
 
   // «D&N заметил»: необычные траты, перелимиты, найденные подписки, копилки.
   const notes: { href: string; icon: string; title: string; text: string; tone: "warn" | "info" | "good" }[] = [];
@@ -51,7 +61,7 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
     notes.push({ href: "/analytics", icon: u.emoji || "📈", title: `${u.name}: +${u.pct}%`, text: `${formatMoney(u.now)} с начала месяца — обычно к этому дню ${formatMoney(u.usual)}`, tone: "warn" });
   for (const a of budgetAlerts(now).slice(0, 2))
     notes.push({
-      href: `/centers/${a.id}`,
+      href: simple ? "/spend" : `/centers/${a.id}`,
       icon: "⚠️",
       title: a.status === "over" ? `${a.name}: перелимит` : `${a.name}: идёт к перелимиту`,
       text: a.status === "over" ? `на ${formatMoney(a.spent - a.budget)} больше лимита` : `при таком темпе ≈ ${formatMoney(a.forecast)} при лимите ${formatMoney(a.budget)}`,
@@ -99,46 +109,37 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
       )}
       {all && <div className="toast-row">✓ Записано сразу: {all}</div>}
 
-      {/* Главное: сколько можно тратить */}
-      <Link href="/income" className="hero safe-hero">
-        {safe.known ? (
-          <>
-            <div className="hero-top">
-              <span>Можно потратить до конца месяца</span>
-              <span className="hero-chip">{safe.daysLeft} {plural(safe.daysLeft, "день", "дня", "дней")}</span>
-            </div>
-            <div className="hero-value">
-              <CountUp value={safe.left} format="money" />
-            </div>
-            <div className="hero-note">
-              {safe.left > 0 ? `≈ ${formatMoney(safe.perDay)} в день` : "Потрачено больше, чем есть на месяц"}
-            </div>
-            <div className="safe-meter" aria-hidden>
-              <i style={{ width: `${safe.pct}%` }} />
-            </div>
-            <div className="safe-row">
-              <span>
-                Доходы <b>+{formatMoney(safe.income + safe.expected)}</b>
+      {/* Главное: сколько потрачено сегодня и сколько можно — одним взглядом */}
+      <Link href="/spend" className="hero day-hero">
+        <DayRing spent={todaySpent} limit={safe.known ? dayLimit : 0} />
+        <div className="day-main">
+          <span className="day-label">Сегодня потрачено</span>
+          <b className="day-sum">
+            <CountUp value={todaySpent} format="money" />
+          </b>
+          <span className="day-sub">
+            {safe.known
+              ? dayLimit > 0
+                ? todaySpent <= dayLimit
+                  ? `можно ещё ${formatMoney(dayLimit - todaySpent)} сегодня`
+                  : `на ${formatMoney(todaySpent - dayLimit)} больше дневной нормы`
+                : "в этом месяце уже всё потрачено"
+              : `за ${month} — ${formatMoney(safe.spent)}`}
+          </span>
+        </div>
+        <div className="day-foot">
+          {safe.known ? (
+            <>
+              <span>До конца месяца можно</span>
+              <b>{safe.left >= 0 ? formatMoney(safe.left) : `−${formatMoney(-safe.left)}`}</b>
+              <span className="day-foot-days">
+                {safe.daysLeft} {plural(safe.daysLeft, "день", "дня", "дней")}
               </span>
-              <span>
-                Потрачено <b>−{formatMoney(safe.spent)}</b>
-              </span>
-              {safe.toPay > 0 && (
-                <span>
-                  Платежи <b>−{formatMoney(safe.toPay)}</b>
-                </span>
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="hero-top">
-              <span>Мои траты · {month}</span>
-            </div>
-            <div className="hero-value">{formatMoney(safe.spent)}</div>
-            <div className="hero-note">Добавьте ставку или доход — D&amp;N посчитает, сколько можно тратить в день ›</div>
-          </>
-        )}
+            </>
+          ) : (
+            <span>Добавьте ставку или доход в «Деньги» — D&amp;N посчитает, сколько можно тратить в день ›</span>
+          )}
+        </div>
       </Link>
 
       <QuickLine next="/" />
@@ -204,7 +205,7 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
             <h2>D&amp;N заметил</h2>
           </div>
           <div className="notes-strip">
-            {notes.map((n, i) => (
+            {notes.slice(0, 3).map((n, i) => (
               <Link key={i} href={n.href} className={`note-card tone-${n.tone}`}>
                 <span className="note-icon" aria-hidden>
                   {n.icon}
@@ -252,15 +253,10 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
       {/* Последние */}
       <section className="today-sec">
         <div className="today-head">
-          <h2>Последние операции</h2>
-          <span className="today-links">
-            <Link href="/calendar" className="link small">
-              Календарь
-            </Link>
-            <Link href="/history" className="link small">
-              Вся история ›
-            </Link>
-          </span>
+          <h2>Последние траты</h2>
+          <Link href="/spend" className="link small">
+            Все траты ›
+          </Link>
         </div>
         {recent.length === 0 ? (
           <Link href="/new" className="card empty-row">

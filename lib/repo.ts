@@ -746,3 +746,8 @@ export function listTxOn(day: string): Tx[] {
   const to = new Date(y, m - 1, d + 1).toISOString();
   return rows<Tx>(getDb().prepare(`${TX_SELECT} WHERE t.occurred_at >= ? AND t.occurred_at < ? ORDER BY t.occurred_at DESC`).all(from, to));
 }
+
+/** Операции за период [from, to), новые сверху. */
+export function listTxRange(from: string, to: string): Tx[] {
+  return rows<Tx>(getDb().prepare(`${TX_SELECT} WHERE t.occurred_at >= ? AND t.occurred_at < ? ORDER BY t.occurred_at DESC`).all(from, to));
+}

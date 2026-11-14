@@ -25,7 +25,7 @@ export function CountUp({ value, format }: { value: number; format: "money" | "i
   return (
     <>
       {v < 0 ? "−" : ""}
-      {abs.toLocaleString("ru-RU", { maximumFractionDigits: abs >= 1000 ? 0 : 2 })} ₴
+      {abs.toLocaleString("ru-RU", abs >= 1000 || Number.isInteger(abs) ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₴
     </>
   );
 }

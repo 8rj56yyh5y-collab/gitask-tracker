@@ -53,6 +53,8 @@ after(() => server.close());
 const repo = await import("../lib/repo.ts");
 const tg = await import("../lib/telegram.ts");
 const { setSetting, getSetting } = await import("../lib/settings.ts");
+// Эти тесты проверяют расширенный режим (с «чьими деньгами»); простой — отдельным тестом в конце.
+setSetting("ui_mode", "full");
 const { connectMonobank, saveMonoItem, backfill } = await import("../lib/monobank.ts");
 const center = (name: string) => repo.listCenters().find((c) => c.name.startsWith(name))!;
 
@@ -282,4 +284,19 @@ test("telegram: тот же магазин снова — «Как в прошл
   assert.equal(tx.description, "подписка на кино");
   assert.ok(!repo.listUnassigned().some((t) => t.id === id));
   assert.match(calls.find((c) => c.path.endsWith("/editMessageText"))!.body.text, /Записано/);
+});
+
+test("telegram, простой режим: «чьи деньги» не спрашиваем — сразу категория, трата в «мои»", async () => {
+  setSetting("ui_mode", "simple");
+  const { id } = repo.insertTx({ amountKop: -4_500, source: "applepay", counterparty: "Совсем новое кафе", cardId: repo.listCards()[0]?.id ?? null });
+  calls.length = 0;
+  await tg.notifyNewTx(id);
+  const sent = calls.find((c) => c.path.endsWith("/sendMessage"))!.body;
+  assert.match(sent.text, /На что потратили/);
+  assert.doesNotMatch(sent.text, /Чьи это деньги/);
+  assert.ok(sent.reply_markup.inline_keyboard.flat().some((b: any) => String(b.callback_data).startsWith(`k:${id}:`)), "кнопки категорий");
+  const tx = repo.getTx(id)!;
+  const personal = repo.listCenters().find((c) => c.name === "Личные")!.id;
+  assert.equal(tx.cost_center_id, personal, "трата сразу в «мои деньги»");
+  setSetting("ui_mode", "full");
 });

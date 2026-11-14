@@ -10,6 +10,7 @@ import { QuickTemplates } from "../components/QuickTemplates.tsx";
 import { AddedToast } from "../components/AddedToast.tsx";
 import { OTHER_INCOME_KINDS } from "@/lib/income.ts";
 import { getSetting } from "@/lib/settings.ts";
+import { isSimple, personalCenterId } from "@/lib/mode.ts";
 import { centerTree, listCards } from "@/lib/repo.ts";
 import { listCashboxes } from "@/lib/cash.ts";
 
@@ -45,11 +46,12 @@ export default async function NewTx({ searchParams }: { searchParams: Promise<{ 
   const { type, saved, amount: preAmount, note: preNote, cat: preCat, added } = await searchParams;
   const tab = type === "in" || type === "move" ? type : "out";
   const last = lastChoice();
+  const simple = isSimple();
 
   return (
     <div className="narrow">
       <h1 className="sr-only">Новая операция</h1>
-      <SegTabs tabs={TABS} active={tab} />
+      <SegTabs tabs={simple ? TABS.filter((t) => t.id !== "move") : TABS} active={tab} />
       {saved && <div className="toast-row">✓ Записано. Можно вводить следующую.</div>}
       <AddedToast id={added} next="/new" />
       {tab === "out" && !preAmount && <QuickTemplates next="/new" />}
@@ -59,7 +61,24 @@ export default async function NewTx({ searchParams }: { searchParams: Promise<{ 
           <AmountPad initial={preAmount ?? ""}>
             <CategoryChips required tiles label="На что" suggested={popularCategories(8)} defaultValue={Number(preCat) || null} />
             <input name="description" required placeholder="Комментарий: на что именно" aria-label="Комментарий" maxLength={200} defaultValue={preNote ?? ""} />
-            {last.center ? (
+            {simple ? (
+              <>
+                <input type="hidden" name="centerId" value={last.center?.id ?? personalCenterId() ?? ""} />
+                {listCards().length > 0 && (
+                  <details className="quick-defaults">
+                    <summary>
+                      <span>
+                        💳 <b>{last.accountLabel}</b>
+                      </span>
+                      <span className="link">изменить</span>
+                    </summary>
+                    <div className="form">
+                      <AccountChips label="Чем платили" none="Наличными" defaultValue={last.account} />
+                    </div>
+                  </details>
+                )}
+              </>
+            ) : (last.center ? (
               <details className="quick-defaults">
                 <summary>
                   <span>
@@ -77,7 +96,7 @@ export default async function NewTx({ searchParams }: { searchParams: Promise<{ 
                 <CenterChips required label="Чьи это деньги" includeInternal={false} />
                 <AccountChips label="Откуда списались" none="Наличными, без кассы" hint="Касса — расход уменьшит её остаток. Карта — трата попадёт в её лимит." />
               </>
-            )}
+            ))}
             <CashCenterLink />
             <More>
               <label>
@@ -160,12 +179,16 @@ export default async function NewTx({ searchParams }: { searchParams: Promise<{ 
         <Link href="/plans#new" className="new-link">
           📅 <span>Запланировать платёж</span>
         </Link>
+        {!simple && (
         <Link href="/sales/new" className="new-link">
           🛍 <span>Продажа товара</span>
         </Link>
+        )}
+        {!simple && (
         <Link href="/transit" className="new-link">
           ↔ <span>Чужие деньги</span>
         </Link>
+        )}
       </div>
     </div>
   );

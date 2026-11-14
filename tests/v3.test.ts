@@ -100,3 +100,13 @@ test("операции за день — по местному времени", 
   assert.ok(repo.listTxOn("2026-04-05").some((t) => t.id === id));
   assert.ok(!repo.listTxOn("2026-04-06").some((t) => t.id === id));
 });
+
+test("голос: числа словами → цифры, слова не трогаем", async () => {
+  const { spokenToText } = await import("../lib/spoken.ts");
+  assert.equal(spokenToText("кофе семьдесят пять"), "кофе 75");
+  assert.equal(spokenToText("такси сто сорок шесть гривен"), "такси 146");
+  assert.equal(spokenToText("аренда двенадцать тысяч"), "аренда 12000");
+  assert.equal(spokenToText("ремонт тысяча двести"), "ремонт 1200");
+  assert.equal(spokenToText("кофе 75"), "кофе 75");
+  assert.equal(quick.parseQuick(spokenToText("обед двести тридцать")).amount, 230_00);
+});

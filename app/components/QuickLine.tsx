@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 import { quickAddAction, quickPreviewAction } from "../actions.ts";
+import { spokenToText } from "@/lib/spoken.ts";
 
 type Preview = Awaited<ReturnType<typeof quickPreviewAction>>;
 
@@ -12,6 +13,54 @@ function Go({ ok }: { ok: boolean }) {
   return (
     <button className={`ql-go ${ok ? "is-ready" : ""}`} disabled={pending} aria-label="Записать">
       {pending ? "…" : "↵"}
+    </button>
+  );
+}
+
+type Rec = { lang: string; interimResults: boolean; maxAlternatives: number; start: () => void; stop: () => void; onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null; onerror: (() => void) | null };
+
+/** Кнопка микрофона: говорите «кофе семьдесят пять» — строка заполнится сама. Есть не во всех браузерах. */
+function Mic({ onText }: { onText: (t: string) => void }) {
+  const [ok, setOk] = useState(false);
+  const [on, setOn] = useState(false);
+  const rec = useRef<Rec | null>(null);
+  useEffect(() => {
+    const w = window as unknown as { SpeechRecognition?: new () => Rec; webkitSpeechRecognition?: new () => Rec };
+    setOk(Boolean(w.SpeechRecognition || w.webkitSpeechRecognition));
+  }, []);
+  if (!ok) return null;
+  const toggle = () => {
+    if (on) {
+      rec.current?.stop();
+      return;
+    }
+    const w = window as unknown as { SpeechRecognition?: new () => Rec; webkitSpeechRecognition?: new () => Rec };
+    const R = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!R) return;
+    const r = new R();
+    r.lang = "ru-RU";
+    r.interimResults = false;
+    r.maxAlternatives = 1;
+    r.onresult = (e) => {
+      const t = e.results[0]?.[0]?.transcript ?? "";
+      if (t) onText(spokenToText(t));
+    };
+    r.onend = () => setOn(false);
+    r.onerror = () => setOn(false);
+    rec.current = r;
+    setOn(true);
+    try {
+      r.start();
+    } catch {
+      setOn(false);
+    }
+  };
+  return (
+    <button type="button" className={`ql-mic ${on ? "is-on" : ""}`} onClick={toggle} aria-label={on ? "Остановить запись голоса" : "Сказать голосом"} title="Сказать голосом: «кофе семьдесят пять»">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+        <rect x="9" y="3" width="6" height="11" rx="3" />
+        <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+      </svg>
     </button>
   );
 }
@@ -56,7 +105,7 @@ export function QuickLine({ next = "/" }: { next?: string }) {
           enterKeyHint="done"
           maxLength={120}
         />
-        {q && <Go ok={ready} />}
+        {q ? <Go ok={ready} /> : <Mic onText={setQ} />}
       </div>
       {p && (
         <div className="ql-preview" aria-live="polite">

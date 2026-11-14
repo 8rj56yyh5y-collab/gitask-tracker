@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useTransition } from "react";
 import { Icon } from "./Icon.tsx";
 import { NAV_ITEMS, type NavId } from "@/lib/nav.ts";
-import { SECTIONS } from "@/lib/sections.ts";
+import { visibleSections } from "@/lib/sections.ts";
 
 const isActive = (path: string, href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(href + "/"));
 
@@ -40,7 +40,7 @@ export function TopNav() {
 }
 
 /** Нижняя панель на телефоне (два раздела · «＋» · два раздела) и боковое меню на большом экране. */
-export function Nav({ pending, items }: { pending: number; items: NavId[] }) {
+export function Nav({ pending, items, simple = false }: { pending: number; items: NavId[]; simple?: boolean }) {
   const path = usePathname();
   const cls = (href: string) => `nav-item ${isActive(path, href) ? "is-active" : ""}`;
   const badge = pending > 0 ? <span className="badge">{pending > 99 ? "99+" : pending}</span> : null;
@@ -61,7 +61,8 @@ export function Nav({ pending, items }: { pending: number; items: NavId[] }) {
       <span>{i.label}</span>
     </Link>
   );
-  const groups = [...new Set(SECTIONS.map((s) => s.group))];
+  const sections = visibleSections(simple);
+  const groups = [...new Set(sections.map((s) => s.group))];
 
   return (
     <>
@@ -83,12 +84,12 @@ export function Nav({ pending, items }: { pending: number; items: NavId[] }) {
           + Записать
         </Link>
         <Link href="/" className={cls("/")}>
-          <Icon name="home" /> Сегодня {badge}
+          <Icon name="home" /> Главная {badge}
         </Link>
         {groups.map((g) => (
           <div key={g} className="side-group">
             <div className="side-group-title">{g}</div>
-            {SECTIONS.filter((s) => s.group === g && s.href !== "/welcome").map((s) => (
+            {sections.filter((s) => s.group === g && s.href !== "/welcome").map((s) => (
               <Link key={s.href} href={s.href} className={cls(s.href)}>
                 <Icon name={s.icon} /> {s.title}
               </Link>

@@ -6,9 +6,11 @@ import { transitOpenSum } from "@/lib/transit.ts";
 import { limitState } from "@/lib/limits.ts";
 import { cardStyle } from "@/lib/banks.ts";
 import { formatMoney } from "@/lib/money.ts";
+import { isSimple } from "@/lib/mode.ts";
 
-/** Кошельки: всё, где лежат деньги, на одном экране — карты, кассы, копилки и чужие деньги. */
+/** «Деньги»: всё, где лежат деньги, на одном экране — карты, наличные, копилки и чужие деньги. */
 export default function Wallets() {
+  const simple = isSimple();
   const cards = listMainCards();
   const usage = groupUsage();
   const boxes = listCashboxes();
@@ -22,7 +24,7 @@ export default function Wallets() {
 
   return (
     <div className="narrow-wide">
-      <h1>Кошельки</h1>
+      <h1>Деньги</h1>
 
       <section className="wallet-sum">
         <div>
@@ -73,6 +75,8 @@ export default function Wallets() {
         </div>
       )}
 
+      {(!simple || boxes.length > 0) && (
+        <>
       <div className="row-between section-row">
         <h2>Наличные</h2>
         <Link href="/cash?new=1#new" className="link small">
@@ -101,6 +105,9 @@ export default function Wallets() {
             );
           })}
         </div>
+      )}
+
+        </>
       )}
 
       <div className="row-between section-row">
@@ -132,7 +139,7 @@ export default function Wallets() {
         </div>
       )}
 
-      {transit > 0 && (
+      {!simple && transit > 0 && (
         <Link href="/transit" className="card wallet-transit">
           <span>
             <strong>Чужие деньги у вас</strong>

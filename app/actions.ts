@@ -21,6 +21,7 @@ import { createTransit, deleteTransit, finishTransit, linkTxToTransit } from "@/
 import { getDb } from "@/lib/db.ts";
 import { addToGoal, archiveGoal, createGoal } from "@/lib/goals.ts";
 import { guessQuick, quickTemplates } from "@/lib/quick.ts";
+import { setUiMode } from "@/lib/mode.ts";
 import { detectSubscriptions, hideSubscription } from "@/lib/insights.ts";
 import { acceptSuggestion, fullSuggestion, readyToAccept } from "@/lib/suggest.ts";
 import { createAccount, currentIngestKey, deleteAccount, isOwner, resetPassword, updateAccount } from "@/lib/accounts.ts";
@@ -519,6 +520,13 @@ export async function restorePlanAction(f: FormData) {
   if (id) restorePlan(id);
   refresh();
   redirect(`/plans/${id}`);
+}
+
+/** Простой или расширенный режим. */
+export async function setUiModeAction(f: FormData) {
+  setUiMode(str(f, "mode") === "full" ? "full" : "simple");
+  refresh();
+  redirect("/settings#mode");
 }
 
 /** Итог недели в Telegram: включить или выключить. */
