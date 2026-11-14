@@ -3,6 +3,7 @@ import { listTxRange, personalCenterIds, type Tx } from "@/lib/repo.ts";
 import { catColor } from "@/lib/categories.ts";
 import { formatMoney } from "@/lib/money.ts";
 import { isSimple } from "@/lib/mode.ts";
+import { inWorkTime } from "@/lib/hours.ts";
 import { TxRow } from "../components/TxRow.tsx";
 import { categoryBudgets } from "@/lib/catbudget.ts";
 import { setCategoryBudgetAction } from "../actions.ts";
@@ -155,6 +156,7 @@ export default async function Spend({ searchParams }: { searchParams: Promise<SP
             <span className="muted small">
               {scoped.length} {type === "out" ? "трат" : "поступлений"} · ≈ {formatMoney(Math.round(total / Math.max(1, passedDays) / 100) * 100)} в день
             </span>
+            {type === "out" && inWorkTime(total) && <span className="spend-hours">⏱ это {inWorkTime(total).replace("≈ ", "≈ ")}</span>}
           </div>
           {!simple && (
             <nav className="who-switch" aria-label="Чьи деньги показывать">

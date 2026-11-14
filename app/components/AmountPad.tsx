@@ -1,12 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
+import { inWorkTimeAt } from "@/lib/worktime.ts";
 
 /**
  * Сумма своими кнопками, как в калькуляторе: телефонная клавиатура не выезжает и не закрывает форму.
  * На компьютере можно просто печатать цифры. Значение уходит в форму скрытым полем name.
  * children — то, что стоит между суммой и кнопками (категория, комментарий).
  */
-export function AmountPad({ name = "amount", label = "Сумма", initial = "", children }: { name?: string; label?: string; initial?: string; children?: React.ReactNode }) {
+export function AmountPad({ name = "amount", label = "Сумма", initial = "", hourRate = 0, children }: { name?: string; label?: string; initial?: string; hourRate?: number; children?: React.ReactNode }) {
   const [v, setV] = useState(() => (/^\d{1,8}([.,]\d{1,2})?$/.test(initial) ? initial.replace(".", ",") : ""));
   const press = (k: string) =>
     setV((cur) => {
@@ -42,6 +43,7 @@ export function AmountPad({ name = "amount", label = "Сумма", initial = "",
       <div className={`pad-display ${v ? "" : "is-empty"}`} aria-live="polite" aria-label={`${label}: ${shown} гривен`}>
         <span className="num">{shown}</span> <small>₴</small>
       </div>
+      {hourRate > 0 && v && <div className="pad-hours">{inWorkTimeAt(Math.round(Number(v.replace(",", ".")) * 100), hourRate)}</div>}
       {/* Обычное поле: валидация формы и сабмит по Enter работают как раньше. */}
       <input className="pad-hidden" name={name} value={v.replace(",", ".")} required onChange={() => {}} tabIndex={-1} aria-hidden onInvalid={(e) => e.currentTarget.setCustomValidity("Наберите сумму")} onInput={(e) => e.currentTarget.setCustomValidity("")} />
       {children}
