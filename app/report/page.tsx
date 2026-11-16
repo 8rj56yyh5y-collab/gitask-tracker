@@ -57,6 +57,7 @@ export default async function ReportPage({ searchParams }: { searchParams: Promi
     `Расходы: ${formatMoney(r.expense)}`,
     `Итог: ${formatMoney(r.net)}`,
     r.cash ? `Наличные на конец: ${formatMoney(r.cash.end)}` : null,
+    r.cash?.fact ? `На руках по факту: ${formatMoney(r.cash.fact.amount)}` : null,
     r.pending.length ? `Ожидают оплаты: ${formatMoney(r.pending.reduce((a, p) => a + p.left, 0))}` : null,
   ]
     .filter(Boolean)
@@ -149,6 +150,15 @@ export default async function ReportPage({ searchParams }: { searchParams: Promi
           <div className="rs-row is-total">
             <span>Наличные на конец</span>
             <b className="num">{formatMoney(r.cash.end)}</b>
+          </div>
+        )}
+        {r.cash?.fact && (
+          <div className="rs-row is-total">
+            <span>
+              ✋ На руках по факту
+              <small className="muted"> · пересчёт {new Date(r.cash.fact.at).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}</small>
+            </span>
+            <b className="num">{formatMoney(r.cash.fact.amount)}</b>
           </div>
         )}
         {r.pending.length > 0 && (

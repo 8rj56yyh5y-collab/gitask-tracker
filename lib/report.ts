@@ -36,7 +36,7 @@ export interface Report {
   /** Ожидают оплаты из кассы (заказали, платить при получении) — на сегодня. */
   pending: PendingPay[];
   /** Остаток наличных (касса или кассы направления) на начало и конец периода. */
-  cash: { names: string; start: number; end: number } | null;
+  cash: { names: string; start: number; end: number; fact?: { amount: number; at: string } | null } | null;
   currency: string;
 }
 
@@ -160,7 +160,10 @@ export function buildReport(scope: ReportScope, from: string, to: string): Repor
     const before = db.prepare(`SELECT COALESCE(SUM(t.amount), 0) AS s FROM transactions t WHERE (${cond}) AND t.occurred_at < ?`).get(fromIso) as { s: number };
     const during = db.prepare(`SELECT COALESCE(SUM(t.amount), 0) AS s FROM transactions t WHERE (${cond}) AND t.occurred_at >= ? AND t.occurred_at < ?`).get(fromIso, toIso) as { s: number };
     const start = opening + Number(before.s);
-    cash = { names: list.map((b) => b.name).join(", "), start, end: start + Number(during.s) };
+    // «На руках по факту» — только если записан у всех касс отчёта.
+    const facts = list.map((b) => (b.fact === null || b.fact === undefined ? null : { amount: Number(b.fact), at: String(b.fact_at ?? "") }));
+    const fact = facts.length && facts.every(Boolean) ? { amount: facts.reduce((a, x) => a + x!.amount, 0), at: facts.map((x) => x!.at).sort()[0] } : null;
+    cash = { names: list.map((b) => b.name).join(", "), start, end: start + Number(during.s), fact };
   }
   return {
     scope,
@@ -418,6 +421,31 @@ export async function reportXlsx(r: Report): Promise<Buffer> {
     row += 4;
   };
   drawCards(cards1, true);
+  // «На руках по факту» — отдельной плашкой: учёт с тратами, записанными заранее, может отличаться от пересчёта.
+  if (r.cash?.fact) {
+    const f = r.cash.fact;
+    const diff = f.amount - r.cash.end;
+    const when = f.at ? new Date(f.at).toLocaleDateString("ru-RU", { day: "numeric", month: "long" }) : "";
+    s.getRow(row).height = 30;
+    s.mergeCells(`B${row}:F${row}`);
+    s.mergeCells(`G${row}:I${row}`);
+    cell(`B${row}`).value = {
+      richText: [
+        { text: "НА РУКАХ ПО ФАКТУ", font: font(8.5, C.muted, true) },
+        { text: `   пересчёт ${when}${diff ? ` · разница с учётом ${diff > 0 ? "+" : ""}${fmtPlain(diff, sym)} (траты, записанные заранее)` : " · совпадает с учётом"}`, font: font(9, C.muted) },
+      ],
+    };
+    cell(`B${row}`).alignment = { vertical: "middle", indent: 1 };
+    cell(`G${row}`).value = f.amount / 100;
+    cell(`G${row}`).numFmt = money;
+    cell(`G${row}`).font = font(17, f.amount < 0 ? C.red : C.ink, true);
+    cell(`G${row}`).alignment = { vertical: "middle", horizontal: "right", indent: 1 };
+    for (const c of COLS) {
+      cell(`${c}${row}`).fill = fill(C.accentSoft);
+      cell(`${c}${row}`).border = { left: c === "B" ? { style: "thick", color: { argb: C.accent } } : undefined };
+    }
+    row += 2;
+  }
   drawCards(cards2, false);
 
   const section = (title: string, hint?: string) => {

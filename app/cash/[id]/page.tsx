@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { adjustCashboxAction, archiveCashboxAction, cashMoveAction, createPlanAction, payPlanAction, setCashboxPotAction, transferAction, updateCashboxAction } from "../../actions.ts";
+import { adjustCashboxAction, setCashFactAction, archiveCashboxAction, cashMoveAction, createPlanAction, payPlanAction, setCashboxPotAction, transferAction, updateCashboxAction } from "../../actions.ts";
 import { AccountSelect } from "../../components/AccountSelect.tsx";
 import { CenterSelect } from "../../components/CenterSelect.tsx";
 import { CategoryChips, CenterChips, SegTabs } from "../../components/Pickers.tsx";
@@ -25,9 +25,9 @@ const dayTitle = (iso: string) => {
   return d.toLocaleDateString("ru-RU", { day: "numeric", month: "long", weekday: "short" });
 };
 
-export default async function CashboxPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ op?: string; fix?: string; to?: string; sign?: string; note?: string; fixed?: string; wait?: string }> }) {
+export default async function CashboxPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ op?: string; fix?: string; to?: string; sign?: string; note?: string; fixed?: string; wait?: string; hand?: string; facted?: string }> }) {
   const { id: raw } = await params;
-  const { op: rawOp, fix, to: fixTo, sign: fixSign, note: fixNote, fixed, wait } = await searchParams;
+  const { op: rawOp, fix, to: fixTo, sign: fixSign, note: fixNote, fixed, wait, hand, facted } = await searchParams;
   const op = rawOp === "in" || rawOp === "move" ? rawOp : "out";
   const b = getCashbox(Number(raw));
   if (!b || b.archived) notFound();
@@ -36,6 +36,9 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
   const fixRaw = String(fixTo ?? "").replace(/\s/g, "").replace(",", ".");
   const fixAbs = fixRaw && Number.isFinite(Number(fixRaw)) ? Math.round(Math.abs(Number(fixRaw)) * 100) : null;
   const fixActual = fixAbs === null ? null : fixSign === "minus" || fixRaw.startsWith("-") ? -fixAbs : fixAbs;
+  const hasFact = b.fact !== null && b.fact !== undefined;
+  const fact = hasFact ? Number(b.fact) : 0;
+  const factDate = b.fact_at ? new Date(b.fact_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long" }) : "";
   const pending = cashPending(b);
   const pendingSum = pending.reduce((a, p) => a + p.left, 0);
   const afterPay = balance - pendingSum;
@@ -84,7 +87,7 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
           <span className="cash-hero-name">💵 {b.name}</span>
           {center && (b.pot ? <span className="cash-hero-tag">касса и направление</span> : center.name !== b.name && <span className="cash-hero-tag">{center.name}</span>)}
         </div>
-        <div className="cash-hero-label">В кассе сейчас</div>
+        <div className="cash-hero-label">{hasFact ? "По учёту (с записанными тратами)" : "В кассе сейчас"}</div>
         <div className={`cash-hero-balance${balance < 0 ? " is-neg" : ""}`}>{fmtSigned(balance)}</div>
         {pendingSum > 0 && (
           <a href="#wait" className="cash-hero-wait">
@@ -101,12 +104,72 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
             К концу месяца будет ≈ <b>{formatMoney(Math.round(st.forecastEnd / 100) * 100)}</b>
           </div>
         )}
-        {!fix && (
-          <Link href={`${base}?fix=1#fix`} className="cash-hero-fix">
-            ✎ Поправить остаток
-          </Link>
+        {hasFact && (
+          <a href={`${base}?hand=1#hand`} className="cash-hero-fact">
+            <span>✋ На руках по факту</span>
+            <b className={fact < 0 ? "neg" : undefined}>{fmtSigned(fact)}</b>
+            <small>
+              пересчёт {factDate}
+              {fact !== balance ? ` · разница с учётом ${fact - balance > 0 ? "+" : "−"}${formatMoney(Math.abs(fact - balance))}` : " · совпадает с учётом"}
+            </small>
+          </a>
+        )}
+        {!fix && !hand && (
+          <div className="cash-hero-btns">
+            <Link href={`${base}?hand=1#hand`} className="cash-hero-fix">
+              ✋ {hasFact ? "Обновить «на руках»" : "Сколько на руках"}
+            </Link>
+            <Link href={`${base}?fix=1#fix`} className="cash-hero-fix">
+              ✎ Поправить учёт
+            </Link>
+          </div>
         )}
       </section>
+
+      {facted && (
+        <div className="card fix-done" role="status">
+          ✓ Записано, сколько на руках. Учёт и траты не менялись — в отчёте будет отдельная строка «На руках по факту».
+        </div>
+      )}
+
+      {hand && (
+        <form id="hand" action={setCashFactAction} className="card form fix-card">
+          <input type="hidden" name="id" value={b.id} />
+          <h2>Сколько на руках по факту</h2>
+          <p className="muted small">
+            Записали трату заранее (например, заказали фару и заплатите при получении на почте), и по учёту в кассе меньше, чем лежит на самом деле? Впишите,
+            сколько наличных у вас <b>на руках сейчас</b>. Это отдельная цифра: учёт, траты и история <b>не меняются</b>. В отчёте будет видно и «по учёту», и
+            «на руках».
+          </p>
+          <div className="sign-seg" role="radiogroup" aria-label="Плюс или минус">
+            <label>
+              <input type="radio" name="sign" value="plus" defaultChecked={!hasFact || fact >= 0} />
+              <span>＋ Есть деньги</span>
+            </label>
+            <label>
+              <input type="radio" name="sign" value="minus" defaultChecked={hasFact && fact < 0} />
+              <span>− В минусе</span>
+            </label>
+          </div>
+          <label className="amount-field">
+            <input name="fact" inputMode="decimal" required placeholder="0" defaultValue={hasFact ? String(Math.abs(fact) / 100) : ""} className="amount-input" aria-label="Сколько на руках" autoFocus />
+            <span className="amount-cur" aria-hidden>
+              {curSymbol()}
+            </span>
+          </label>
+          <div className="fix-btns">
+            <Link href={base} className="btn btn-ghost">
+              Отмена
+            </Link>
+            <button className="btn btn-primary">Сохранить</button>
+          </div>
+          {hasFact && (
+            <button name="clear" value="1" formNoValidate className="btn btn-ghost btn-sm danger">
+              Не показывать «на руках»
+            </button>
+          )}
+        </form>
+      )}
 
       {fixed && (
         <div className="card fix-done" role="status">

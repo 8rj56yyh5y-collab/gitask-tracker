@@ -14,6 +14,9 @@ export interface Cashbox {
   center_id: number | null;
   /** 1 — «касса = направление»: считает все операции своего направления, не только свои движения. */
   pot?: number;
+  /** Сколько на руках по факту (пересчёт), копейки; null — не записано. Учёт не меняет. */
+  fact?: number | null;
+  fact_at?: string | null;
 }
 
 type Row = Record<string, unknown>;
@@ -124,6 +127,16 @@ export function cashPending(b: Pick<Cashbox, "id" | "center_id" | "pot">): Pendi
     )
     .all(b.id) as unknown as PendingPay[];
   return rows.map((r) => ({ ...r, id: Number(r.id), left: Number(r.left) })).filter((r) => r.left > 0);
+}
+
+/**
+ * Записать, сколько наличных на руках по факту. Это отдельная цифра: остаток по учёту, история и отчёт по тратам
+ * не меняются (траты могли записать заранее — «заказал, заплачу при получении»). null — стереть.
+ */
+export function setCashFact(id: number, kop: number | null) {
+  getDb()
+    .prepare("UPDATE cashboxes SET fact = ?, fact_at = ? WHERE id = ?")
+    .run(kop, kop === null ? null : new Date().toISOString(), id);
 }
 
 /** Включить или выключить «касса = направление». */

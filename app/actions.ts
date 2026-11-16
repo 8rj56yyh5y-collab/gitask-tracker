@@ -11,7 +11,7 @@ import { cookies } from "next/headers";
 import { THEME_COOKIE, normalizeTheme } from "@/lib/theme.ts";
 import { NAV_COOKIE, NAV_ITEMS, parseNav } from "@/lib/nav.ts";
 import { BANK_NAMES } from "@/lib/banks.ts";
-import { adjustCashbox, archiveCashbox, cashMove, createCashbox, parseAccount, setCashboxPot, transfer, updateCashbox } from "@/lib/cash.ts";
+import { adjustCashbox, setCashFact, archiveCashbox, cashMove, createCashbox, parseAccount, setCashboxPot, transfer, updateCashbox } from "@/lib/cash.ts";
 import { afterTxDeleted, cancelPlan, createPlan, listPlans, payPlan, restorePlan, undoPlanPayment, updatePlan } from "@/lib/plans.ts";
 import { archiveGroup, archiveProduct, createSale, deleteSale, payCompany, saveGroup, saveProduct, setSalesBase } from "@/lib/sales.ts";
 import { acceptNorms, extendNorm, restartNorm } from "@/lib/norms.ts";
@@ -635,6 +635,21 @@ export async function linkTransitAction(f: FormData) {
 }
 
 // ---------- Касса направления ----------
+/** «На руках по факту» — отдельная цифра, учёт не меняет. */
+export async function setCashFactAction(f: FormData) {
+  const id = num(f, "id");
+  if (!id) return;
+  if (str(f, "clear") === "1") setCashFact(id, null);
+  else {
+    const raw = str(f, "fact");
+    if (!raw.trim()) return;
+    const v = kop(f, "fact");
+    setCashFact(id, str(f, "sign") === "minus" || raw.trim().startsWith("-") ? -v : v);
+  }
+  refresh();
+  redirect(`/cash/${id}?facted=1`);
+}
+
 /** Поправить остаток кассы — только после подтверждения (второй шаг с «было → станет»). */
 export async function adjustCashboxAction(f: FormData) {
   const id = num(f, "id");
