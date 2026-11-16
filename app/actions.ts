@@ -349,7 +349,9 @@ export async function createCashboxAction(f: FormData) {
 export async function updateCashboxAction(f: FormData) {
   const id = num(f, "id");
   if (!id) return;
-  updateCashbox(id, { name: str(f, "name") || "Касса", owner: str(f, "owner"), color: hexColor(str(f, "color")) ?? "#16a34a", opening: kop(f, "opening"), centerId: num(f, "centerId") });
+  // Начальный остаток может быть и в минусе: знак — отдельным переключателем (на iPhone на цифровой клавиатуре нет «−»).
+  const opening = (str(f, "openingSign") === "minus" || str(f, "opening").trim().startsWith("-") ? -1 : 1) * kop(f, "opening");
+  updateCashbox(id, { name: str(f, "name") || "Касса", owner: str(f, "owner"), color: hexColor(str(f, "color")) ?? "#16a34a", opening, centerId: num(f, "centerId") });
   refresh();
   back(f);
 }
@@ -640,6 +642,7 @@ export async function adjustCashboxAction(f: FormData) {
   const raw = str(f, "actual").replace(/\s/g, "").replace(",", ".");
   const v = Number(raw);
   if (!raw || !Number.isFinite(v)) return;
+  // Знак уже учтён на первом шаге (касса может быть в минусе).
   adjustCashbox(id, Math.round(v * 100), str(f, "note"));
   refresh();
   redirect(`/cash/${id}?fixed=1`);

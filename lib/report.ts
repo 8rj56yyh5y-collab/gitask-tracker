@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 import { getDb } from "./db.ts";
 import { centerTree } from "./repo.ts";
-import { ADJUST, boxScope, getCashbox, listCashboxes } from "./cash.ts";
+import { ADJUST, boxScope, cashPending, getCashbox, listCashboxes, type PendingPay } from "./cash.ts";
 import { curSymbol, currentCurrency } from "./money.ts";
 
 // Отчёт за период (например, еженедельный отчёт руководителю): траты, приходы, итог —
@@ -33,6 +33,8 @@ export interface Report {
   byCat: { name: string; s: number; n: number }[];
   /** Корректировки остатка кассы за период (не приход и не расход). */
   adjust: number;
+  /** Ожидают оплаты из кассы (заказали, платить при получении) — на сегодня. */
+  pending: PendingPay[];
   /** Остаток наличных (касса или кассы направления) на начало и конец периода. */
   cash: { names: string; start: number; end: number } | null;
   currency: string;
@@ -145,6 +147,9 @@ export function buildReport(scope: ReportScope, from: string, to: string): Repor
     c.n++;
     cats.set(o.category, c);
   }
+  const pendingMap = new Map<number, PendingPay>();
+  for (const b of listCashboxes().filter((x) => boxIds.includes(x.id))) for (const p of cashPending(b)) pendingMap.set(p.id, p);
+  const pending = [...pendingMap.values()];
   let cash: Report["cash"] = null;
   if (boxIds.length) {
     // Остаток кассы на начало и конец. У «касса = направление» он включает все операции направления.
@@ -169,6 +174,7 @@ export function buildReport(scope: ReportScope, from: string, to: string): Repor
     net: income - expense,
     byCat: [...cats.values()].sort((a, b) => b.s - a.s),
     adjust,
+    pending,
     cash,
     currency: currentCurrency(),
   };
@@ -354,7 +360,16 @@ export async function reportXlsx(r: Report): Promise<Buffer> {
     { label: "Расходы", v: r.expense / 100, fmt: money, color: C.red, bg: C.redSoft, edge: C.red, note: dOut.note, noteColor: dOut.color },
     { label: "Итог за период", v: r.net / 100, fmt: signed, color: r.net < 0 ? C.red : r.net > 0 ? C.green : C.text, bg: C.accentSoft, edge: C.accent, note: dNet.note, noteColor: dNet.color },
     r.cash
-      ? { label: "Остаток на конец", v: r.cash.end / 100, fmt: money, color: C.ink, bg: C.soft, edge: C.ink, note: `на начало ${fmtPlain(r.cash.start, sym)}`, noteColor: C.muted }
+      ? {
+          label: "Остаток на конец",
+          v: r.cash.end / 100,
+          fmt: money,
+          color: r.cash.end < 0 ? C.red : C.ink,
+          bg: C.soft,
+          edge: C.ink,
+          note: r.pending.length ? `после оплат ${r.cash.end - r.pending.reduce((a, p) => a + p.left, 0) < 0 ? "−" : ""}${fmtPlain(Math.abs(r.cash.end - r.pending.reduce((a, p) => a + p.left, 0)), sym)}` : `на начало ${fmtPlain(r.cash.start, sym)}`,
+          noteColor: r.pending.length ? C.amber : C.muted,
+        }
       : { label: "В среднем в день", v: r.expense / nDays / 100, fmt: money, color: C.ink, bg: C.soft, edge: C.ink, note: "расходов", noteColor: C.muted },
   ];
   const cards2: Card[] = [
@@ -567,6 +582,33 @@ export async function reportXlsx(r: Report): Promise<Buffer> {
       );
   }
 
+  // ---- Ожидают оплаты (заказали, платить при получении) ----
+  if (r.pending.length) {
+    const tot = r.pending.reduce((a, p) => a + p.left, 0);
+    section("Ожидают оплаты", "заказано, оплата при получении — из кассы ещё не списано");
+    header([["B:E", "Что"], ["F:G", "Где / кому"], ["H", "Когда"], ["I", "Сумма", "right"]]);
+    r.pending.forEach((p, i) =>
+      line(i, [
+        ["B:E", p.title.slice(0, 50)],
+        ["F:G", p.payee || "—", { color: C.muted }],
+        ["H", p.due ? new Date(`${p.due}T12:00:00`).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" }) : "—", { color: C.muted }],
+        ["I", p.left / 100, { fmt: money, right: true, bold: true, color: C.amber }],
+      ]),
+    );
+    const rest = (r.cash ? r.cash.end : 0) - tot;
+    s.getRow(row).height = 22;
+    s.mergeCells(`B${row}:H${row}`);
+    cell(`B${row}`).value = r.cash ? `Остаток на конец ${fmtPlain(r.cash.end, sym)} − ожидают оплаты ${fmtPlain(tot, sym)} = после всех оплат` : "Всего ожидают оплаты";
+    cell(`B${row}`).font = font(10.5, C.ink, true);
+    cell(`B${row}`).alignment = { indent: 1, vertical: "middle" };
+    cell(`I${row}`).value = (r.cash ? rest : tot) / 100;
+    cell(`I${row}`).numFmt = r.cash ? money : money;
+    cell(`I${row}`).font = font(12, r.cash && rest < 0 ? C.red : C.ink, true);
+    cell(`I${row}`).alignment = { horizontal: "right", vertical: "middle" };
+    for (const c of COLS) cell(`${c}${row}`).border = { top: { style: "medium", color: { argb: C.ink } } };
+    row += 1;
+  }
+
   // ---- Откуда приходы ----
   if (incomes.length) {
     const src = new Map<string, { s: number; n: number }>();
@@ -739,7 +781,7 @@ export async function reportXlsx(r: Report): Promise<Buffer> {
 
 /** «1 250 ₴» для подписей внутри текста. */
 function fmtPlain(kop: number, sym: string): string {
-  return `${Math.round(kop / 100).toLocaleString("ru-RU").replace(/ /g, " ")} ${sym}`;
+  return `${kop < 0 ? "−" : ""}${Math.round(Math.abs(kop) / 100).toLocaleString("ru-RU").replace(/ /g, " ")} ${sym}`;
 }
 
 /** Имя файла: «Отчёт Руководитель 2026-11-09 - 2026-11-15.xlsx» — без символов, на которых спотыкаются браузеры. */

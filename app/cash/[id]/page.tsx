@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { adjustCashboxAction, archiveCashboxAction, cashMoveAction, setCashboxPotAction, transferAction, updateCashboxAction } from "../../actions.ts";
+import { adjustCashboxAction, archiveCashboxAction, cashMoveAction, createPlanAction, payPlanAction, setCashboxPotAction, transferAction, updateCashboxAction } from "../../actions.ts";
 import { AccountSelect } from "../../components/AccountSelect.tsx";
 import { CenterSelect } from "../../components/CenterSelect.tsx";
 import { CategoryChips, CenterChips, SegTabs } from "../../components/Pickers.tsx";
 import { popularCategories } from "@/lib/categories.ts";
 import { TxRow } from "../../components/TxRow.tsx";
-import { boxScope, cashStats, getCashbox } from "@/lib/cash.ts";
+import { boxScope, cashPending, cashStats, getCashbox } from "@/lib/cash.ts";
 import { getDb } from "@/lib/db.ts";
 import { formatMoney, curSymbol } from "@/lib/money.ts";
 import { listPlans } from "@/lib/plans.ts";
@@ -25,16 +25,21 @@ const dayTitle = (iso: string) => {
   return d.toLocaleDateString("ru-RU", { day: "numeric", month: "long", weekday: "short" });
 };
 
-export default async function CashboxPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ op?: string; fix?: string; to?: string; note?: string; fixed?: string }> }) {
+export default async function CashboxPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ op?: string; fix?: string; to?: string; sign?: string; note?: string; fixed?: string; wait?: string }> }) {
   const { id: raw } = await params;
-  const { op: rawOp, fix, to: fixTo, note: fixNote, fixed } = await searchParams;
+  const { op: rawOp, fix, to: fixTo, sign: fixSign, note: fixNote, fixed, wait } = await searchParams;
   const op = rawOp === "in" || rawOp === "move" ? rawOp : "out";
   const b = getCashbox(Number(raw));
   if (!b || b.archived) notFound();
   const st = cashStats(b.id);
   const balance = st.balance;
   const fixRaw = String(fixTo ?? "").replace(/\s/g, "").replace(",", ".");
-  const fixActual = fixRaw && Number.isFinite(Number(fixRaw)) ? Math.round(Number(fixRaw) * 100) : null;
+  const fixAbs = fixRaw && Number.isFinite(Number(fixRaw)) ? Math.round(Math.abs(Number(fixRaw)) * 100) : null;
+  const fixActual = fixAbs === null ? null : fixSign === "minus" || fixRaw.startsWith("-") ? -fixAbs : fixAbs;
+  const pending = cashPending(b);
+  const pendingSum = pending.reduce((a, p) => a + p.left, 0);
+  const afterPay = balance - pendingSum;
+  const fmtSigned = (k: number) => `${k < 0 ? "−" : ""}${formatMoney(Math.abs(k))}`;
   const center = b.center_id ? getCenter(b.center_id) : null;
   const { from, to } = monthBounds();
   const moves = getDb()
@@ -80,10 +85,20 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
           {center && (b.pot ? <span className="cash-hero-tag">касса и направление</span> : center.name !== b.name && <span className="cash-hero-tag">{center.name}</span>)}
         </div>
         <div className="cash-hero-label">В кассе сейчас</div>
-        <div className="cash-hero-balance">{formatMoney(balance)}</div>
+        <div className={`cash-hero-balance${balance < 0 ? " is-neg" : ""}`}>{fmtSigned(balance)}</div>
+        {pendingSum > 0 && (
+          <a href="#wait" className="cash-hero-wait">
+            <span>
+              Ожидают оплаты <b>−{formatMoney(pendingSum)}</b>
+            </span>
+            <span>
+              После оплат <b className={afterPay < 0 ? "neg" : undefined}>{fmtSigned(afterPay)}</b>
+            </span>
+          </a>
+        )}
         {st.forecastEnd !== null && (
           <div className="cash-hero-forecast">
-            К концу месяца будет ≈ <b>{formatMoney(st.forecastEnd)}</b>
+            К концу месяца будет ≈ <b>{formatMoney(Math.round(st.forecastEnd / 100) * 100)}</b>
           </div>
         )}
         {!fix && (
@@ -104,11 +119,21 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
           <input type="hidden" name="fix" value="1" />
           <h2>Поправить остаток</h2>
           <p className="muted small">
-            Пересчитали деньги и в кассе не столько, сколько показывает D&amp;N? Впишите, сколько <b>на самом деле</b>. Разница запишется в историю как
+            Пересчитали деньги и в кассе не столько, сколько показывает D&amp;N? Впишите, сколько <b>на самом деле</b>. Если касса ушла в минус (потратили больше, чем было), выберите «− В минусе». Разница запишется в историю как
             «Корректировка остатка» — это не трата и не приход, в отчёте её видно отдельно.
           </p>
+          <div className="sign-seg" role="radiogroup" aria-label="Плюс или минус">
+            <label>
+              <input type="radio" name="sign" value="plus" defaultChecked={balance >= 0} />
+              <span>＋ Есть деньги</span>
+            </label>
+            <label>
+              <input type="radio" name="sign" value="minus" defaultChecked={balance < 0} />
+              <span>− В минусе</span>
+            </label>
+          </div>
           <label className="amount-field">
-            <input name="to" inputMode="decimal" required defaultValue={String(balance / 100)} className="amount-input" aria-label="Сколько в кассе на самом деле" autoFocus />
+            <input name="to" inputMode="decimal" required defaultValue={String(Math.abs(balance) / 100)} className="amount-input" aria-label="Сколько в кассе на самом деле" autoFocus />
             <span className="amount-cur" aria-hidden>
               {curSymbol()}
             </span>
@@ -136,14 +161,14 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
           <div className="fix-diff">
             <div>
               <span className="muted small">Сейчас</span>
-              <b className="num">{formatMoney(balance)}</b>
+              <b className="num">{fmtSigned(balance)}</b>
             </div>
             <span className="fix-arrow" aria-hidden>
               →
             </span>
             <div>
               <span className="muted small">Станет</span>
-              <b className="num">{formatMoney(fixActual)}</b>
+              <b className={`num${fixActual < 0 ? " danger" : ""}`}>{fmtSigned(fixActual)}</b>
             </div>
           </div>
           {fixActual === balance ? (
@@ -213,7 +238,7 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
                 В среднем за день: <b className={st.perDay >= 0 ? "pos-text" : undefined}>{st.perDay >= 0 ? "+" : "−"}{formatMoney(Math.abs(st.perDay))}</b>
               </span>
               <span>
-                К концу месяца в кассе будет ≈ <b>{formatMoney(st.forecastEnd)}</b>
+                К концу месяца в кассе будет ≈ <b>{formatMoney(Math.round(st.forecastEnd / 100) * 100)}</b>
                 {st.daysToAccurate > 0 && <em> · предварительно, по {st.dataDays} дн.; точнее — через {st.daysToAccurate} дн.</em>}
               </span>
             </>
@@ -238,6 +263,71 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
             <span><i className="out" /> расход</span>
           </div>
         )}
+      </section>
+
+      <section id="wait" className="card wait-card">
+        <div className="wait-head">
+          <h2>Ожидают оплаты</h2>
+          {pendingSum > 0 && <b className="num">−{formatMoney(pendingSum)}</b>}
+        </div>
+        <p className="muted small">
+          Заказали, а платить при получении — например, на «Новой почте»? Запишите сюда. Деньги из кассы не уходят, пока не нажмёте «Оплатил», но видно,
+          сколько останется после оплат.
+        </p>
+        {pending.length > 0 && (
+          <div className="wait-list">
+            {pending.map((p) => (
+              <form key={p.id} action={payPlanAction} className="wait-item">
+                <input type="hidden" name="id" value={p.id} />
+                <input type="hidden" name="amount" value={String(p.left / 100)} />
+                <input type="hidden" name="account" value={`cash:${b.id}`} />
+                <input type="hidden" name="next" value={base} />
+                <Link href={`/plans/${p.id}`} className="wait-what plain">
+                  <strong>{p.title}</strong>
+                  <span className="muted small">
+                    {[p.payee, p.due ? `до ${new Date(`${p.due}T12:00:00`).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}` : ""].filter(Boolean).join(" · ") || "когда придёт"}
+                  </span>
+                </Link>
+                <b className="num">{formatMoney(p.left)}</b>
+                <button className="btn btn-sm btn-primary">Оплатил</button>
+              </form>
+            ))}
+            <div className="wait-total">
+              <span>На руках сейчас</span>
+              <b className="num">{fmtSigned(balance)}</b>
+              <span>После всех оплат</span>
+              <b className={`num${afterPay < 0 ? " danger" : ""}`}>{fmtSigned(afterPay)}</b>
+            </div>
+          </div>
+        )}
+        <details className="more-fields" open={Boolean(wait) || undefined}>
+          <summary>Добавить ожидаемую оплату</summary>
+          <form action={createPlanAction} className="form" style={{ marginTop: 10 }}>
+            <input type="hidden" name="account" value={`cash:${b.id}`} />
+            <input type="hidden" name="direction" value="out" />
+            {b.center_id && <input type="hidden" name="centerId" value={b.center_id} />}
+            <input type="hidden" name="next" value={`${base}#wait`} />
+            <label>
+              Что заказали
+              <input name="title" required placeholder="например, запчасти — наложенный платёж" />
+            </label>
+            <div className="grid-2-tight">
+              <label>
+                Сколько заплатить, {curSymbol()}
+                <input name="total" inputMode="decimal" required placeholder="0" />
+              </label>
+              <label>
+                Когда примерно
+                <input name="due" type="date" />
+              </label>
+            </div>
+            <label>
+              Где / кому (необязательно)
+              <input name="payee" placeholder="например, Нова пошта" />
+            </label>
+            <button className="btn btn-primary">Добавить</button>
+          </form>
+        </details>
       </section>
 
       <SegTabs
@@ -365,7 +455,11 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
           <div className="grid-2-tight">
             <label>
               Сколько было в начале, {curSymbol()}
-              <input name="opening" inputMode="decimal" defaultValue={b.opening / 100} />
+              <input name="opening" inputMode="decimal" defaultValue={Math.abs(b.opening) / 100} />
+              <select name="openingSign" defaultValue={b.opening < 0 ? "minus" : "plus"} aria-label="Плюс или минус">
+                <option value="plus">＋ в плюсе</option>
+                <option value="minus">− в минусе</option>
+              </select>
             </label>
             <label>
               Цвет
