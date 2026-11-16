@@ -51,6 +51,29 @@ test("касса «D» и направление «D» — одно целое: 
   assert.deepEqual({ n: Number(after.n), s: Number(after.s) }, { n: Number(before.n), s: Number(before.s) }, "старые записи на месте");
 });
 
+test("поправить остаток кассы: корректировка в истории, не приход и не расход, можно удалить", async () => {
+  const ExcelJS = (await import("exceljs")).default;
+  const box = cash.createCashbox({ name: "Касса склада", opening: 1_000_00 });
+  cash.cashMove(box, { amountKop: -200_00, note: "вода", at: new Date().toISOString() });
+  assert.equal(cash.cashBalances().get(box), 800_00);
+  assert.equal(cash.adjustCashbox(box, 800_00), null, "та же сумма — ничего не пишем");
+  const id = cash.adjustCashbox(box, 750_00, "пересчитал")!;
+  assert.equal(cash.cashBalances().get(box), 750_00);
+  const st = cash.cashStats(box);
+  assert.equal(st.monthOut, 200_00, "корректировка — не расход");
+  const today = new Date();
+  const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const r = report.buildReport({ kind: "cash", id: box }, ymd, ymd);
+  assert.equal(r.expense, 200_00);
+  assert.equal(r.adjust, -50_00);
+  assert.equal(r.cash!.end, 750_00);
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load((await report.reportXlsx(r)) as unknown as ArrayBuffer);
+  assert.equal(wb.getWorksheet("Операции")!.getRow(7).getCell(4).value, "Корректировка");
+  getDb().prepare("DELETE FROM transactions WHERE id = ?").run(id);
+  assert.equal(cash.cashBalances().get(box), 800_00, "удалили корректировку — остаток вернулся");
+});
+
 test("обычная касса без пары по названию остаётся как была", () => {
   const box = cash.createCashbox({ name: "Сейф", opening: 0 });
   const b = cash.getCashbox(box)!;
