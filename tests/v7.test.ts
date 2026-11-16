@@ -70,11 +70,13 @@ test("отчёт по направлению с кассой: траты, при
   const file = await report.reportXlsx(r);
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(file as unknown as ArrayBuffer);
-  assert.deepEqual(wb.worksheets.map((w) => w.name), ["Итог", "Операции"]);
+  assert.deepEqual(wb.worksheets.map((w) => w.name), ["Отчёт", "Операции"]);
   const ops = wb.getWorksheet("Операции")!;
-  assert.equal(ops.getRow(1).getCell(4).value, "Сумма");
-  assert.equal(ops.rowCount, 1 + 3 + 1, "заголовок + 3 операции + итого");
-  assert.equal(ops.getRow(2).getCell(4).value, 20_000);
+  assert.equal(ops.getRow(8).getCell(6).value, "Сумма", "шапка таблицы под фирменной шапкой");
+  assert.equal(ops.getRow(9).getCell(6).value, 20_000, "первая операция");
+  assert.equal(ops.getRow(12).getCell(2).value, "Итого");
+  assert.equal(wb.getWorksheet("Отчёт")!.getCell("C2").value, "D&N", "логотип и название сверху");
+  assert.ok(wb.model.media.length >= 1, "в файле есть картинка-логотип");
   assert.equal(report.reportFileName(r), "Отчёт Руководитель 2026-11-09 - 2026-11-15.xlsx");
 });
 
