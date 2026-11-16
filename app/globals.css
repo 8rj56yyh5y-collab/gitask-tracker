@@ -1905,3 +1905,10 @@ body { padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
 .wallet-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
 .wallet-cards .gcard { width: auto; }
 .report-dates input { width: 100%; min-width: 0; box-sizing: border-box; } .report-dates label { min-width: 0; }
+
+/* Касса = направление */
+.pot-card { display: flex; gap: 12px; align-items: center; justify-content: space-between; }
+.pot-card p { margin: 4px 0 0; font-size: 13px; }
+.pot-card.on { border-color: color-mix(in srgb, var(--accent, #7c5cff) 45%, transparent); }
+.pot-card .btn { flex-shrink: 0; }
+@media (max-width: 520px) { .pot-card { flex-direction: column; align-items: stretch; } }

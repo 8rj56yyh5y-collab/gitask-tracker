@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 import { getDb } from "./db.ts";
 import { centerTree } from "./repo.ts";
-import { getCashbox, listCashboxes } from "./cash.ts";
+import { boxScope, getCashbox, listCashboxes } from "./cash.ts";
 import { curSymbol, currentCurrency } from "./money.ts";
 
 // Отчёт за период (например, еженедельный отчёт руководителю): траты, приходы, итог —
@@ -107,9 +107,11 @@ export function buildReport(scope: ReportScope, from: string, to: string): Repor
     where = `((t.cost_center_id IN (${ids.join(",")}) AND t.kind != 'internal')${boxIds.length ? ` OR t.cashbox_id IN (${boxIds.join(",")})` : ""})`;
   } else if (scope.kind === "cash") {
     const b = getCashbox(scope.id);
-    scopeName = b ? `Касса «${b.name}»` : "Касса";
+    const c = b?.pot && b.center_id ? centerTree().find((x) => x.id === b.center_id) : null;
+    scopeName = b ? (c ? c.name : `Касса «${b.name}»`) : "Касса";
     boxIds = b ? [b.id] : [];
-    where = `t.cashbox_id = ${b ? b.id : -1}`;
+    // «Касса = направление» — все траты и приходы направления плюс движения кассы.
+    where = b ? boxScope(b) : "0";
   }
   const rows = db
     .prepare(
@@ -140,15 +142,15 @@ export function buildReport(scope: ReportScope, from: string, to: string): Repor
   }
   let cash: Report["cash"] = null;
   if (boxIds.length) {
-    const q = db.prepare(`SELECT COALESCE(SUM(b.opening), 0) AS o FROM cashboxes b WHERE b.id IN (${boxIds.join(",")})`).get() as { o: number };
-    const before = db.prepare(`SELECT COALESCE(SUM(amount), 0) AS s FROM transactions WHERE cashbox_id IN (${boxIds.join(",")}) AND occurred_at < ?`).get(fromIso) as { s: number };
-    const during = db.prepare(`SELECT COALESCE(SUM(amount), 0) AS s FROM transactions WHERE cashbox_id IN (${boxIds.join(",")}) AND occurred_at >= ? AND occurred_at < ?`).get(fromIso, toIso) as { s: number };
-    const start = Number(q.o) + Number(before.s);
-    const names = listCashboxes()
-      .filter((b) => boxIds.includes(b.id))
-      .map((b) => b.name)
-      .join(", ");
-    cash = { names, start, end: start + Number(during.s) };
+    // Остаток кассы на начало и конец. У «касса = направление» он включает все операции направления.
+    // Каждая операция считается один раз, даже если подходит под несколько касс.
+    const list = listCashboxes().filter((b) => boxIds.includes(b.id));
+    const cond = list.map((b) => boxScope(b)).join(" OR ") || "0";
+    const opening = list.reduce((a, b) => a + Number(b.opening), 0);
+    const before = db.prepare(`SELECT COALESCE(SUM(t.amount), 0) AS s FROM transactions t WHERE (${cond}) AND t.occurred_at < ?`).get(fromIso) as { s: number };
+    const during = db.prepare(`SELECT COALESCE(SUM(t.amount), 0) AS s FROM transactions t WHERE (${cond}) AND t.occurred_at >= ? AND t.occurred_at < ?`).get(fromIso, toIso) as { s: number };
+    const start = opening + Number(before.s);
+    cash = { names: list.map((b) => b.name).join(", "), start, end: start + Number(during.s) };
   }
   return {
     from,

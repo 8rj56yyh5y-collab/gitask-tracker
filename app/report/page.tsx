@@ -35,7 +35,14 @@ export default async function ReportPage({ searchParams }: { searchParams: Promi
   const r = buildReport(scope, from, to);
   const centers = centerTree().filter((c) => !c.is_internal);
   const boxes = listCashboxes();
-  const key = scopeKey(scope);
+  // «Касса = направление» — один пункт вместо двух одинаковых.
+  const potCenters = new Set(boxes.filter((b) => b.pot && b.center_id).map((b) => b.center_id as number));
+  let shown = scope;
+  if (scope.kind === "cash") {
+    const pb = boxes.find((b) => b.id === scope.id && b.pot && b.center_id);
+    if (pb) shown = { kind: "center", id: pb.center_id as number };
+  }
+  const key = scopeKey(shown);
   const q = (extra: Record<string, string>) => {
     const p = new URLSearchParams({ scope: key, from, to, ...extra });
     return p.toString();
@@ -89,12 +96,13 @@ export default async function ReportPage({ searchParams }: { searchParams: Promi
                   <option key={c.id} value={`c:${c.id}`}>
                     {c.depth ? "— " : ""}
                     {c.name}
+                    {potCenters.has(c.id) ? " · касса и направление" : ""}
                   </option>
                 ))}
               </optgroup>
               {boxes.length > 0 && (
                 <optgroup label="Кассы (наличные)">
-                  {boxes.map((b) => (
+                  {boxes.filter((b) => !(b.pot && b.center_id)).map((b) => (
                     <option key={b.id} value={`b:${b.id}`}>
                       {b.name}
                     </option>

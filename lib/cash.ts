@@ -1,5 +1,5 @@
 import { getDb } from "./db.ts";
-import { insertTx, internalCenterId } from "./repo.ts";
+import { centerTree, insertTx, internalCenterId } from "./repo.ts";
 
 // Кассы (наличные): у каждой свой остаток. Движения кассы — обычные операции с cashbox_id.
 
@@ -12,6 +12,8 @@ export interface Cashbox {
   archived: number;
   /** Категория по умолчанию для расходов из кассы. */
   center_id: number | null;
+  /** 1 — «касса = направление»: считает все операции своего направления, не только свои движения. */
+  pot?: number;
 }
 
 type Row = Record<string, unknown>;
@@ -33,10 +35,26 @@ export function nextCashColor(): string {
   return CASH_COLORS.find((c) => !used.has(c)) ?? CASH_COLORS[used.size % CASH_COLORS.length];
 }
 
-export function createCashbox(c: { name: string; owner?: string; color?: string; opening?: number; centerId?: number | null }): number {
-  const r = getDb()
-    .prepare("INSERT INTO cashboxes (name, owner, color, opening, center_id) VALUES (?, ?, ?, ?, ?)")
-    .run(c.name, c.owner ?? "", c.color || nextCashColor(), c.opening ?? 0, c.centerId ?? null);
+/** Название без слова «касса» и без знаков: «Касса D» → «d». */
+export const boxNameKey = (s: string) => s.toLowerCase().replace(/касс[аыи]?/g, "").replace(/[^a-zа-яёіїєґ0-9]/gi, "");
+
+/**
+ * Новая касса. Если направление не выбрано, но есть направление с таким же названием — привязываем к нему.
+ * Касса направления («Касса D» у направления «D», или созданная со страницы отчёта) — сразу «касса = направление».
+ */
+export function createCashbox(c: { name: string; owner?: string; color?: string; opening?: number; centerId?: number | null; pot?: boolean }): number {
+  const db = getDb();
+  let centerId = c.centerId ?? null;
+  const key = boxNameKey(c.name);
+  if (!centerId && key) {
+    const same = centerTree().filter((x) => !x.is_internal && boxNameKey(x.name) === key);
+    if (same.length === 1) centerId = same[0].id;
+  }
+  const center = centerId ? centerTree().find((x) => x.id === centerId) : null;
+  const pot = c.pot ?? Boolean(center && key && boxNameKey(center.name) === key);
+  const r = db
+    .prepare("INSERT INTO cashboxes (name, owner, color, opening, center_id, pot) VALUES (?, ?, ?, ?, ?, ?)")
+    .run(c.name, c.owner ?? "", c.color || nextCashColor(), c.opening ?? 0, centerId, pot ? 1 : 0);
   return Number(r.lastInsertRowid);
 }
 
@@ -50,12 +68,40 @@ export function archiveCashbox(id: number) {
   getDb().prepare("UPDATE cashboxes SET archived = 1 WHERE id = ?").run(id);
 }
 
-/** Остатки всех касс: начальный остаток + все приходы и расходы. */
+/** Направление и все вложенные в него. */
+function centerSubtree(id: number): number[] {
+  const all = centerTree();
+  const out = [id];
+  for (let i = 0; i < out.length; i++) for (const c of all) if (c.parent_id === out[i] && !out.includes(c.id)) out.push(c.id);
+  return out;
+}
+
+/**
+ * Какие операции относятся к кассе (условие SQL для таблицы `t`).
+ * Обычная касса — только её движения. «Касса = направление» — ещё и все траты и приходы её направления
+ * (с карт тоже), кроме переводов и чужих денег. Операция, которая и в кассе, и в направлении, считается один раз.
+ */
+export function boxScope(b: Pick<Cashbox, "id" | "center_id" | "pot">, alias = "t"): string {
+  const id = Number(b.id);
+  if (!b.pot || !b.center_id) return `${alias}.cashbox_id = ${id}`;
+  const ids = centerSubtree(Number(b.center_id)).join(",");
+  return `(${alias}.cashbox_id = ${id} OR (${alias}.cost_center_id IN (${ids}) AND ${alias}.kind != 'internal' AND ${alias}.transit_id IS NULL))`;
+}
+
+/** Остатки всех касс: начальный остаток + все приходы и расходы (у «касса = направление» — всего направления). */
 export function cashBalances(): Map<number, number> {
-  const rows = getDb()
-    .prepare("SELECT b.id, b.opening + COALESCE(SUM(t.amount), 0) AS bal FROM cashboxes b LEFT JOIN transactions t ON t.cashbox_id = b.id GROUP BY b.id")
-    .all() as Row[];
-  return new Map(rows.map((r) => [Number(r.id), Number(r.bal)]));
+  const db = getDb();
+  const out = new Map<number, number>();
+  for (const b of db.prepare("SELECT id, opening, center_id, pot FROM cashboxes").all() as unknown as Cashbox[]) {
+    const r = db.prepare(`SELECT COALESCE(SUM(t.amount), 0) AS s FROM transactions t WHERE ${boxScope(b)}`).get() as { s: number };
+    out.set(Number(b.id), Number(b.opening) + Number(r.s));
+  }
+  return out;
+}
+
+/** Включить или выключить «касса = направление». */
+export function setCashboxPot(id: number, on: boolean) {
+  getDb().prepare("UPDATE cashboxes SET pot = ? WHERE id = ?").run(on ? 1 : 0, id);
 }
 
 export interface CashMove {
@@ -133,17 +179,19 @@ const DAY_MS = 864e5;
 export function cashStats(id: number, now = new Date()): CashStats {
   const db = getDb();
   const balance = cashBalances().get(id) ?? 0;
+  const box = getCashbox(id);
+  const where = box ? boxScope(box) : `t.cashbox_id = ${Number(id)}`;
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const sum = (from: Date, to: Date) =>
     db
       .prepare(
         `SELECT COALESCE(SUM(CASE WHEN amount > 0 THEN amount END), 0) AS i, COALESCE(SUM(CASE WHEN amount < 0 THEN -amount END), 0) AS o
-         FROM transactions WHERE cashbox_id = ? AND occurred_at >= ? AND occurred_at < ?`,
+         FROM transactions t WHERE ${where} AND t.occurred_at >= ? AND t.occurred_at < ?`,
       )
-      .get(id, from.toISOString(), to.toISOString()) as { i: number; o: number };
+      .get(from.toISOString(), to.toISOString()) as { i: number; o: number };
   const m = sum(monthStart, nextMonth);
-  const first = db.prepare("SELECT MIN(occurred_at) AS f FROM transactions WHERE cashbox_id = ?").get(id) as { f: string | null };
+  const first = db.prepare(`SELECT MIN(t.occurred_at) AS f FROM transactions t WHERE ${where}`).get() as { f: string | null };
   const since = first.f ? Math.max(1, Math.ceil((now.getTime() - new Date(first.f).getTime()) / DAY_MS)) : 0;
   const dataDays = Math.min(30, since);
   let perDay = 0;
@@ -178,11 +226,16 @@ export function cashStats(id: number, now = new Date()): CashStats {
 export function cashMonthTotals(now = new Date()): Map<number, { in: number; out: number }> {
   const from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   const to = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
-  const rows = getDb()
-    .prepare(
-      `SELECT cashbox_id AS id, COALESCE(SUM(CASE WHEN amount > 0 THEN amount END), 0) AS i, COALESCE(SUM(CASE WHEN amount < 0 THEN -amount END), 0) AS o
-       FROM transactions WHERE cashbox_id IS NOT NULL AND occurred_at >= ? AND occurred_at < ? GROUP BY cashbox_id`,
-    )
-    .all(from, to) as { id: number; i: number; o: number }[];
-  return new Map(rows.map((r) => [Number(r.id), { in: Number(r.i), out: Number(r.o) }]));
+  const db = getDb();
+  const out = new Map<number, { in: number; out: number }>();
+  for (const b of listCashboxes()) {
+    const r = db
+      .prepare(
+        `SELECT COALESCE(SUM(CASE WHEN t.amount > 0 THEN t.amount END), 0) AS i, COALESCE(SUM(CASE WHEN t.amount < 0 THEN -t.amount END), 0) AS o
+         FROM transactions t WHERE ${boxScope(b)} AND t.occurred_at >= ? AND t.occurred_at < ?`,
+      )
+      .get(from, to) as { i: number; o: number };
+    out.set(b.id, { in: Number(r.i), out: Number(r.o) });
+  }
+  return out;
 }

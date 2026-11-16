@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { archiveCashboxAction, cashMoveAction, transferAction, updateCashboxAction } from "../../actions.ts";
+import { archiveCashboxAction, cashMoveAction, setCashboxPotAction, transferAction, updateCashboxAction } from "../../actions.ts";
 import { AccountSelect } from "../../components/AccountSelect.tsx";
 import { CenterSelect } from "../../components/CenterSelect.tsx";
 import { CategoryChips, CenterChips, SegTabs } from "../../components/Pickers.tsx";
 import { popularCategories } from "@/lib/categories.ts";
 import { TxRow } from "../../components/TxRow.tsx";
-import { cashStats, getCashbox } from "@/lib/cash.ts";
+import { boxScope, cashStats, getCashbox } from "@/lib/cash.ts";
 import { getDb } from "@/lib/db.ts";
 import { formatMoney, curSymbol } from "@/lib/money.ts";
 import { listPlans } from "@/lib/plans.ts";
@@ -39,9 +39,9 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
     .prepare(
       `SELECT t.*, cc.name AS center_name, cc.color AS center_color, cb.name AS cashbox_name FROM transactions t
        LEFT JOIN cost_centers cc ON cc.id = t.cost_center_id LEFT JOIN cashboxes cb ON cb.id = t.cashbox_id
-       WHERE t.cashbox_id = ? ORDER BY t.occurred_at DESC LIMIT 300`,
+       WHERE ${boxScope(b)} ORDER BY t.occurred_at DESC LIMIT 500`,
     )
-    .all(b.id) as unknown as Tx[];
+    .all() as unknown as Tx[];
   void from;
   void to;
   const maxBar = Math.max(1, ...st.months.map((x) => Math.max(x.in, x.out)));
@@ -75,7 +75,7 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
       <section className="cash-hero" style={{ "--c": b.color } as React.CSSProperties}>
         <div className="cash-hero-top">
           <span className="cash-hero-name">💵 {b.name}</span>
-          {center && center.name !== b.name && <span className="cash-hero-tag">{center.name}</span>}
+          {center && (b.pot ? <span className="cash-hero-tag">касса и направление</span> : center.name !== b.name && <span className="cash-hero-tag">{center.name}</span>)}
         </div>
         <div className="cash-hero-label">В кассе сейчас</div>
         <div className="cash-hero-balance">{formatMoney(balance)}</div>
@@ -85,6 +85,22 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
           </div>
         )}
       </section>
+
+      {center && (
+        <form action={setCashboxPotAction} className={`card pot-card${b.pot ? " on" : ""}`}>
+          <input type="hidden" name="id" value={b.id} />
+          <input type="hidden" name="on" value={b.pot ? "0" : "1"} />
+          <div>
+            <strong>{b.pot ? `✓ Касса и направление «${center.name}» — одно целое` : `Считать все траты и приходы «${center.name}»`}</strong>
+            <p className="muted">
+              {b.pot
+                ? `Здесь видны все траты и приходы направления «${center.name}» — с карт тоже, — и движения кассы. Ничего не переносится и не удаляется: это тот же учёт, просто в одном месте.`
+                : `Сейчас касса показывает только свои движения. Включите — и здесь, и в отчёте будут все траты и приходы направления «${center.name}». Записи не меняются.`}
+            </p>
+          </div>
+          <button className={b.pot ? "btn btn-ghost" : "btn btn-primary"}>{b.pot ? "Только наличные" : "Объединить"}</button>
+        </form>
+      )}
 
       <section className="card stats-card">
         <h2>{monthName[0].toUpperCase() + monthName.slice(1)}</h2>

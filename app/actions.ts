@@ -11,7 +11,7 @@ import { cookies } from "next/headers";
 import { THEME_COOKIE, normalizeTheme } from "@/lib/theme.ts";
 import { NAV_COOKIE, NAV_ITEMS, parseNav } from "@/lib/nav.ts";
 import { BANK_NAMES } from "@/lib/banks.ts";
-import { archiveCashbox, cashMove, createCashbox, parseAccount, transfer, updateCashbox } from "@/lib/cash.ts";
+import { archiveCashbox, cashMove, createCashbox, parseAccount, setCashboxPot, transfer, updateCashbox } from "@/lib/cash.ts";
 import { afterTxDeleted, cancelPlan, createPlan, listPlans, payPlan, restorePlan, undoPlanPayment, updatePlan } from "@/lib/plans.ts";
 import { archiveGroup, archiveProduct, createSale, deleteSale, payCompany, saveGroup, saveProduct, setSalesBase } from "@/lib/sales.ts";
 import { acceptNorms, extendNorm, restartNorm } from "@/lib/norms.ts";
@@ -165,7 +165,7 @@ export async function addCenter(f: FormData) {
   const id = createCenter(name, num(f, "parentId"), color, toKop(parseAmount(str(f, "budget")) ?? 0), f.get("internal") === "on");
   if (f.get("personal") === "on") getDb().prepare("UPDATE cost_centers SET is_personal = 1 WHERE id = ?").run(id);
   // Своя касса (наличные) у направления — сразу.
-  if (f.get("withCash") === "on") createCashbox({ name, centerId: id, opening: kop(f, "opening") });
+  if (f.get("withCash") === "on") createCashbox({ name, centerId: id, opening: kop(f, "opening"), pot: true });
   refresh();
   back(f);
 }
@@ -633,11 +633,18 @@ export async function linkTransitAction(f: FormData) {
 }
 
 // ---------- Касса направления ----------
+export async function setCashboxPotAction(f: FormData) {
+  const id = num(f, "id");
+  if (id) setCashboxPot(id, str(f, "on") === "1");
+  refresh();
+  redirect(`/cash/${id}`);
+}
+
 export async function createCenterCashboxAction(f: FormData) {
   const centerId = num(f, "centerId");
   const name = str(f, "name");
   if (!centerId || !name) return;
-  const id = createCashbox({ name, centerId, opening: kop(f, "opening") });
+  const id = createCashbox({ name, centerId, opening: kop(f, "opening"), pot: true });
   refresh();
   redirect(`/cash/${id}`);
 }
