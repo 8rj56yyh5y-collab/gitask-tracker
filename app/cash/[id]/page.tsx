@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { archiveCashboxAction, cashMoveAction, setCashboxPotAction, transferAction, updateCashboxAction } from "../../actions.ts";
+import { adjustCashboxAction, archiveCashboxAction, cashMoveAction, setCashboxPotAction, transferAction, updateCashboxAction } from "../../actions.ts";
 import { AccountSelect } from "../../components/AccountSelect.tsx";
 import { CenterSelect } from "../../components/CenterSelect.tsx";
 import { CategoryChips, CenterChips, SegTabs } from "../../components/Pickers.tsx";
@@ -25,14 +25,16 @@ const dayTitle = (iso: string) => {
   return d.toLocaleDateString("ru-RU", { day: "numeric", month: "long", weekday: "short" });
 };
 
-export default async function CashboxPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ op?: string }> }) {
+export default async function CashboxPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ op?: string; fix?: string; to?: string; note?: string; fixed?: string }> }) {
   const { id: raw } = await params;
-  const { op: rawOp } = await searchParams;
+  const { op: rawOp, fix, to: fixTo, note: fixNote, fixed } = await searchParams;
   const op = rawOp === "in" || rawOp === "move" ? rawOp : "out";
   const b = getCashbox(Number(raw));
   if (!b || b.archived) notFound();
   const st = cashStats(b.id);
   const balance = st.balance;
+  const fixRaw = String(fixTo ?? "").replace(/\s/g, "").replace(",", ".");
+  const fixActual = fixRaw && Number.isFinite(Number(fixRaw)) ? Math.round(Number(fixRaw) * 100) : null;
   const center = b.center_id ? getCenter(b.center_id) : null;
   const { from, to } = monthBounds();
   const moves = getDb()
@@ -84,7 +86,86 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
             К концу месяца будет ≈ <b>{formatMoney(st.forecastEnd)}</b>
           </div>
         )}
+        {!fix && (
+          <Link href={`${base}?fix=1#fix`} className="cash-hero-fix">
+            ✎ Поправить остаток
+          </Link>
+        )}
       </section>
+
+      {fixed && (
+        <div className="card fix-done" role="status">
+          ✓ Остаток поправлен. В истории появилась запись «Корректировка остатка» — если ошиблись, откройте её и удалите.
+        </div>
+      )}
+
+      {fix && fixActual === null && (
+        <form id="fix" method="get" action={base} className="card form fix-card">
+          <input type="hidden" name="fix" value="1" />
+          <h2>Поправить остаток</h2>
+          <p className="muted small">
+            Пересчитали деньги и в кассе не столько, сколько показывает D&amp;N? Впишите, сколько <b>на самом деле</b>. Разница запишется в историю как
+            «Корректировка остатка» — это не трата и не приход, в отчёте её видно отдельно.
+          </p>
+          <label className="amount-field">
+            <input name="to" inputMode="decimal" required defaultValue={String(balance / 100)} className="amount-input" aria-label="Сколько в кассе на самом деле" autoFocus />
+            <span className="amount-cur" aria-hidden>
+              {curSymbol()}
+            </span>
+          </label>
+          <label>
+            Почему (необязательно)
+            <input name="note" placeholder="например, пересчитал кассу; забыл записать бензин" />
+          </label>
+          <div className="fix-btns">
+            <Link href={base} className="btn btn-ghost">
+              Отмена
+            </Link>
+            <button className="btn btn-primary">Дальше</button>
+          </div>
+        </form>
+      )}
+
+      {fix && fixActual !== null && (
+        <form id="fix" action={adjustCashboxAction} className="card form fix-card fix-confirm">
+          <input type="hidden" name="id" value={b.id} />
+          <input type="hidden" name="actual" value={String(fixActual / 100)} />
+          <input type="hidden" name="note" value={fixNote ?? ""} />
+          <input type="hidden" name="confirm" value="yes" />
+          <h2>Проверьте и подтвердите</h2>
+          <div className="fix-diff">
+            <div>
+              <span className="muted small">Сейчас</span>
+              <b className="num">{formatMoney(balance)}</b>
+            </div>
+            <span className="fix-arrow" aria-hidden>
+              →
+            </span>
+            <div>
+              <span className="muted small">Станет</span>
+              <b className="num">{formatMoney(fixActual)}</b>
+            </div>
+          </div>
+          {fixActual === balance ? (
+            <p className="muted">Остаток уже такой — менять нечего.</p>
+          ) : (
+            <p>
+              В историю запишется корректировка{" "}
+              <b className={fixActual > balance ? "pos-text" : "danger"} style={{ whiteSpace: "nowrap" }}>
+                {fixActual > balance ? "+" : "−"}
+                {formatMoney(Math.abs(fixActual - balance))}
+              </b>
+              {fixNote ? <> — «{fixNote}»</> : null}.
+            </p>
+          )}
+          <div className="fix-btns">
+            <Link href={`${base}?fix=1#fix`} className="btn btn-ghost">
+              ← Изменить сумму
+            </Link>
+            {fixActual !== balance && <button className="btn btn-primary">Да, поправить</button>}
+          </div>
+        </form>
+      )}
 
       {center && (
         <form action={setCashboxPotAction} className={`card pot-card${b.pot ? " on" : ""}`}>

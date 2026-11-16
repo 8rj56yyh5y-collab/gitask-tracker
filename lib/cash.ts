@@ -131,6 +131,31 @@ export function cashMove(cashboxId: number, m: CashMove): number {
   }).id;
 }
 
+/** Подпись корректировки остатка — по ней корректировки отличаются от обычных приходов и расходов. */
+export const ADJUST = "Корректировка остатка";
+/** SQL: операция — не корректировка остатка. */
+export const notAdjust = (alias = "t") => `NOT (${alias}.kind = 'internal' AND ${alias}.counterparty = '${ADJUST}')`;
+
+/**
+ * Поправить остаток кассы: «в кассе на самом деле столько». Записывает в историю корректировку на разницу
+ * (не приход и не расход — в отчёте не попадает в траты). Её видно в истории, и её можно удалить.
+ */
+export function adjustCashbox(id: number, actualKop: number, note = ""): number | null {
+  const now = cashBalances().get(id);
+  if (now === undefined) throw new Error("Касса не найдена");
+  const diff = actualKop - now;
+  if (!diff) return null;
+  return insertTx({
+    amountKop: diff,
+    kind: "internal",
+    cashboxId: id,
+    costCenterId: internalCenterId(),
+    counterparty: ADJUST,
+    description: note || `было ${now / 100}, стало ${actualKop / 100}`,
+    source: "manual",
+  }).id;
+}
+
 export type Account = { card: number } | { cashbox: number };
 
 /** Перевод между кассами и картами: две операции «внутренний перевод», не расход и не доход. */
@@ -187,7 +212,7 @@ export function cashStats(id: number, now = new Date()): CashStats {
     db
       .prepare(
         `SELECT COALESCE(SUM(CASE WHEN amount > 0 THEN amount END), 0) AS i, COALESCE(SUM(CASE WHEN amount < 0 THEN -amount END), 0) AS o
-         FROM transactions t WHERE ${where} AND t.occurred_at >= ? AND t.occurred_at < ?`,
+         FROM transactions t WHERE ${where} AND ${notAdjust()} AND t.occurred_at >= ? AND t.occurred_at < ?`,
       )
       .get(from.toISOString(), to.toISOString()) as { i: number; o: number };
   const m = sum(monthStart, nextMonth);
@@ -232,7 +257,7 @@ export function cashMonthTotals(now = new Date()): Map<number, { in: number; out
     const r = db
       .prepare(
         `SELECT COALESCE(SUM(CASE WHEN t.amount > 0 THEN t.amount END), 0) AS i, COALESCE(SUM(CASE WHEN t.amount < 0 THEN -t.amount END), 0) AS o
-         FROM transactions t WHERE ${boxScope(b)} AND t.occurred_at >= ? AND t.occurred_at < ?`,
+         FROM transactions t WHERE ${boxScope(b)} AND ${notAdjust()} AND t.occurred_at >= ? AND t.occurred_at < ?`,
       )
       .get(from, to) as { i: number; o: number };
     out.set(b.id, { in: Number(r.i), out: Number(r.o) });

@@ -138,6 +138,12 @@ export default async function ReportPage({ searchParams }: { searchParams: Promi
           <span>Итог</span>
           <b className="num">{formatMoney(r.net)}</b>
         </div>
+        {r.adjust !== 0 && (
+          <div className="rs-row">
+            <span>Корректировки остатка</span>
+            <b className="num">{r.adjust > 0 ? "+" : "−"}{formatMoney(Math.abs(r.adjust))}</b>
+          </div>
+        )}
         {r.cash && (
           <div className="rs-row is-total">
             <span>Наличные на конец</span>
