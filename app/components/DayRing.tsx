@@ -1,3 +1,5 @@
+import { curSymbol } from "@/lib/money.ts";
+
 /**
  * Кольцо дня: сколько из дневной нормы уже потрачено. Без нормы — просто кольцо-значок.
  * Зелёное — в пределах нормы, оранжевое — почти всё, красное — больше нормы.
@@ -24,7 +26,7 @@ export function DayRing({ spent, limit }: { spent: number; limit: number }) {
         className="day-ring-arc"
       />
       <text x="40" y="45" textAnchor="middle" className="day-ring-text">
-        {pct === null ? "₴" : `${Math.min(pct, 999)}%`}
+        {pct === null ? curSymbol() : `${Math.min(pct, 999)}%`}
       </text>
     </svg>
   );

@@ -8,7 +8,7 @@ import { popularCategories } from "@/lib/categories.ts";
 import { TxRow } from "../../components/TxRow.tsx";
 import { cashStats, getCashbox } from "@/lib/cash.ts";
 import { getDb } from "@/lib/db.ts";
-import { formatMoney } from "@/lib/money.ts";
+import { formatMoney, curSymbol } from "@/lib/money.ts";
 import { listPlans } from "@/lib/plans.ts";
 import { getCenter, monthBounds, type Tx } from "@/lib/repo.ts";
 
@@ -160,7 +160,7 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
           <label className="amount-field">
             <input name="amount" inputMode="decimal" required placeholder="0" className="amount-input" aria-label="Сумма в гривнах" />
             <span className="amount-cur" aria-hidden>
-              ₴
+              {curSymbol()}
             </span>
           </label>
           <label>
@@ -206,7 +206,7 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
           <label className="amount-field">
             <input name="amount" inputMode="decimal" required placeholder="0" className="amount-input" aria-label="Сумма в гривнах" />
             <span className="amount-cur" aria-hidden>
-              ₴
+              {curSymbol()}
             </span>
           </label>
           <label>
@@ -267,7 +267,7 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
           </label>
           <div className="grid-2-tight">
             <label>
-              Сколько было в начале, ₴
+              Сколько было в начале, {curSymbol()}
               <input name="opening" inputMode="decimal" defaultValue={b.opening / 100} />
             </label>
             <label>

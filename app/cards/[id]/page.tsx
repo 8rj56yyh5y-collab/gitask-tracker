@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { deleteCardAction, removeCard, setCardParentAction, updateCardAction } from "../../actions.ts";
+import { deleteCardAction, removeCard, setCardBalanceAction, setCardParentAction, updateCardAction } from "../../actions.ts";
+import { cardBalance } from "@/lib/balance.ts";
 import { CardTile } from "../../components/CardTile.tsx";
 import { TxRow } from "../../components/TxRow.tsx";
 import { BANK_NAMES, BANK_STYLE, cardStyle } from "@/lib/banks.ts";
 import { forecastExhaustDay } from "@/lib/limits.ts";
-import { formatMoney } from "@/lib/money.ts";
+import { formatMoney, curSymbol } from "@/lib/money.ts";
 import { cardTransactions, cardUsage, childCards, getCard, groupUsage, listMainCards } from "@/lib/repo.ts";
 import { BankBadge } from "../../components/BankBadge.tsx";
 
@@ -24,6 +25,7 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
   const day = forecastExhaustDay(used, card.monthly_limit, new Date());
   const txs = cardTransactions(card.id);
   const month = new Date().toLocaleDateString("ru-RU", { month: "long" });
+  const balance = cardBalance(card.id);
 
   return (
     <div className="narrow-wide">
@@ -45,6 +47,32 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
       <div className="card-hero">
         <CardTile card={card} used={parent ? (own.get(card.id) ?? 0) : used} extra={kids.length} />
       </div>
+      {!parent && (
+        <form action={setCardBalanceAction} className={`card balance-card ${balance !== null ? "is-set" : ""}`}>
+          <input type="hidden" name="id" value={card.id} />
+          {balance !== null ? (
+            <span className="balance-now">
+              <span className="muted small">На карте сейчас</span>
+              <b className="num">{formatMoney(balance)}</b>
+              <span className="muted small">D&amp;N считает сам: вписанная сумма + приходы − траты по этой карте. Если разошлось с банком — впишите заново.</span>
+            </span>
+          ) : (
+            <span className="balance-now">
+              <strong>Баланс карты</strong>
+              <span className="muted small">Необязательно. Впишите, сколько сейчас на карте, — дальше D&amp;N будет пересчитывать сам и покажет баланс на главной и в «Деньгах».</span>
+            </span>
+          )}
+          <span className="fc-start-row">
+            <input name="balance" inputMode="decimal" placeholder={balance !== null ? String(Math.round(balance / 100)) : `например, 12 500 ${curSymbol()}`} aria-label={`Баланс карты, ${curSymbol()}`} />
+            <button className="btn btn-sm btn-primary">{balance !== null ? "Обновить" : "Сохранить"}</button>
+            {balance !== null && (
+              <button className="btn btn-sm btn-ghost" name="clear" value="1">
+                Убрать
+              </button>
+            )}
+          </span>
+        </form>
+      )}
       {kids.length > 0 && (
         <section className="card" style={{ marginTop: 12 }}>
           <h2>Карты внутри · траты за месяц</h2>
@@ -116,7 +144,7 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
           </select>
         </label>
         <label>
-          Лимит в месяц, ₴ (0 — без лимита)
+          Лимит в месяц, {curSymbol()} (0 — без лимита)
           <input name="limit" inputMode="decimal" defaultValue={card.monthly_limit ? card.monthly_limit / 100 : ""} />
         </label>
         <label>

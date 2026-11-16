@@ -3,6 +3,7 @@ import { getSetting, setSetting } from "./settings.ts";
 import { listPlans, nextMonth, ymd } from "./plans.ts";
 import { personalCenterIds } from "./repo.ts";
 import { cashBalances, listCashboxes } from "./cash.ts";
+import { cardBalances } from "./balance.ts";
 
 // Прогноз денег на 30 дней: сколько будет по дням с учётом зарплаты, платежей и обычных трат.
 
@@ -40,8 +41,10 @@ export function forecastStart(): { amount: number; known: boolean } {
       .get(at) as { s: number };
     return { amount: Number(v) + Number(r.s), known: true };
   }
+  // Не вписано — берём наличные в кассах и балансы карт (если они указаны).
   const bal = cashBalances();
-  return { amount: listCashboxes().reduce((a, b) => a + (bal.get(b.id) ?? 0), 0), known: false };
+  const cards = [...cardBalances().values()].reduce((a, v) => a + v, 0);
+  return { amount: listCashboxes().reduce((a, b) => a + (bal.get(b.id) ?? 0), 0) + cards, known: cards !== 0 };
 }
 
 export function setForecastStart(kop: number | null) {

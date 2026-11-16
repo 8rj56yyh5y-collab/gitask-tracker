@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { closeListAction, closePlainAction, deleteListAction, renameListAction, reopenListAction } from "../actions.ts";
 import { ShoppingEditor } from "./ShoppingEditor.tsx";
 import { AccountChips, CategoryChips, CenterChips } from "../../components/Pickers.tsx";
-import { formatMoney } from "@/lib/money.ts";
+import { formatMoney, curSymbol } from "@/lib/money.ts";
 import { getList, groupTotals, lastPrices, listSum, paymentMatches } from "@/lib/shopping.ts";
 import { groupById } from "@/lib/groups.ts";
 import { ReceiptButton } from "../ReceiptButton.tsx";
@@ -103,7 +103,7 @@ export default async function ShoppingListPage({ params, searchParams }: { param
         </div>
       )}
 
-      <ShoppingEditor listId={l.id} initial={l.items} hints={hints} readOnly={closed} autoFocus={Boolean(isNew) || l.items.length === 0} />
+      <ShoppingEditor symbol={curSymbol()} listId={l.id} initial={l.items} hints={hints} readOnly={closed} autoFocus={Boolean(isNew) || l.items.length === 0} />
 
       {!closed && l.items.length > 0 && (
         <section className="card finish">
@@ -120,13 +120,13 @@ export default async function ShoppingListPage({ params, searchParams }: { param
               <span className="muted small">Без денег — как обычный список.</span>
             </form>
             <details className="finish-opt finish-money">
-              <summary className="btn btn-primary btn-big">₴ Записать как расход</summary>
+              <summary className="btn btn-primary btn-big">Записать как расход</summary>
               <form action={closeListAction} className="form form-big" style={{ marginTop: 12 }}>
                 <input type="hidden" name="id" value={l.id} />
                 <label className="amount-field">
-                  <input name="total" inputMode="decimal" className="amount-input" defaultValue={checkTotal ? checkTotal / 100 : ""} placeholder="0" aria-label="Сумма чека, ₴" />
+                  <input name="total" inputMode="decimal" className="amount-input" defaultValue={checkTotal ? checkTotal / 100 : ""} placeholder="0" aria-label={`Сумма чека, ${curSymbol()}`} />
                   <span className="amount-cur" aria-hidden>
-                    ₴
+                    {curSymbol()}
                   </span>
                 </label>
                 <p className="muted small" style={{ margin: "-6px 0 0", textAlign: "center" }}>

@@ -132,7 +132,7 @@ export default async function Fop({ searchParams }: { searchParams: Promise<{ sa
               <input name="rate" inputMode="decimal" defaultValue={s.rate} />
             </label>
             <label>
-              Минимальная зарплата, ₴
+              Минимальная зарплата, грн
               <input name="minWage" inputMode="decimal" defaultValue={s.minWage / 100} />
             </label>
           </div>

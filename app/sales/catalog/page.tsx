@@ -1,7 +1,7 @@
 import { archiveGroupAction, archiveProductAction, saveGroupAction, saveProductAction, setSalesBaseAction } from "../../actions.ts";
 import { ChipPicker } from "../../components/Pickers.tsx";
 import { SalesTabs } from "../SalesTabs.tsx";
-import { formatMoney } from "@/lib/money.ts";
+import { formatMoney, curSymbol } from "@/lib/money.ts";
 import type { Tier } from "@/lib/pricing.ts";
 import { listGroups, listProducts, salesBase } from "@/lib/sales.ts";
 
@@ -20,7 +20,7 @@ function ProductFields({ p, groups }: { p?: { id: number; name: string; unit: st
       </label>
       <div className="grid-2-tight">
         <label>
-          Цена за 1, ₴
+          Цена за 1, {curSymbol()}
           <input name="price1" inputMode="decimal" defaultValue={one ? one.price / 100 : ""} placeholder="450" />
         </label>
         <label>
@@ -36,8 +36,8 @@ function ProductFields({ p, groups }: { p?: { id: number; name: string; unit: st
             <div key={i} className="set-row">
               <input name={`setQty${i}`} inputMode="numeric" defaultValue={t?.qty ?? ""} placeholder={i === 1 ? "3" : "кол-во"} aria-label={`Набор ${i}: сколько штук`} />
               <span>шт. за</span>
-              <input name={`setPrice${i}`} inputMode="decimal" defaultValue={t ? t.price / 100 : ""} placeholder={i === 1 ? "1200" : "цена"} aria-label={`Набор ${i}: цена, ₴`} />
-              <span>₴</span>
+              <input name={`setPrice${i}`} inputMode="decimal" defaultValue={t ? t.price / 100 : ""} placeholder={i === 1 ? "1200" : "цена"} aria-label={`Набор ${i}: цена, ${curSymbol()}`} />
+              <span>{curSymbol()}</span>
             </div>
           );
         })}

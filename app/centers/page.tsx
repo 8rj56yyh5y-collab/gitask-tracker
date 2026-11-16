@@ -3,7 +3,7 @@ import { addCenter, restoreCenterAction } from "../actions.ts";
 import { Hint } from "../components/Hint.tsx";
 import { centerStats, centerTree, listHiddenCenters } from "@/lib/repo.ts";
 import { cashBalances, listCashboxes } from "@/lib/cash.ts";
-import { formatMoney } from "@/lib/money.ts";
+import { formatMoney, curSymbol } from "@/lib/money.ts";
 
 export default function Directions() {
   const tree = centerTree();
@@ -88,7 +88,7 @@ export default function Directions() {
           </label>
         </div>
         <label>
-          Лимит в месяц, ₴ (необязательно)
+          Лимит в месяц, {curSymbol()} (необязательно)
           <input name="budget" inputMode="decimal" />
         </label>
         <label className="check">
@@ -98,7 +98,7 @@ export default function Directions() {
           <input type="checkbox" name="withCash" /> Своя касса с наличными
         </label>
         <label>
-          Сейчас наличных в этой кассе, ₴
+          Сейчас наличных в этой кассе, {curSymbol()}
           <input name="opening" inputMode="decimal" placeholder="0" />
         </label>
         <label className="check">

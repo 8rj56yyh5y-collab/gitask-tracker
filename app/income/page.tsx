@@ -4,7 +4,7 @@ import { AccountChips } from "../components/Pickers.tsx";
 import { Hint } from "../components/Hint.tsx";
 import { MonthMoneyCard } from "../components/MonthMoneyCard.tsx";
 import { canAutoCredit, listSalaries, monthIncomes } from "@/lib/income.ts";
-import { formatMoney } from "@/lib/money.ts";
+import { formatMoney, curSymbol } from "@/lib/money.ts";
 import { listCards } from "@/lib/repo.ts";
 import { listCashboxes } from "@/lib/cash.ts";
 
@@ -61,8 +61,8 @@ export default async function Income({ searchParams }: { searchParams: Promise<{
         <summary>+ Добавить ставку</summary>
         <form action={createSalaryAction} className="form form-big" style={{ marginTop: 14 }}>
           <label className="amount-field">
-            <input name="amount" inputMode="decimal" required className="amount-input" placeholder="0" aria-label="Сумма ставки, ₴" />
-            <span className="amount-cur" aria-hidden>₴</span>
+            <input name="amount" inputMode="decimal" required className="amount-input" placeholder="0" aria-label={`Сумма ставки, ${curSymbol()}`} />
+            <span className="amount-cur" aria-hidden>{curSymbol()}</span>
           </label>
           <div className="grid-2-tight">
             <label>

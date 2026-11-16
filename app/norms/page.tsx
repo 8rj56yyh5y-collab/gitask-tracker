@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { acceptNormsAction, extendNormAction, restartNormAction } from "../actions.ts";
-import { formatMoney } from "@/lib/money.ts";
+import { formatMoney, curSymbol } from "@/lib/money.ts";
 import { normState } from "@/lib/norms.ts";
 
 export const dynamic = "force-dynamic";
@@ -54,7 +54,7 @@ export default async function Norms({ searchParams }: { searchParams: Promise<{ 
               inputMode="decimal"
               defaultValue={(s.acceptedAt ? r.budget : r.suggested || r.budget) / 100 || ""}
               placeholder="без нормы"
-              aria-label={`Норма для «${r.name}», ₴ в месяц`}
+              aria-label={`Норма для «${r.name}», ${curSymbol()} в месяц`}
             />
           </label>
         ))}

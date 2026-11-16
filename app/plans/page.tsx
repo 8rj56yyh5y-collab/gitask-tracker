@@ -2,7 +2,7 @@ import Link from "next/link";
 import { addSubscriptionAction, createPlanAction, hideSubscriptionAction, payCompanyAction } from "../actions.ts";
 import { detectSubscriptions } from "@/lib/insights.ts";
 import { AccountChips, CenterChips } from "../components/Pickers.tsx";
-import { formatMoney } from "@/lib/money.ts";
+import { formatMoney, curSymbol } from "@/lib/money.ts";
 import { listPlans, ymd, type Plan } from "@/lib/plans.ts";
 import { companyDebt } from "@/lib/sales.ts";
 
@@ -121,8 +121,8 @@ export default async function Plans({ searchParams }: { searchParams: Promise<{ 
           </p>
           <input type="hidden" name="next" value="/plans?tab=company" />
           <label className="amount-field">
-            <input name="amount" inputMode="decimal" defaultValue={debt > 0 ? debt / 100 : ""} required className="amount-input" aria-label="Сумма, ₴" placeholder="0" />
-            <span className="amount-cur" aria-hidden>₴</span>
+            <input name="amount" inputMode="decimal" defaultValue={debt > 0 ? debt / 100 : ""} required className="amount-input" aria-label={`Сумма, ${curSymbol()}`} placeholder="0" />
+            <span className="amount-cur" aria-hidden>{curSymbol()}</span>
           </label>
           <AccountChips label="Откуда отдали" none="Наличными, без кассы" />
           <button className="btn btn-primary btn-big">Отдал компании</button>
@@ -159,8 +159,8 @@ export default async function Plans({ searchParams }: { searchParams: Promise<{ 
               <input type="hidden" name="direction" value={tab} />
               <input type="hidden" name="next" value={`/plans?tab=${tab}`} />
               <label className="amount-field">
-                <input name="total" inputMode="decimal" required className="amount-input" placeholder="0" aria-label="Сумма, ₴" />
-                <span className="amount-cur" aria-hidden>₴</span>
+                <input name="total" inputMode="decimal" required className="amount-input" placeholder="0" aria-label={`Сумма, ${curSymbol()}`} />
+                <span className="amount-cur" aria-hidden>{curSymbol()}</span>
               </label>
               <label>
                 {isIn ? "Кто и за что должен" : "Что оплатить"}
@@ -181,7 +181,7 @@ export default async function Plans({ searchParams }: { searchParams: Promise<{ 
                 <summary>Часть уже {isIn ? "получена" : "оплачена"}, комментарий</summary>
                 <div className="form">
                   <label>
-                    {isIn ? "Уже получено, ₴" : "Уже оплачено, ₴"}
+                    {isIn ? `Уже получено, ${curSymbol()}` : `Уже оплачено, ${curSymbol()}`}
                     <input name="advance" inputMode="decimal" placeholder="например, 2000" />
                   </label>
                   <label>

@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { aiConfigured } from "./ai.ts";
+import { curSymbol, currentCurrency } from "./money.ts";
 import { getDb } from "./db.ts";
 import { personalCenterIds } from "./repo.ts";
 import { listPlans } from "./plans.ts";
@@ -12,11 +13,11 @@ import { detectSubscriptions, safeToSpend } from "./insights.ts";
 
 const MODEL = "claude-opus-5-5";
 
-const SYSTEM = `Ты — помощник в приложении D&N для учёта денег (Украина, гривны).
+const SYSTEM = `Ты — помощник в приложении D&N для учёта денег.
 Отвечаешь на вопросы пользователя о его деньгах. Данные пользователя — в JSON в первом сообщении.
 Правила:
 - Отвечай по-русски, коротко и по делу: сначала прямой ответ (цифра или вывод), потом 1–3 строки пояснения.
-- Считай аккуратно по данным. Суммы пиши в гривнах с пробелами между тысячами: 12 500 ₴.
+- Считай аккуратно по данным. Суммы пиши в валюте пользователя (она указана в данных) с пробелами между тысячами: 12 500.
 - Если в данных нет того, что спрашивают, — так и скажи и подскажи, что записать, чтобы ответ появился.
 - «Мои» деньги — направления из списка «личные_направления»; если человек спрашивает про «мои траты», считай только их.
 - Советы давай конкретные, по его тратам (категории, магазины, подписки), без общих фраз.
@@ -43,12 +44,13 @@ export function assistantContext(now = new Date()) {
   const safe = safeToSpend(now);
   return {
     сегодня: ymd(now.toISOString()),
+    валюта: `${currentCurrency()} (${curSymbol()})`,
     личные_направления: personal,
     можно_потратить_до_конца_месяца: safe.known ? uah(safe.left) : null,
     операции: rows.map((r) =>
       [ymd(r.occurred_at), uah(r.amount), r.kind === "internal" ? "перевод" : r.kind === "income" ? "доход" : "расход", r.counterparty || "", r.cat ?? "", r.center ?? "", r.description && r.description !== r.counterparty ? r.description : "", r.bank ?? (r.box ? `наличные: ${r.box}` : "")].join(" | "),
     ),
-    формат_операции: "дата | сумма ₴ (минус — расход) | тип | где/кому | категория | чьи деньги | комментарий | карта",
+    формат_операции: "дата | сумма (минус — расход) | тип | где/кому | категория | чьи деньги | комментарий | карта",
     платежи_к_оплате: listPlans("open", 100, "out").map((p) => ({ что: p.title, осталось: uah(p.total - p.paid), срок: p.due_date })),
     мне_должны: listPlans("open", 100, "in").filter((p) => p.kind !== "salary").map((p) => ({ что: p.title, осталось: uah(p.total - p.paid), срок: p.due_date })),
     копилки: listGoals().map((g) => ({ цель: g.name, собрано: uah(g.saved), нужно: uah(g.target), срок: g.deadline })),

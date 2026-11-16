@@ -6,6 +6,7 @@ import {
   deleteAccountAction,
   disconnectTelegramAction,
   setUiModeAction,
+  setCurrencyAction,
   setHourRateAction,
   toggleWeekSummaryAction,
   resetAccountAction,
@@ -23,7 +24,7 @@ import { getSetting } from "@/lib/settings.ts";
 import { uiMode } from "@/lib/mode.ts";
 import { FaceIdToggle } from "../components/AppLock.tsx";
 import { hourRate } from "@/lib/hours.ts";
-import { formatMoney } from "@/lib/money.ts";
+import { CURRENCIES, curSymbol, currentCurrency, formatMoney } from "@/lib/money.ts";
 import { MAX_BACKFILL_DAYS } from "@/lib/monobank.ts";
 import { publicBase } from "@/lib/url.ts";
 import { cookies } from "next/headers";
@@ -64,6 +65,7 @@ export default async function Settings({
   const theme = normalizeTheme((await cookies()).get(THEME_COOKIE)?.value);
   const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const mode = uiMode();
+  const currency = currentCurrency();
   const rate = hourRate();
   const ownRate = Boolean(getSetting("hour_rate"));
   const today = ymd(new Date());
@@ -79,6 +81,24 @@ export default async function Settings({
 
       <FaceIdToggle />
 
+      <section className="card cur-card" id="currency">
+        <span>
+          <strong>💱 Валюта</strong>
+          <span className="muted small"> — в ней показываются все суммы. Уже записанные суммы не пересчитываются: выберите ту, в которой ведёте учёт.</span>
+        </span>
+        <div className="cur-opts">
+          {CURRENCIES.map((c) => (
+            <form key={c.code} action={setCurrencyAction}>
+              <input type="hidden" name="currency" value={c.code} />
+              <button className={`cur-opt ${currency === c.code ? "is-on" : ""}`} aria-pressed={currency === c.code}>
+                <b>{c.symbol}</b>
+                <span>{c.name}</span>
+              </button>
+            </form>
+          ))}
+        </div>
+      </section>
+
       <form action={setHourRateAction} className="card hour-card" id="hours">
         <span>
           <strong>⏱ Цена часа вашей работы</strong>
@@ -89,7 +109,7 @@ export default async function Settings({
           </span>
         </span>
         <span className="fc-start-row">
-          <input name="rate" inputMode="decimal" placeholder={rate ? String(Math.round(rate / 100)) : "например, 250"} aria-label="Цена часа, ₴" />
+          <input name="rate" inputMode="decimal" placeholder={rate ? String(Math.round(rate / 100)) : "например, 250"} aria-label={`Цена часа, ${curSymbol()}`} />
           <button className="btn btn-sm">Сохранить</button>
           {ownRate && (
             <button className="btn btn-sm btn-ghost" name="reset" value="1">

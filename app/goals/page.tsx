@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { archiveGoalAction, createGoalAction, goalMoveAction } from "../actions.ts";
 import { goalMoves, listGoals } from "@/lib/goals.ts";
-import { formatMoney } from "@/lib/money.ts";
+import { formatMoney, curSymbol } from "@/lib/money.ts";
 import { SubmitButton } from "../components/SubmitButton.tsx";
 
 const EMOJI = ["🎯", "✈️", "🚗", "🏠", "💻", "📱", "🎓", "💍", "🛡️", "🎁"];
@@ -67,7 +67,7 @@ export default async function Goals({ searchParams }: { searchParams: Promise<{ 
                 <form action={goalMoveAction} className="goal-move">
                   <input type="hidden" name="id" value={g.id} />
                   <input type="hidden" name="next" value={`/goals?open=${g.id}`} />
-                  <input name="amount" inputMode="decimal" placeholder="Сумма, ₴" required aria-label="Сумма" />
+                  <input name="amount" inputMode="decimal" placeholder={`Сумма, ${curSymbol()}`} required aria-label="Сумма" />
                   <SubmitButton className="btn btn-primary" name="dir" value="add">
                     + Отложить
                   </SubmitButton>
@@ -121,7 +121,7 @@ export default async function Goals({ searchParams }: { searchParams: Promise<{ 
           </label>
           <div className="grid-2-tight">
             <label>
-              Сколько нужно, ₴
+              Сколько нужно, {curSymbol()}
               <input name="target" inputMode="decimal" required placeholder="50 000" />
             </label>
             <label>
@@ -130,7 +130,7 @@ export default async function Goals({ searchParams }: { searchParams: Promise<{ 
             </label>
           </div>
           <label>
-            Уже есть, ₴ (если начали раньше)
+            Уже есть, {curSymbol()} (если начали раньше)
             <input name="start" inputMode="decimal" placeholder="0" />
           </label>
           <SubmitButton className="btn btn-primary btn-big">Создать копилку</SubmitButton>

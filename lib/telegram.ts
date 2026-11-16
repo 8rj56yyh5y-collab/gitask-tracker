@@ -88,7 +88,7 @@ const SOURCE: Record<string, string> = { manual: "вручную", applepay: "Ap
 function txText(tx: Tx): string {
   const time = new Date(tx.occurred_at).toLocaleString("ru-RU", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
   const lines = [
-    `<b>${esc(formatMoney(tx.amount, tx.currency))}</b>${tx.counterparty ? ` · ${esc(tx.counterparty)}` : ""}`,
+    `<b>${esc(formatMoney(tx.amount))}</b>${tx.counterparty ? ` · ${esc(tx.counterparty)}` : ""}`,
     // Если карту не узнали — показываем, как её назвал Wallet, чтобы было понятно, откуда платёж.
     [tx.card_label || (tx.description ? `карта: ${tx.description}` : ""), SOURCE[tx.source] ?? tx.source, time].filter(Boolean).map((x) => esc(String(x))).join(" · "),
   ];
@@ -353,8 +353,19 @@ export async function sendWeekSummary(now = new Date()): Promise<boolean> {
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   if (getSetting("week_sent") === today) return false;
   setSetting("week_sent", today);
+  // Файл отчёта за прошлую неделю (если включено на странице «Отчёт») — чтобы сразу переслать руководителю.
+  if (getSetting("report_auto") === "1") {
+    try {
+      const { buildReport, parseScope, presetRange, reportFileName, reportXlsx } = await import("./report.ts");
+      const range = presetRange("lastweek", now);
+      const r = buildReport(parseScope(getSetting("report_scope")), range.from, range.to);
+      await sendFileToTelegram(await reportXlsx(r), reportFileName(r), `📎 Отчёт за прошлую неделю\n${reportCaption(r)}`);
+    } catch (e) {
+      console.error("Weekly report file:", e);
+    }
+  }
   const text = weekSummaryText(now);
-  if (!text) return false;
+  if (!text) return true;
   const url = publicUrl();
   await call(token, "sendMessage", {
     chat_id: chat,
@@ -584,4 +595,28 @@ export async function handleUpdate(update: Update): Promise<void> {
     const kb = action === "m" ? rootsKeyboard(tx) : childKeyboard(tx, Number(centerRaw));
     await call(token, "editMessageReplyMarkup", { ...target, reply_markup: { inline_keyboard: kb } });
   }
+}
+
+/** Отправить файл себе в Telegram (например, отчёт за неделю) — оттуда его легко переслать. */
+export async function sendFileToTelegram(file: Buffer, filename: string, caption: string): Promise<void> {
+  const token = getSetting("tg_token");
+  const chat = getSetting("tg_chat_id");
+  if (!token || !chat) throw new Error("Telegram не подключён: подключите его в «Настройках».");
+  const form = new FormData();
+  form.append("chat_id", chat);
+  form.append("caption", caption.slice(0, 1000));
+  form.append("parse_mode", "HTML");
+  form.append("document", new Blob([new Uint8Array(file)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), filename);
+  const res = await fetch(`${API()}/bot${token}/sendDocument`, { method: "POST", body: form, signal: AbortSignal.timeout(20_000) });
+  const data = (await res.json().catch(() => ({}))) as { ok?: boolean; description?: string };
+  if (!data.ok) throw new Error(`Telegram: ${data.description ?? res.status}`);
+}
+
+/** Короткий текст отчёта для сообщения: приходы, расходы, итог. */
+export function reportCaption(r: { title: string; income: number; expense: number; net: number; cash: { start: number; end: number } | null }): string {
+  const lines = [`<b>${esc(r.title)}</b>`];
+  if (r.cash) lines.push(`Наличные на начало: ${esc(formatMoney(r.cash.start))}`);
+  lines.push(`Приходы: ${esc(formatMoney(r.income))}`, `Расходы: ${esc(formatMoney(r.expense))}`, `Итог: <b>${esc(formatMoney(r.net))}</b>`);
+  if (r.cash) lines.push(`Наличные на конец: <b>${esc(formatMoney(r.cash.end))}</b>`);
+  return lines.join("\n");
 }

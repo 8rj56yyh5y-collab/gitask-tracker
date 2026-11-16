@@ -6,7 +6,7 @@ import { AccountChips } from "../../components/Pickers.tsx";
 import { CenterSelect } from "../../components/CenterSelect.tsx";
 import { TxRow } from "../../components/TxRow.tsx";
 import { getDb } from "@/lib/db.ts";
-import { formatMoney } from "@/lib/money.ts";
+import { formatMoney, curSymbol } from "@/lib/money.ts";
 import { getPlan } from "@/lib/plans.ts";
 import type { Tx } from "@/lib/repo.ts";
 
@@ -64,8 +64,8 @@ export default async function PlanPage({ params, searchParams }: { params: Promi
           <input type="hidden" name="id" value={p.id} />
           <input type="hidden" name="next" value={`/plans/${p.id}`} />
           <label className="amount-field">
-            <input name="amount" inputMode="decimal" defaultValue={left / 100} required className="amount-input" aria-label="Сумма, ₴ — всё или часть" />
-            <span className="amount-cur" aria-hidden>₴</span>
+            <input name="amount" inputMode="decimal" defaultValue={left / 100} required className="amount-input" aria-label={`Сумма, ${curSymbol()} — всё или часть`} />
+            <span className="amount-cur" aria-hidden>{curSymbol()}</span>
           </label>
           <p className="muted small" style={{ margin: "-6px 0 0", textAlign: "center" }}>можно всю сумму или часть</p>
           <AccountChips label={isIn ? "Куда пришли деньги" : "Откуда списались деньги"} defaultValue={acc} none="Наличными, без кассы" hint={isIn ? undefined : "Если выбрать кассу — оплата появится в её истории и уменьшит остаток."} />
@@ -116,7 +116,7 @@ export default async function PlanPage({ params, searchParams }: { params: Promi
         </label>
         <div className="grid-2-tight">
           <label>
-            Сумма, ₴
+            Сумма, {curSymbol()}
             <input name="total" inputMode="decimal" defaultValue={p.total / 100} required />
           </label>
           <label>

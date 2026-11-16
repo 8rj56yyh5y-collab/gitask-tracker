@@ -294,6 +294,9 @@ function migrate(db: DatabaseSync, tenant: string) {
   // Цвет и значок карты (по умолчанию — цвета банка).
   if (!cardCols.includes("color")) db.exec("ALTER TABLE cards ADD COLUMN color TEXT");
   if (!cardCols.includes("badge")) db.exec("ALTER TABLE cards ADD COLUMN badge TEXT");
+  // Баланс карты (необязательно): сколько было на карте в момент balance_at; дальше считается по операциям.
+  if (!cardCols.includes("balance")) db.exec("ALTER TABLE cards ADD COLUMN balance INTEGER");
+  if (!cardCols.includes("balance_at")) db.exec("ALTER TABLE cards ADD COLUMN balance_at TEXT");
   // Дополнительная карта входит в основную: у группы один лимит (например, все карты Monobank).
   if (!cardCols.includes("parent_id")) db.exec("ALTER TABLE cards ADD COLUMN parent_id INTEGER");
   const boxCols = (db.prepare("PRAGMA table_info(cashboxes)").all() as { name: string }[]).map((c) => c.name);

@@ -1,5 +1,5 @@
 import { forecast30 } from "@/lib/forecast.ts";
-import { formatMoney as fmtExact } from "@/lib/money.ts";
+import { formatMoney as fmtExact, curSymbol } from "@/lib/money.ts";
 
 // В прогнозе копейки не нужны — только гривны.
 const formatMoney = (kop: number) => fmtExact(Math.round(kop / 100) * 100);
@@ -65,7 +65,7 @@ export default function ForecastPage() {
             </span>
           </span>
           <span className="fc-start-row">
-            <input name="amount" inputMode="decimal" defaultValue={Math.round(f.start / 100)} aria-label="Сколько денег сейчас, ₴" />
+            <input name="amount" inputMode="decimal" defaultValue={Math.round(f.start / 100)} aria-label={`Сколько денег сейчас, ${curSymbol()}`} />
             <button className="btn btn-primary btn-sm">Пересчитать</button>
           </span>
         </label>

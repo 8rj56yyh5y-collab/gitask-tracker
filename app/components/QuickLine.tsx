@@ -6,7 +6,7 @@ import { spokenToText } from "@/lib/spoken.ts";
 
 type Preview = Awaited<ReturnType<typeof quickPreviewAction>>;
 
-const money = (kop: number) => `${(kop / 100).toLocaleString("ru-RU", { maximumFractionDigits: 2 })} ₴`;
+const money = (kop: number, sym: string) => `${(kop / 100).toLocaleString("ru-RU", { maximumFractionDigits: 2 })} ${sym}`;
 
 function Go({ ok }: { ok: boolean }) {
   const { pending } = useFormStatus();
@@ -69,7 +69,7 @@ function Mic({ onText }: { onText: (t: string) => void }) {
  * Запись одной строкой: «кофе 75», «такси 146», «обед 230». Пока человек печатает,
  * под строкой видно, что поймёт D&N: сумму, категорию и чьи деньги.
  */
-export function QuickLine({ next = "/" }: { next?: string }) {
+export function QuickLine({ next = "/", symbol = "₴" }: { next?: string; symbol?: string }) {
   const [q, setQ] = useState("");
   const [p, setP] = useState<Preview | null>(null);
   const [, start] = useTransition();
@@ -109,7 +109,7 @@ export function QuickLine({ next = "/" }: { next?: string }) {
       </div>
       {p && (
         <div className="ql-preview" aria-live="polite">
-          {p.amount ? <b className="ql-chip">{money(p.amount)}</b> : <span className="ql-chip is-miss">сумма?</span>}
+          {p.amount ? <b className="ql-chip">{money(p.amount, symbol)}</b> : <span className="ql-chip is-miss">сумма?</span>}
           {p.category ? (
             <span className="ql-chip">
               {p.category.emoji} {p.category.name}

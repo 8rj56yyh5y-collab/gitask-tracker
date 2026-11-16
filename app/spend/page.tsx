@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { listTxRange, personalCenterIds, type Tx } from "@/lib/repo.ts";
 import { catColor } from "@/lib/categories.ts";
-import { formatMoney } from "@/lib/money.ts";
+import { formatMoney, curSymbol } from "@/lib/money.ts";
 import { isSimple } from "@/lib/mode.ts";
 import { inWorkTime } from "@/lib/hours.ts";
 import { TxRow } from "../components/TxRow.tsx";
@@ -246,7 +246,7 @@ export default async function Spend({ searchParams }: { searchParams: Promise<SP
           <form action={setCategoryBudgetAction} className="budget-form">
             <input type="hidden" name="categoryId" value={cat} />
             <input type="hidden" name="next" value={link({})} />
-            <input name="amount" inputMode="decimal" placeholder={selBudget ? String(selBudget.limit / 100) : "например, 3000"} aria-label="Лимит на месяц, ₴" />
+            <input name="amount" inputMode="decimal" placeholder={selBudget ? String(selBudget.limit / 100) : "например, 3000"} aria-label={`Лимит на месяц, ${curSymbol()}`} />
             <button className="btn btn-sm btn-primary">{selBudget ? "Изменить" : "Поставить лимит"}</button>
             {selBudget && (
               <button className="btn btn-sm btn-ghost" name="clear" value="1">

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { curSymbol } from "@/lib/money.ts";
 import { addIncomeAction, addTransaction, transferAction } from "../actions.ts";
 import { AccountChips, CategoryChips, CenterChips, ChipPicker, SegTabs } from "../components/Pickers.tsx";
 import { popularCategories } from "@/lib/categories.ts";
@@ -59,7 +60,7 @@ export default async function NewTx({ searchParams }: { searchParams: Promise<{ 
       {tab === "out" && (
         <form action={addTransaction} className="card form form-big quick-add">
           <input type="hidden" name="direction" value="out" />
-          <AmountPad initial={preAmount ?? ""} hourRate={hourRate()}>
+          <AmountPad initial={preAmount ?? ""} hourRate={hourRate()} symbol={curSymbol()}>
             <CategoryChips required tiles label="На что" suggested={popularCategories(8)} defaultValue={Number(preCat) || null} />
             <input name="description" required placeholder="Комментарий: на что именно" aria-label="Комментарий" maxLength={200} defaultValue={preNote ?? ""} />
             {simple ? (
@@ -125,7 +126,7 @@ export default async function NewTx({ searchParams }: { searchParams: Promise<{ 
 
       {tab === "in" && (
         <form action={addIncomeAction} className="card form form-big">
-          <AmountPad />
+          <AmountPad symbol={curSymbol()} />
           <ChipPicker name="kind" label="Что это" defaultValue="Ставка" options={["Ставка", ...OTHER_INCOME_KINDS].map((k) => ({ value: k, label: k }))} />
           <AccountChips label="Куда пришли деньги" none="Наличными, без кассы" hint="Выберите кассу — приход появится в её истории, а остаток вырастет." />
           <More>
@@ -153,7 +154,7 @@ export default async function NewTx({ searchParams }: { searchParams: Promise<{ 
       {tab === "move" && (
         <form action={transferAction} className="card form form-big">
           <input type="hidden" name="next" value="/" />
-          <AmountPad />
+          <AmountPad symbol={curSymbol()} />
           <div className="grid-2-tight">
             <label>
               Откуда

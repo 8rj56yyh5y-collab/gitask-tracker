@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
 /** Число «набегает» от нуля при открытии — 0,6 секунды. Текст сумм не меняется, только анимация. */
-export function CountUp({ value, format }: { value: number; format: "money" | "int" }) {
+export function CountUp({ value, format, symbol = "₴" }: { value: number; format: "money" | "int"; symbol?: string }) {
   const [v, setV] = useState(value);
   const first = useRef(true);
   useEffect(() => {
@@ -25,7 +25,7 @@ export function CountUp({ value, format }: { value: number; format: "money" | "i
   return (
     <>
       {v < 0 ? "−" : ""}
-      {abs.toLocaleString("ru-RU", abs >= 1000 || Number.isInteger(abs) ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₴
+      {abs.toLocaleString("ru-RU", abs >= 1000 || Number.isInteger(abs) ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {symbol}
     </>
   );
 }

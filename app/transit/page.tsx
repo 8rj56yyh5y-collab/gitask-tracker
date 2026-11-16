@@ -1,6 +1,6 @@
 import { createTransitAction, deleteTransitAction, finishTransitAction } from "../actions.ts";
 import { Hint } from "../components/Hint.tsx";
-import { formatMoney } from "@/lib/money.ts";
+import { formatMoney, curSymbol } from "@/lib/money.ts";
 import { listTransits, transitOpenSum, transitTransactions } from "@/lib/transit.ts";
 
 const when = (iso: string) => new Date(iso.includes("T") ? iso : `${iso.replace(" ", "T")}Z`).toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
@@ -56,8 +56,8 @@ export default function TransitPage() {
         <summary>+ Взял чужие деньги</summary>
         <form action={createTransitAction} className="form form-big" style={{ marginTop: 14 }}>
         <label className="amount-field">
-          <input name="amount" inputMode="decimal" required className="amount-input" placeholder="0" aria-label="Сумма, ₴" />
-          <span className="amount-cur" aria-hidden>₴</span>
+          <input name="amount" inputMode="decimal" required className="amount-input" placeholder="0" aria-label={`Сумма, ${curSymbol()}`} />
+          <span className="amount-cur" aria-hidden>{curSymbol()}</span>
         </label>
         <label>
           Что за деньги
