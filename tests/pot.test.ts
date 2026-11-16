@@ -88,3 +88,23 @@ test("похожие, но разные названия не склеивают
   assert.equal(cash.getCashbox(box)!.center_id, null);
   assert.equal(cash.getCashbox(box)!.pot, 0);
 });
+
+test("касса может уйти в минус; ожидаемые оплаты не списываются, пока не отмечены", async () => {
+  const plans = await import("../lib/plans.ts");
+  const box = cash.createCashbox({ name: "Касса выезда", opening: 500_00 });
+  cash.cashMove(box, { amountKop: -800_00, note: "бензин", at: new Date().toISOString() });
+  assert.equal(cash.cashBalances().get(box), -300_00, "минус возможен");
+  cash.adjustCashbox(box, -250_00, "пересчитал");
+  assert.equal(cash.cashBalances().get(box), -250_00, "поправить можно и в минус");
+  cash.adjustCashbox(box, 2_000_00);
+  const p = plans.createPlan({ title: "Запчасти — наложенный платёж", payee: "Нова пошта", total: 1_200_00, cashboxId: box });
+  const b = cash.getCashbox(box)!;
+  assert.deepEqual(cash.cashPending(b).map((x) => x.left), [1_200_00]);
+  assert.equal(cash.cashBalances().get(box), 2_000_00, "на руках не изменилось");
+  const today = new Date();
+  const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  assert.equal(report.buildReport({ kind: "cash", id: box }, ymd, ymd).pending.length, 1);
+  plans.payPlan(p, 1_200_00, { cashboxId: box });
+  assert.equal(cash.cashBalances().get(box), 800_00, "оплатил — списалось");
+  assert.equal(cash.cashPending(b).length, 0);
+});

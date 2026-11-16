@@ -613,10 +613,11 @@ export async function sendFileToTelegram(file: Buffer, filename: string, caption
 }
 
 /** Короткий текст отчёта для сообщения: приходы, расходы, итог. */
-export function reportCaption(r: { title: string; income: number; expense: number; net: number; cash: { start: number; end: number } | null }): string {
+export function reportCaption(r: { title: string; income: number; expense: number; net: number; cash: { start: number; end: number } | null; pending?: { left: number }[] }): string {
   const lines = [`<b>${esc(r.title)}</b>`];
   if (r.cash) lines.push(`Наличные на начало: ${esc(formatMoney(r.cash.start))}`);
   lines.push(`Приходы: ${esc(formatMoney(r.income))}`, `Расходы: ${esc(formatMoney(r.expense))}`, `Итог: <b>${esc(formatMoney(r.net))}</b>`);
   if (r.cash) lines.push(`Наличные на конец: <b>${esc(formatMoney(r.cash.end))}</b>`);
+  if (r.pending?.length) lines.push(`Ожидают оплаты: ${esc(formatMoney(r.pending.reduce((a, p) => a + p.left, 0)))}`);
   return lines.join("\n");
 }

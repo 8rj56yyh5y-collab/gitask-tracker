@@ -99,6 +99,33 @@ export function cashBalances(): Map<number, number> {
   return out;
 }
 
+export interface PendingPay {
+  id: number;
+  title: string;
+  payee: string;
+  due: string | null;
+  /** Сколько ещё заплатить, копейки. */
+  left: number;
+}
+
+/**
+ * Ожидают оплаты из кассы: заказали, а платить при получении (наложенный платёж, «Нова пошта»).
+ * Это открытые платежи «я плачу» с этой кассой; у «касса = направление» — ещё платежи направления без карты и кассы.
+ * Деньги из кассы не уходят, пока оплату не отметили.
+ */
+export function cashPending(b: Pick<Cashbox, "id" | "center_id" | "pot">): PendingPay[] {
+  const ids = b.pot && b.center_id ? centerSubtree(Number(b.center_id)) : [];
+  const extra = ids.length ? ` OR (p.cashbox_id IS NULL AND p.card_id IS NULL AND p.cost_center_id IN (${ids.join(",")}))` : "";
+  const rows = getDb()
+    .prepare(
+      `SELECT p.id, p.title, p.payee, p.due_date AS due, p.total - COALESCE((SELECT SUM(-t.amount) FROM transactions t WHERE t.plan_id = p.id), 0) AS left
+       FROM plans p WHERE p.status = 'open' AND p.direction = 'out' AND (p.cashbox_id = ?${extra})
+       ORDER BY p.due_date IS NULL, p.due_date, p.id`,
+    )
+    .all(b.id) as unknown as PendingPay[];
+  return rows.map((r) => ({ ...r, id: Number(r.id), left: Number(r.left) })).filter((r) => r.left > 0);
+}
+
 /** Включить или выключить «касса = направление». */
 export function setCashboxPot(id: number, on: boolean) {
   getDb().prepare("UPDATE cashboxes SET pot = ? WHERE id = ?").run(on ? 1 : 0, id);
