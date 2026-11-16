@@ -62,7 +62,7 @@ test("отчёт по направлению с кассой: траты, при
   assert.equal(r.income, 20_000_00);
   assert.equal(r.expense, 4_000_00);
   assert.equal(r.net, 16_000_00);
-  assert.deepEqual(r.cash, { names: "Касса руководителя", start: 4_000_00, end: 20_800_00 });
+  assert.deepEqual(r.cash, { names: "Касса руководителя", start: 4_000_00, end: 20_800_00, fact: null });
   assert.equal(r.ops.length, 3);
   assert.equal(r.byCat[0].name, "Топливо");
   assert.equal(report.periodTitle("2026-11-09", "2026-11-15"), "9–15 ноября 2026");

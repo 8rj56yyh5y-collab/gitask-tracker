@@ -108,3 +108,21 @@ test("касса может уйти в минус; ожидаемые опла�
   assert.equal(cash.cashBalances().get(box), 800_00, "оплатил — списалось");
   assert.equal(cash.cashPending(b).length, 0);
 });
+
+test("«на руках по факту» — отдельная цифра: учёт и траты не меняются, в отчёте видно обе", async () => {
+  const box = cash.createCashbox({ name: "Касса фары", opening: 0 });
+  cash.cashMove(box, { amountKop: -11_390_00, counterparty: "Фара", note: "заказ, оплата при получении", at: new Date().toISOString() });
+  const before = getDb().prepare("SELECT COUNT(*) AS n FROM transactions").get() as { n: number };
+  cash.setCashFact(box, 30_000_00);
+  assert.equal(cash.cashBalances().get(box), -11_390_00, "учёт прежний");
+  assert.equal((getDb().prepare("SELECT COUNT(*) AS n FROM transactions").get() as { n: number }).n, before.n, "записей не добавилось");
+  const today = new Date();
+  const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const r = report.buildReport({ kind: "cash", id: box }, ymd, ymd);
+  assert.equal(r.cash!.end, -11_390_00);
+  assert.equal(r.cash!.fact!.amount, 30_000_00);
+  assert.equal(r.expense, 11_390_00);
+  await report.reportXlsx(r);
+  cash.setCashFact(box, null);
+  assert.equal(report.buildReport({ kind: "cash", id: box }, ymd, ymd).cash!.fact, null);
+});

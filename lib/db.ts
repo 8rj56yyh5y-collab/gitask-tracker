@@ -304,6 +304,9 @@ function migrate(db: DatabaseSync, tenant: string) {
   if (!boxCols.includes("center_id")) db.exec("ALTER TABLE cashboxes ADD COLUMN center_id INTEGER");
   // «Касса = направление»: касса считает все операции своего направления (с карт и наличными), а не только свои движения.
   if (!boxCols.includes("pot")) db.exec("ALTER TABLE cashboxes ADD COLUMN pot INTEGER NOT NULL DEFAULT 0");
+  // «На руках по факту»: сколько наличных реально лежит (пересчёт), отдельно от учёта. Учёт не меняет.
+  if (!boxCols.includes("fact")) db.exec("ALTER TABLE cashboxes ADD COLUMN fact INTEGER");
+  if (!boxCols.includes("fact_at")) db.exec("ALTER TABLE cashboxes ADD COLUMN fact_at TEXT");
   const planCols = (db.prepare("PRAGMA table_info(plans)").all() as { name: string }[]).map((c) => c.name);
   // out — я плачу; in — мне должны (ожидаемое поступление).
   if (!planCols.includes("direction")) db.exec("ALTER TABLE plans ADD COLUMN direction TEXT NOT NULL DEFAULT 'out'");
