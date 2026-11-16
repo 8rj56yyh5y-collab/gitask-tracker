@@ -2,11 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSetting } from "@/lib/settings.ts";
 import { getDb } from "@/lib/db.ts";
-import { formatMoney } from "@/lib/money.ts";
-import { budgetAlerts, centerTree, getTx, groupUsage, listMainCards, listRecent, listTxOn, listTxRange, listUnassigned, personalCenterIds } from "@/lib/repo.ts";
+import { formatMoney, curSymbol } from "@/lib/money.ts";
+import { budgetAlerts, centerTree, getTx, listRecent, listTxOn, listTxRange, listUnassigned, personalCenterIds } from "@/lib/repo.ts";
 import { catColor, shortName } from "@/lib/categories.ts";
-import { cardStyle } from "@/lib/banks.ts";
-import { cashBalances, listCashboxes } from "@/lib/cash.ts";
 import { isSimple } from "@/lib/mode.ts";
 import { categoryBudgets } from "@/lib/catbudget.ts";
 import { InstallHint } from "./components/InstallHint.tsx";
@@ -74,11 +72,7 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
     byCat.set(t.category_id, c);
   }
   const topCats = [...byCat.values()].sort((a, b) => b.s - a.s).slice(0, 8);
-  // Карты-градиенты: сколько списано и сколько осталось лимита.
-  const cards = listMainCards();
-  const usage = groupUsage();
-  const boxes = simple ? [] : listCashboxes();
-  const boxBal = cashBalances();
+
   // Норма на день: что осталось на месяц (вместе с сегодняшними тратами), поровну на оставшиеся дни.
   const dayLimit = safe.known ? Math.max(0, Math.floor((safe.left + todaySpent) / safe.daysLeft / 100) * 100) : 0;
 
@@ -150,7 +144,7 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
         <div className="day-main">
           <span className="day-label">Сегодня потрачено</span>
           <b className="day-sum">
-            <CountUp value={todaySpent} format="money" />
+            <CountUp value={todaySpent} format="money" symbol={curSymbol()} />
           </b>
           <span className="day-sub">
             {safe.known
@@ -192,15 +186,15 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
         <Link href="/spend" className="act">
           <i aria-hidden>📊</i>Траты
         </Link>
-        <Link href="/forecast" className="act">
-          <i aria-hidden>🔮</i>Прогноз
+        <Link href="/report" className="act">
+          <i aria-hidden>📄</i>Отчёт
         </Link>
         <Link href="/ask" className="act">
           <i aria-hidden>✨</i>Спросить
         </Link>
       </nav>
 
-      <QuickLine next="/" />
+      <QuickLine next="/" symbol={curSymbol()} />
       <QuickTemplates next="/" />
 
       {now.getDate() <= 7 && (
@@ -271,50 +265,6 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
                 <i aria-hidden>{c.emoji}</i>
                 <span>{shortName(c.name)}</span>
                 <b>{formatMoney(c.s).replace(/,\d+/, "")}</b>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Карты и наличные */}
-      {(cards.length > 0 || boxes.length > 0) && (
-        <section className="today-sec">
-          <div className="today-head">
-            <h2>Карты{boxes.length > 0 ? " и наличные" : ""}</h2>
-            <Link href="/wallets" className="link small">
-              Деньги ›
-            </Link>
-          </div>
-          <div className="gcards">
-            {cards.map((c) => {
-              const used = usage.get(c.id) ?? 0;
-              const lim = c.monthly_limit;
-              return (
-                <Link key={c.id} href={`/cards/${c.id}`} className="gcard" style={{ "--gc": cardStyle(c).color } as React.CSSProperties}>
-                  <span className="gcard-top">
-                    {c.bank}
-                    <small>•• {c.last4}</small>
-                  </span>
-                  <span>
-                    <span className="gcard-sum">{lim > 0 ? formatMoney(Math.max(0, lim - used)) : formatMoney(used)}</span>
-                    <span className="gcard-sub">{lim > 0 ? ` осталось из ${formatMoney(lim)}` : " списано в этом месяце"}</span>
-                    {lim > 0 && (
-                      <span className="gcard-track" style={{ display: "block" }}>
-                        <i style={{ width: `${Math.min(100, (used / lim) * 100)}%` }} />
-                      </span>
-                    )}
-                  </span>
-                </Link>
-              );
-            })}
-            {boxes.map((b) => (
-              <Link key={`b${b.id}`} href={`/cash/${b.id}`} className="gcard is-cash" style={{ "--gc": b.color || "#16a34a" } as React.CSSProperties}>
-                <span className="gcard-top">
-                  {b.name}
-                  <small>наличные</small>
-                </span>
-                <span className="gcard-sum">{formatMoney(boxBal.get(b.id) ?? 0)}</span>
               </Link>
             ))}
           </div>

@@ -294,11 +294,16 @@ function migrate(db: DatabaseSync, tenant: string) {
   // Цвет и значок карты (по умолчанию — цвета банка).
   if (!cardCols.includes("color")) db.exec("ALTER TABLE cards ADD COLUMN color TEXT");
   if (!cardCols.includes("badge")) db.exec("ALTER TABLE cards ADD COLUMN badge TEXT");
+  // Баланс карты (необязательно): сколько было на карте в момент balance_at; дальше считается по операциям.
+  if (!cardCols.includes("balance")) db.exec("ALTER TABLE cards ADD COLUMN balance INTEGER");
+  if (!cardCols.includes("balance_at")) db.exec("ALTER TABLE cards ADD COLUMN balance_at TEXT");
   // Дополнительная карта входит в основную: у группы один лимит (например, все карты Monobank).
   if (!cardCols.includes("parent_id")) db.exec("ALTER TABLE cards ADD COLUMN parent_id INTEGER");
   const boxCols = (db.prepare("PRAGMA table_info(cashboxes)").all() as { name: string }[]).map((c) => c.name);
   // Категория кассы: расходы из неё по умолчанию записываются туда.
   if (!boxCols.includes("center_id")) db.exec("ALTER TABLE cashboxes ADD COLUMN center_id INTEGER");
+  // «Касса = направление»: касса считает все операции своего направления (с карт и наличными), а не только свои движения.
+  if (!boxCols.includes("pot")) db.exec("ALTER TABLE cashboxes ADD COLUMN pot INTEGER NOT NULL DEFAULT 0");
   const planCols = (db.prepare("PRAGMA table_info(plans)").all() as { name: string }[]).map((c) => c.name);
   // out — я плачу; in — мне должны (ожидаемое поступление).
   if (!planCols.includes("direction")) db.exec("ALTER TABLE plans ADD COLUMN direction TEXT NOT NULL DEFAULT 'out'");
@@ -352,18 +357,40 @@ function migrate(db: DatabaseSync, tenant: string) {
  * привязываем кассу к направлению, чтобы не было двух отдельных сущностей. Один раз.
  */
 function linkCashboxesByName(db: DatabaseSync) {
-  const done = db.prepare("SELECT value FROM settings WHERE key = 'boxes_linked'").get();
-  if (done) return;
-  const norm = (s: string) => s.toLowerCase().replace(/касс[аы]?/g, "").replace(/[^a-zа-яёіїєґ0-9]/gi, "").slice(0, 4);
+  // Название без слова «касса» и без знаков: «Касса D» → «d», «Касса отдела» → «отдела».
+  const full = (s: string) => s.toLowerCase().replace(/касс[аыи]?/g, "").replace(/[^a-zа-яёіїєґ0-9]/gi, "");
+  // Привязка (как раньше): первые 4 буквы. «Касса = направление»: одинаковые названия
+  // или общее начало от 5 букв («Касса руководителя» ↔ «Руководитель»), но не «Продажи» ↔ «Продукты».
+  const near = (box: string, center: string) => {
+    const a = full(box);
+    const b = full(center);
+    return a.length >= 3 && b.length >= 3 && a.slice(0, 4) === b.slice(0, 4);
+  };
+  const same = (box: string, center: string) => {
+    const a = full(box);
+    const b = full(center);
+    if (!a || !b) return false;
+    if (a === b) return true;
+    let n = 0;
+    while (n < a.length && n < b.length && a[n] === b[n]) n++;
+    return n >= 5;
+  };
   const centers = db.prepare("SELECT id, name FROM cost_centers WHERE is_internal = 0 AND archived = 0").all() as { id: number; name: string }[];
-  const boxes = db.prepare("SELECT id, name FROM cashboxes WHERE center_id IS NULL AND archived = 0").all() as { id: number; name: string }[];
-  for (const b of boxes) {
-    const key = norm(b.name);
-    if (key.length < 3) continue;
-    const matches = centers.filter((c) => norm(c.name) === key);
-    if (matches.length === 1) db.prepare("UPDATE cashboxes SET center_id = ? WHERE id = ?").run(matches[0].id, b.id);
+  // 1) Касса без направления, а направление с тем же названием есть — связываем и объединяем.
+  const loose = db.prepare("SELECT id, name FROM cashboxes WHERE center_id IS NULL AND archived = 0").all() as { id: number; name: string }[];
+  for (const b of loose) {
+    const exact = centers.filter((c) => full(c.name) === full(b.name) && full(b.name));
+    const matches = exact.length ? exact : centers.filter((c) => near(b.name, c.name));
+    if (matches.length === 1) db.prepare("UPDATE cashboxes SET center_id = ?, pot = ? WHERE id = ?").run(matches[0].id, same(b.name, matches[0].name) ? 1 : 0, b.id);
   }
-  db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('boxes_linked', '1')").run();
+  // 2) Один раз: уже связанные кассы с тем же названием, что у направления, — тоже «касса = направление».
+  if (!db.prepare("SELECT 1 FROM settings WHERE key = 'boxes_pot_v1'").get()) {
+    const linked = db
+      .prepare("SELECT b.id, b.name, c.name AS cname FROM cashboxes b JOIN cost_centers c ON c.id = b.center_id WHERE b.archived = 0")
+      .all() as { id: number; name: string; cname: string }[];
+    for (const b of linked) if (same(b.name, b.cname)) db.prepare("UPDATE cashboxes SET pot = 1 WHERE id = ?").run(b.id);
+    db.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('boxes_pot_v1', '1')").run();
+  }
 }
 
 /** Готовый список категорий: включены самые частые, остальные можно включить в «Категориях». */

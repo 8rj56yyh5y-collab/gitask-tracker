@@ -5,7 +5,7 @@ import { isSimple } from "@/lib/mode.ts";
 import { listCards } from "@/lib/repo.ts";
 import { listCashboxes } from "@/lib/cash.ts";
 import { listPlans } from "@/lib/plans.ts";
-import { formatMoney } from "@/lib/money.ts";
+import { currentCurrency, formatMoney } from "@/lib/money.ts";
 import { Icon } from "../components/Icon.tsx";
 import { TxRow } from "../components/TxRow.tsx";
 import { SearchBox } from "./SearchBox.tsx";
@@ -34,7 +34,7 @@ export default async function Search({ searchParams }: { searchParams: Promise<{
           <p className="muted small search-tip">Ищет всё сразу: операции (по магазину, комментарию, категории, сумме), карты, кассы, платежи и разделы.</p>
           <div className="search-group">Все разделы</div>
           <div className="card menu-list">
-            {visibleSections(simple).map((s) => (
+            {visibleSections(simple, currentCurrency() === "UAH").map((s) => (
               <Link key={s.href} href={s.href} className="menu-row">
                 <span className="menu-icon">
                   <Icon name={s.icon} />

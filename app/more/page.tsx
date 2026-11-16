@@ -4,7 +4,7 @@ import { toggleSetupAction } from "../actions.ts";
 import { unassignedSummary } from "@/lib/repo.ts";
 import { setupHidden } from "@/lib/setup.ts";
 import { transitOpenSum } from "@/lib/transit.ts";
-import { formatMoney } from "@/lib/money.ts";
+import { currentCurrency, formatMoney } from "@/lib/money.ts";
 import { visibleSections } from "@/lib/sections.ts";
 import { isSimple } from "@/lib/mode.ts";
 import { currentAccountName } from "@/lib/accounts.ts";
@@ -18,7 +18,7 @@ export default function More() {
     "/inbox": count ? `${count} ждут — подтвердите или поправьте` : "Всё разобрано ✓",
     "/transit": transit ? `У вас сейчас ${formatMoney(transit)} — нужно передать` : "Деньги, которые нужно кому-то отдать",
   };
-  const sections = visibleSections(isSimple());
+  const sections = visibleSections(isSimple(), currentCurrency() === "UAH");
   const groups = [...new Set(sections.map((s) => s.group))];
   return (
     <div className="narrow-wide">

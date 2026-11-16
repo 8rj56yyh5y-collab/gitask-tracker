@@ -4,15 +4,50 @@ export function toKop(value: number): number {
   return Math.round(value * 100);
 }
 
-export function formatMoney(kop: number, currency = "UAH"): string {
+/** Валюты, которые можно выбрать в «Настройках». По умолчанию — гривна. */
+export const CURRENCIES = [
+  { code: "UAH", symbol: "₴", name: "Гривна" },
+  { code: "USD", symbol: "$", name: "Доллар США" },
+  { code: "EUR", symbol: "€", name: "Евро" },
+  { code: "PLN", symbol: "zł", name: "Злотый" },
+  { code: "GBP", symbol: "£", name: "Фунт стерлингов" },
+] as const;
+
+export type CurrencyCode = (typeof CURRENCIES)[number]["code"];
+
+// Валюта аккаунта задаётся в настройках. Этот файл работает и в браузере, поэтому базу он не читает:
+// сервер сам подключает «где взять валюту» (см. lib/settings.ts). В браузере — гривна, если не передали явно.
+let resolver: (() => string | null) | null = null;
+export function setCurrencyResolver(fn: () => string | null) {
+  resolver = fn;
+}
+
+export function normalizeCurrency(v: string | null | undefined): CurrencyCode {
+  return (CURRENCIES.find((c) => c.code === v)?.code ?? "UAH") as CurrencyCode;
+}
+
+/** Валюта текущего аккаунта (на сервере) или гривна. */
+export function currentCurrency(): CurrencyCode {
+  try {
+    return normalizeCurrency(resolver?.());
+  } catch {
+    return "UAH";
+  }
+}
+
+/** Знак валюты: ₴, $, €, zł, £. */
+export function curSymbol(currency: string = currentCurrency()): string {
+  return CURRENCIES.find((c) => c.code === currency)?.symbol ?? currency;
+}
+
+export function formatMoney(kop: number, currency: string = currentCurrency()): string {
   const sign = kop < 0 ? "−" : "";
   const abs = Math.abs(kop) / 100;
   const num = abs.toLocaleString("uk-UA", {
     minimumFractionDigits: abs % 1 === 0 ? 0 : 2,
     maximumFractionDigits: 2,
   });
-  const symbol = currency === "UAH" ? "₴" : currency === "USD" ? "$" : currency === "EUR" ? "€" : currency;
-  return `${sign}${num} ${symbol}`;
+  return `${sign}${num} ${curSymbol(currency)}`;
 }
 
 /**

@@ -4,17 +4,18 @@ import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
 import { analyzeMonth } from "@/lib/ai.ts";
 import { connectMonobank } from "@/lib/monobank.ts";
-import { connectTelegram, disconnectTelegram } from "@/lib/telegram.ts";
+import { connectTelegram, disconnectTelegram, reportCaption, sendFileToTelegram } from "@/lib/telegram.ts";
+import { buildReport, parseScope, reportFileName, reportXlsx } from "@/lib/report.ts";
 import { publicBase } from "@/lib/url.ts";
 import { cookies } from "next/headers";
 import { THEME_COOKIE, normalizeTheme } from "@/lib/theme.ts";
 import { NAV_COOKIE, NAV_ITEMS, parseNav } from "@/lib/nav.ts";
 import { BANK_NAMES } from "@/lib/banks.ts";
-import { archiveCashbox, cashMove, createCashbox, parseAccount, transfer, updateCashbox } from "@/lib/cash.ts";
+import { archiveCashbox, cashMove, createCashbox, parseAccount, setCashboxPot, transfer, updateCashbox } from "@/lib/cash.ts";
 import { afterTxDeleted, cancelPlan, createPlan, listPlans, payPlan, restorePlan, undoPlanPayment, updatePlan } from "@/lib/plans.ts";
 import { archiveGroup, archiveProduct, createSale, deleteSale, payCompany, saveGroup, saveProduct, setSalesBase } from "@/lib/sales.ts";
 import { acceptNorms, extendNorm, restartNorm } from "@/lib/norms.ts";
-import { setSetting } from "@/lib/settings.ts";
+import { setCurrency, setSetting } from "@/lib/settings.ts";
 import { addCategory, renameCategory, setCategoryEnabled, setTxDetails } from "@/lib/categories.ts";
 import { addOtherIncome, createSalary, creditDueSalaries } from "@/lib/income.ts";
 import { createTransit, deleteTransit, finishTransit, linkTxToTransit } from "@/lib/transit.ts";
@@ -23,6 +24,7 @@ import { addToGoal, archiveGoal, createGoal } from "@/lib/goals.ts";
 import { guessQuick, quickTemplates } from "@/lib/quick.ts";
 import { setUiMode } from "@/lib/mode.ts";
 import { setCategoryBudget } from "@/lib/catbudget.ts";
+import { setCardBalance } from "@/lib/balance.ts";
 import { askAssistant } from "@/lib/assistant.ts";
 import { saveFopSettings } from "@/lib/fop.ts";
 import { setForecastStart } from "@/lib/forecast.ts";
@@ -31,7 +33,7 @@ import { detectSubscriptions, hideSubscription } from "@/lib/insights.ts";
 import { acceptSuggestion, fullSuggestion, readyToAccept } from "@/lib/suggest.ts";
 import { createAccount, currentIngestKey, deleteAccount, isOwner, resetPassword, updateAccount } from "@/lib/accounts.ts";
 import { redirect } from "next/navigation";
-import { toKop, parseAmount } from "@/lib/money.ts";
+import { normalizeCurrency, toKop, parseAmount } from "@/lib/money.ts";
 import {
   archiveCard,
   deleteCard,
@@ -163,7 +165,7 @@ export async function addCenter(f: FormData) {
   const id = createCenter(name, num(f, "parentId"), color, toKop(parseAmount(str(f, "budget")) ?? 0), f.get("internal") === "on");
   if (f.get("personal") === "on") getDb().prepare("UPDATE cost_centers SET is_personal = 1 WHERE id = ?").run(id);
   // Своя касса (наличные) у направления — сразу.
-  if (f.get("withCash") === "on") createCashbox({ name, centerId: id, opening: kop(f, "opening") });
+  if (f.get("withCash") === "on") createCashbox({ name, centerId: id, opening: kop(f, "opening"), pot: true });
   refresh();
   back(f);
 }
@@ -527,6 +529,13 @@ export async function restorePlanAction(f: FormData) {
   redirect(`/plans/${id}`);
 }
 
+/** Валюта аккаунта: в ней показываются все суммы. */
+export async function setCurrencyAction(f: FormData) {
+  setCurrency(normalizeCurrency(str(f, "currency")));
+  refresh();
+  redirect("/settings?cur=1#currency");
+}
+
 /** Простой или расширенный режим. */
 export async function setUiModeAction(f: FormData) {
   setUiMode(str(f, "mode") === "full" ? "full" : "simple");
@@ -624,11 +633,18 @@ export async function linkTransitAction(f: FormData) {
 }
 
 // ---------- Касса направления ----------
+export async function setCashboxPotAction(f: FormData) {
+  const id = num(f, "id");
+  if (id) setCashboxPot(id, str(f, "on") === "1");
+  refresh();
+  redirect(`/cash/${id}`);
+}
+
 export async function createCenterCashboxAction(f: FormData) {
   const centerId = num(f, "centerId");
   const name = str(f, "name");
   if (!centerId || !name) return;
-  const id = createCashbox({ name, centerId, opening: kop(f, "opening") });
+  const id = createCashbox({ name, centerId, opening: kop(f, "opening"), pot: true });
   refresh();
   redirect(`/cash/${id}`);
 }
@@ -909,4 +925,42 @@ export async function setHourRateAction(f: FormData) {
   setHourRate(a ? toKop(a) : null);
   refresh();
   redirect(str(f, "next") || "/settings");
+}
+
+/** Баланс карты: вписать или убрать. */
+export async function setCardBalanceAction(f: FormData) {
+  const id = num(f, "id");
+  if (!id) throw new Error("Карта не найдена");
+  const raw = str(f, "balance").trim();
+  const neg = raw.startsWith("-") || raw.startsWith("−");
+  const a = parseAmount(raw.replace(/^[-−]/, ""));
+  setCardBalance(id, str(f, "clear") ? null : a === null && raw !== "0" ? null : (neg ? -1 : 1) * toKop(a ?? 0));
+  refresh();
+  redirect(str(f, "next") || `/cards/${id}`);
+}
+
+/* ---------------- D&N 7.0: отчёт за период ---------------- */
+
+/** Отправить отчёт файлом себе в Telegram. */
+export async function sendReportAction(f: FormData) {
+  const scope = str(f, "scope");
+  const from = str(f, "from");
+  const to = str(f, "to");
+  const back = `/report?scope=${encodeURIComponent(scope)}&from=${from}&to=${to}`;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) throw new Error("Выберите даты");
+  const r = buildReport(parseScope(scope), from, to);
+  let err = "";
+  try {
+    await sendFileToTelegram(await reportXlsx(r), reportFileName(r), reportCaption(r));
+  } catch (e) {
+    err = e instanceof Error ? e.message : "Не получилось отправить";
+  }
+  redirect(`${back}&${err ? `err=${encodeURIComponent(err)}` : "sent=1"}`);
+}
+
+/** Каждый понедельник присылать файл отчёта за прошлую неделю в Telegram. */
+export async function toggleReportAutoAction(f: FormData) {
+  setSetting("report_auto", str(f, "on") === "1" ? "1" : null);
+  refresh();
+  redirect(str(f, "next") || "/report");
 }

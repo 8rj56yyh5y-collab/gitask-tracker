@@ -16,6 +16,7 @@ export const SECTIONS: Section[] = [
   { href: "/spend", icon: "chart", title: "Траты", note: "Всё, что потрачено: по дням и категориям", group: "Каждый день", keywords: "траты расходы потратил операции список куда ушли деньги" },
   { href: "/inbox", icon: "inbox", title: "Разбор операций", note: "Новые траты: подтвердить или поправить", group: "Каждый день", keywords: "разобрать без направления записать неразобранные" },
   { href: "/ask", icon: "help", title: "Помощник", note: "Спросите о своих деньгах обычными словами", group: "Каждый день", keywords: "ии помощник чат вопрос спросить ai совет сэкономить" },
+  { href: "/report", icon: "chart", title: "Отчёт за период", note: "Траты и приходы за неделю или месяц — файлом Excel", group: "Каждый день", keywords: "отчет отчёт руководитель неделя файл excel эксель выгрузка скачать период приходы расходы итог" },
   { href: "/history", icon: "history", title: "Все операции", note: "Расходы, доходы и переводы подряд", group: "Каждый день", keywords: "операции список все траты выписка" },
   { href: "/wallets", icon: "wallet", title: "Деньги", note: "Карты, наличные и копилки — сколько где", group: "Каждый день", keywords: "карты кассы наличные остаток баланс счета" },
   { href: "/shopping", icon: "cart", title: "Список покупок", note: "Что купить, цены, чек по фото", group: "Каждый день", keywords: "покупки магазин чек список продукты купить" },
@@ -39,9 +40,9 @@ export const SECTIONS: Section[] = [
   { href: "/welcome", icon: "home", title: "Знакомство с D&N", note: "Как всё устроено — за минуту", group: "Настройка и помощь", keywords: "знакомство обучение начать" },
 ];
 
-/** Разделы для текущего режима: в простом — без расширенных. */
-export function visibleSections(simple: boolean): Section[] {
-  return simple ? SECTIONS.filter((s) => !s.advanced) : SECTIONS;
+/** Разделы для текущего режима: в простом — без расширенных; налоги ФОП — только при гривне. */
+export function visibleSections(simple: boolean, uah = true): Section[] {
+  return SECTIONS.filter((s) => (!simple || !s.advanced) && (uah || s.href !== "/fop"));
 }
 
 const norm = (s: string) => s.toLocaleLowerCase("ru").replace(/ё/g, "е");

@@ -65,7 +65,7 @@ export function TxRow({ tx, children, hidePending }: { tx: Tx; children?: React.
         {tx.plan_id && <span className="chip">по платежу</span>}
         {!hidePending && tx.cost_center_id === null && tx.kind !== "internal" && !tx.income_kind && <span className="chip chip-pending">не разобрано</span>}
       </div>
-      <div className={`tx-amount ${tx.amount < 0 ? "neg" : "pos"}`}>{formatMoney(tx.amount, tx.currency)}</div>
+      <div className={`tx-amount ${tx.amount < 0 ? "neg" : "pos"}`}>{formatMoney(tx.amount)}</div>
       {children}
     </div>
   );

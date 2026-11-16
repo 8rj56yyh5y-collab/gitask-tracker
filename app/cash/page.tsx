@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createCashboxAction } from "../actions.ts";
 import { CenterChips } from "../components/Pickers.tsx";
 import { cashBalances, cashMonthTotals, listCashboxes, nextCashColor } from "@/lib/cash.ts";
-import { formatMoney } from "@/lib/money.ts";
+import { formatMoney, curSymbol } from "@/lib/money.ts";
 import { listCenters } from "@/lib/repo.ts";
 
 export default async function Cash({ searchParams }: { searchParams: Promise<{ new?: string }> }) {
@@ -79,7 +79,7 @@ export default async function Cash({ searchParams }: { searchParams: Promise<{ n
             <input name="name" required placeholder="например, Домашняя" />
           </label>
           <label>
-            Сколько в ней сейчас, ₴
+            Сколько в ней сейчас, {curSymbol()}
             <input name="opening" inputMode="decimal" placeholder="0" />
           </label>
           <CenterChips label="Чьи это деньги (направление)" withNone="Разные" includeInternal={false} />

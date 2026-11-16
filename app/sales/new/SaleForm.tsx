@@ -11,7 +11,7 @@ export interface SaleProduct {
   mpRate: number;
 }
 
-const money = (kop: number) => `${(kop / 100).toLocaleString("uk-UA", { maximumFractionDigits: 2 })} ₴`;
+const money = (kop: number) => `${(kop / 100).toLocaleString("uk-UA", { maximumFractionDigits: 2 })} ₴`; // продажи товара компании — всегда в гривнах
 const pct = (v: number) => `${v.toLocaleString("ru-RU")}%`;
 
 /** Живой расчёт продажи: цена по наборам, комиссии, доля компании. Окончательно считает сервер. */

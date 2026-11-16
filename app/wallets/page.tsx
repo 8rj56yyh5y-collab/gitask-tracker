@@ -6,6 +6,7 @@ import { transitOpenSum } from "@/lib/transit.ts";
 import { limitState } from "@/lib/limits.ts";
 import { cardStyle } from "@/lib/banks.ts";
 import { formatMoney } from "@/lib/money.ts";
+import { cardBalances } from "@/lib/balance.ts";
 import { isSimple } from "@/lib/mode.ts";
 
 /** «Деньги»: всё, где лежат деньги, на одном экране — карты, наличные, копилки и чужие деньги. */
@@ -21,10 +22,19 @@ export default function Wallets() {
   const saved = goals.reduce((a, g) => a + g.saved, 0);
   const spentCards = cards.reduce((a, c) => a + (usage.get(c.id) ?? 0), 0);
   const month = new Date().toLocaleDateString("ru-RU", { month: "long" });
+  const cardBal = cardBalances();
 
   return (
     <div className="narrow-wide">
       <h1>Деньги</h1>
+
+      {cardBal.size > 0 && (
+        <section className="wallet-total">
+          <span className="muted small">Всего на картах{cash ? " и наличными" : ""}</span>
+          <b className="num">{formatMoney([...cardBal.values()].reduce((a, v) => a + v, 0) + cash)}</b>
+          {cardBal.size < cards.length && <span className="muted small">баланс указан у {cardBal.size} из {cards.length} карт — остальные можно добавить в карточке карты</span>}
+        </section>
+      )}
 
       <section className="wallet-sum">
         <div>
@@ -55,23 +65,31 @@ export default function Wallets() {
         <div className="wallet-cards">
           {cards.map((c) => {
             const used = usage.get(c.id) ?? 0;
-            const st = c.monthly_limit > 0 ? limitState(used, c.monthly_limit) : null;
-            const cs = cardStyle(c);
+            const lim = c.monthly_limit;
+            const b = cardBal.get(c.id);
             return (
-              <Link key={c.id} href={`/cards/${c.id}`} className="mini-card" style={{ "--c": cs.color, "--ink": cs.ink } as React.CSSProperties}>
-                <span className="mini-card-bank">{c.bank}</span>
-                <span className="mini-card-num">•• {c.last4}</span>
-                <span className="mini-card-sum">
-                  {st ? (st.left >= 0 ? `осталось ${formatMoney(st.left)}` : `перелимит ${formatMoney(-st.left)}`) : `списано ${formatMoney(used)}`}
+              <Link key={c.id} href={`/cards/${c.id}`} className="gcard" style={{ "--gc": cardStyle(c).color } as React.CSSProperties}>
+                <span className="gcard-top">
+                  {c.bank}
+                  <small>•• {c.last4}</small>
                 </span>
-                {st && (
-                  <span className="mini-card-track">
-                    <i style={{ width: `${Math.min(100, (used / c.monthly_limit) * 100)}%` }} className={`lvl-${st.level}`} />
+                <span>
+                  <span className="gcard-sum">{b !== undefined ? formatMoney(b) : lim > 0 ? formatMoney(Math.max(0, lim - used)) : formatMoney(used)}</span>
+                  <span className="gcard-sub">
+                    {b !== undefined ? " на карте" : lim > 0 ? ` осталось из лимита ${formatMoney(lim)}` : " списано в этом месяце"}
                   </span>
-                )}
+                  {lim > 0 && (
+                    <span className="gcard-track" style={{ display: "block" }}>
+                      <i style={{ width: `${Math.min(100, (used / lim) * 100)}%` }} />
+                    </span>
+                  )}
+                </span>
               </Link>
             );
           })}
+          <Link href="/cards" className="gcard is-add">
+            + Карта
+          </Link>
         </div>
       )}
 

@@ -3,7 +3,7 @@ import { addCard, mergeCardsAction, setDefaultLimitAction } from "../actions.ts"
 import { CardTile } from "../components/CardTile.tsx";
 import { LimitBar } from "../components/LimitBar.tsx";
 import { defaultCardLimit, groupUsage, listCards, listMainCards } from "@/lib/repo.ts";
-import { formatMoney } from "@/lib/money.ts";
+import { formatMoney, curSymbol } from "@/lib/money.ts";
 import { BANK_NAMES } from "@/lib/banks.ts";
 
 const KINDS: Record<string, string> = { personal: "Личная", fop: "ФОП", corporate: "Корпоративная", cash: "Касса (наличные)" };
@@ -85,7 +85,7 @@ export default function Cards() {
           Ставится каждой новой карте, в том числе из Monobank. У каждой карты его можно поменять.
         </p>
         <div className="inline">
-          <input name="limit" inputMode="decimal" placeholder="например, 30000" defaultValue={def ? def / 100 : ""} aria-label="Лимит по умолчанию, ₴" />
+          <input name="limit" inputMode="decimal" placeholder="например, 30000" defaultValue={def ? def / 100 : ""} aria-label={`Лимит по умолчанию, ${curSymbol()}`} />
           <button className="btn btn-sm">Сохранить</button>
         </div>
         {noLimit > 0 && (
@@ -124,7 +124,7 @@ export default function Cards() {
           </select>
         </label>
         <label>
-          Лимит в месяц, ₴
+          Лимит в месяц, {curSymbol()}
           <input name="limit" inputMode="decimal" placeholder={def ? `по умолчанию ${def / 100}` : "30000"} />
         </label>
         <button className="btn btn-primary">Добавить</button>

@@ -40,7 +40,7 @@ export function TopNav() {
 }
 
 /** Нижняя панель на телефоне (два раздела · «＋» · два раздела) и боковое меню на большом экране. */
-export function Nav({ pending, items, simple = false }: { pending: number; items: NavId[]; simple?: boolean }) {
+export function Nav({ pending, items, simple = false, uah = true }: { pending: number; items: NavId[]; simple?: boolean; uah?: boolean }) {
   const path = usePathname();
   const cls = (href: string) => `nav-item ${isActive(path, href) ? "is-active" : ""}`;
   const badge = pending > 0 ? <span className="badge">{pending > 99 ? "99+" : pending}</span> : null;
@@ -61,7 +61,7 @@ export function Nav({ pending, items, simple = false }: { pending: number; items
       <span>{i.label}</span>
     </Link>
   );
-  const sections = visibleSections(simple);
+  const sections = visibleSections(simple, uah);
   const groups = [...new Set(sections.map((s) => s.group))];
 
   return (

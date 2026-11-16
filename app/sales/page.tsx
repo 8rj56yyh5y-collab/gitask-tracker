@@ -3,7 +3,7 @@ import { Hint } from "../components/Hint.tsx";
 import Link from "next/link";
 import { deleteSaleAction, payCompanyAction } from "../actions.ts";
 import { AccountSelect } from "../components/AccountSelect.tsx";
-import { formatMoney } from "@/lib/money.ts";
+import { formatMoney, curSymbol } from "@/lib/money.ts";
 import { monthDate, monthKey, shiftMonth } from "@/lib/repo.ts";
 import { companyDebt, salesMonth } from "@/lib/sales.ts";
 
@@ -63,7 +63,7 @@ export default async function Sales({ searchParams }: { searchParams: Promise<{ 
         <input type="hidden" name="next" value="/sales" />
         <div className="grid-2-tight">
           <label>
-            Сумма, ₴
+            Сумма, {curSymbol()}
             <input name="amount" inputMode="decimal" defaultValue={debt > 0 ? debt / 100 : ""} required />
           </label>
           <label>

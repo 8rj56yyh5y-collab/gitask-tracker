@@ -6,8 +6,10 @@ import type { ShoppingItem } from "@/lib/shopping.ts";
 import { groupById } from "@/lib/groups.ts";
 
 const UNITS = ["шт", "кг", "г", "л", "мл", "уп"];
+// Знак валюты аккаунта приходит с сервера (в браузере база недоступна).
+let SYM = "₴";
 const money = (kop: number) =>
-  `${(kop / 100).toLocaleString("ru-RU", { minimumFractionDigits: kop % 100 ? 2 : 0, maximumFractionDigits: 2 })} ₴`;
+  `${(kop / 100).toLocaleString("ru-RU", { minimumFractionDigits: kop % 100 ? 2 : 0, maximumFractionDigits: 2 })} ${SYM}`;
 const qtyText = (i: Pick<ShoppingItem, "qty" | "unit">) => (i.qty ? `${i.qty.toLocaleString("ru-RU")} ${i.unit || "шт"}` : "");
 const key = (n: string) => n.trim().toLocaleLowerCase("ru").replace(/ё/g, "е");
 
@@ -21,13 +23,16 @@ export function ShoppingEditor({
   hints,
   readOnly,
   autoFocus,
+  symbol = "₴",
 }: {
+  symbol?: string;
   listId: number;
   initial: ShoppingItem[];
   hints: Record<string, { price: number; qty: number | null; unit: string }>;
   readOnly?: boolean;
   autoFocus?: boolean;
 }) {
+  SYM = symbol;
   const router = useRouter();
   const [items, setItems] = useState(initial);
   const [open, setOpen] = useState<number | null>(null);
@@ -109,7 +114,7 @@ export function ShoppingEditor({
                 ) : (
                   !readOnly && (
                     <button type="button" className="shop-money" aria-label={`Цена и количество: ${i.name}`} onClick={() => setOpen(isOpen ? null : i.id)}>
-                      ₴
+                      {SYM}
                     </button>
                   )
                 )}
@@ -123,7 +128,7 @@ export function ShoppingEditor({
                     </span>
                   )}
                   <label>
-                    Цена, ₴
+                    Цена, {SYM}
                     <input
                       inputMode="decimal"
                       defaultValue={i.price ? i.price / 100 : ""}
@@ -208,7 +213,7 @@ export function ShoppingEditor({
       </ul>
       {!readOnly && items.length > 0 && items.length < 4 && (
         <p className="muted small" style={{ textAlign: "center", margin: "4px 0 0" }}>
-          Нажмите на товар, чтобы отметить. ₴ — цена, если хотите считать деньги.
+          Нажмите на товар, чтобы отметить. {SYM} — цена, если хотите считать деньги.
         </p>
       )}
     </div>

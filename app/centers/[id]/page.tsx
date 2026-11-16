@@ -4,7 +4,7 @@ import { addCenter, createCenterCashboxAction, removeCenter, updateCenterAction,
 import { BudgetLine } from "../../components/BudgetLine.tsx";
 import { TxRow } from "../../components/TxRow.tsx";
 import { centerStats, centerTransactions, centerTree, childStats, getCenter } from "@/lib/repo.ts";
-import { formatMoney } from "@/lib/money.ts";
+import { formatMoney, curSymbol } from "@/lib/money.ts";
 import { dailyAllowance } from "@/lib/budget.ts";
 import { cashBalances, listCashboxes } from "@/lib/cash.ts";
 
@@ -52,7 +52,7 @@ export default async function CenterPage({ params }: { params: Promise<{ id: str
         <form action={updateCenterBudget} className="form limit-form">
           <input type="hidden" name="id" value={id} />
           <label>
-            Сколько можно тратить в месяц, ₴
+            Сколько можно тратить в месяц, {curSymbol()}
             <span className="input-row">
               <input name="budget" inputMode="decimal" placeholder="без лимита" defaultValue={center.monthly_budget ? center.monthly_budget / 100 : ""} />
               <button className="btn btn-sm">Сохранить</button>
@@ -85,7 +85,7 @@ export default async function CenterPage({ params }: { params: Promise<{ id: str
                   <input type="hidden" name="centerId" value={id} />
                   <input type="hidden" name="name" value={center.name} />
                   <label>
-                    Сейчас наличных, ₴
+                    Сейчас наличных, {curSymbol()}
                     <input name="opening" inputMode="decimal" placeholder="0" />
                   </label>
                   <button className="btn btn-sm">Завести кассу</button>
