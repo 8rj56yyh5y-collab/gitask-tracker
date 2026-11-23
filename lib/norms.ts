@@ -68,7 +68,7 @@ export function normState(now = new Date()): NormState {
   const spentRows = db
     .prepare(
       `SELECT cost_center_id AS id, SUM(-amount) AS s FROM transactions
-       WHERE kind = 'expense' AND cost_center_id IS NOT NULL AND occurred_at >= ? AND occurred_at < ?
+       WHERE kind = 'expense' AND transit_id IS NULL AND cost_center_id IS NOT NULL AND occurred_at >= ? AND occurred_at < ?
        GROUP BY cost_center_id`,
     )
     .all(new Date(startMs).toISOString(), now.toISOString()) as { id: number; s: number }[];

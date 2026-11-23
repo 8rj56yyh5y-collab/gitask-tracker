@@ -2,22 +2,17 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSetting } from "@/lib/settings.ts";
 import { getDb } from "@/lib/db.ts";
-import { formatMoney, curSymbol } from "@/lib/money.ts";
-import { budgetAlerts, centerTree, getTx, listRecent, listTxOn, listTxRange, listUnassigned, personalCenterIds } from "@/lib/repo.ts";
-import { catColor, shortName } from "@/lib/categories.ts";
-import { isSimple } from "@/lib/mode.ts";
-import { categoryBudgets } from "@/lib/catbudget.ts";
-import { InstallHint } from "./components/InstallHint.tsx";
-import { DayRing } from "./components/DayRing.tsx";
+import { formatMoney } from "@/lib/money.ts";
+import { centerTree, getTx, listMainCards, listRecent, listTxOn, listTxRange, listUnassigned } from "@/lib/repo.ts";
+import { cashBalances, listCashboxes } from "@/lib/cash.ts";
+import { cardBalances } from "@/lib/balance.ts";
 import { listPlans, ymd } from "@/lib/plans.ts";
 import { readyToAccept } from "@/lib/suggest.ts";
-import { detectSubscriptions, greeting, safeToSpend, streakDays, unusualSpending } from "@/lib/insights.ts";
+import { greeting } from "@/lib/insights.ts";
 import { currentAccountName } from "@/lib/accounts.ts";
-import { QuickLine } from "./components/QuickLine.tsx";
-import { QuickTemplates } from "./components/QuickTemplates.tsx";
 import { AddedToast } from "./components/AddedToast.tsx";
-import { Confetti, CountUp, Swipe } from "./components/Motion.tsx";
-import { listGoals } from "@/lib/goals.ts";
+import { Swipe } from "./components/Motion.tsx";
+import { Icon } from "./components/Icon.tsx";
 import { acceptAllAction, undoAcceptAction } from "./actions.ts";
 import { SetupCard } from "./components/SetupCard.tsx";
 import { TxRow } from "./components/TxRow.tsx";
@@ -28,104 +23,57 @@ const plural = (n: number, one: string, few: string, many: string) => {
     m100 = n % 100;
   return m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many;
 };
+const signed = (k: number) => `${k < 0 ? "−" : ""}${formatMoney(Math.abs(k))}`;
 
-/** «Сегодня»: сколько можно тратить, что разобрать, что заметил D&N и что скоро оплатить. */
-export default async function Today({ searchParams }: { searchParams: Promise<{ saved?: string; done?: string; all?: string; added?: string }> }) {
+/**
+ * Главная (8.0): одна главная цифра — сколько всего денег, три действия, что разобрать, что скоро оплатить, последние операции.
+ * Расходы «сегодня» и «за месяц» — все траты (без переводов и чужих денег), как в разделе «Операции».
+ */
+export default async function Home({ searchParams }: { searchParams: Promise<{ saved?: string; done?: string; all?: string; added?: string }> }) {
   const { saved, done, all, added } = await searchParams;
-  // Новый человек без единой операции — сначала короткое знакомство.
   if (!getSetting("welcome_seen") && !getDb().prepare("SELECT 1 FROM transactions LIMIT 1").get()) redirect("/welcome");
 
   const now = new Date();
-  const month = now.toLocaleDateString("ru-RU", { month: "long" });
-  const safe = safeToSpend(now);
+  const today = ymd(now);
+  const name = currentAccountName();
+  const monthName = now.toLocaleDateString("ru-RU", { month: "long" });
+
+  // Деньги: наличные во всех кассах + баланс основных карт (у кого он указан).
+  const boxes = listCashboxes();
+  const cb = cashBalances();
+  const cashTotal = boxes.reduce((a, b) => a + (cb.get(b.id) ?? 0), 0);
+  const cards = listMainCards();
+  const kb = cardBalances();
+  const withBal = cards.filter((c) => kb.has(c.id));
+  const cardTotal = withBal.reduce((a, c) => a + (kb.get(c.id) ?? 0), 0);
+  const known = boxes.length > 0 || withBal.length > 0;
+
+  const isSpend = (t: { kind: string; transit_id?: number | null }) => t.kind === "expense" && !t.transit_id;
+  const todaySpent = listTxOn(today).filter(isSpend).reduce((a, t) => a - t.amount, 0);
+  const monthSpent = listTxRange(new Date(now.getFullYear(), now.getMonth(), 1).toISOString(), new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString())
+    .filter(isSpend)
+    .reduce((a, t) => a - t.amount, 0);
+
   const queue = listUnassigned();
   const ready = queue.filter((t) => readyToAccept(t)).length;
   const centers = new Map(centerTree().map((c) => [c.id, c]));
   const doneTx = done ? getTx(Number(done)) : null;
-  const today = ymd(now);
   const week = ymd(new Date(now.getTime() + 7 * 864e5));
   const soon = listPlans("open", 200, "out").filter((p) => p.due_date && p.due_date <= week);
   const recent = listRecent(5);
-  const streak = streakDays(now);
-  const name = currentAccountName();
-  const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  // Сегодняшние траты: в простом режиме — все, в расширенном — только мои (как в «Можно потратить»).
-  const mine = new Set(personalCenterIds());
-  const simple = isSimple();
-  const counts = (t: { kind: string; transit_id?: number | null; cost_center_id: number | null }) =>
-    t.kind === "expense" && !t.transit_id && (simple || t.cost_center_id === null || mine.has(t.cost_center_id));
-  const todaySpent = listTxOn(today).filter(counts).reduce((a, t) => a - (t as { amount: number }).amount, 0);
-  // Неделя: столбики за 7 дней (сегодня — последний).
-  const week7 = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6 + i);
-    const key = ymd(d);
-    return { key, wd: d.toLocaleDateString("ru-RU", { weekday: "short" }), s: key === today ? todaySpent : listTxOn(key).filter(counts).reduce((a, t) => a - t.amount, 0) };
-  });
-  const weekMax = Math.max(1, ...week7.map((d) => d.s));
-  // Кружки категорий: на что ушли мои деньги в этом месяце.
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  const byCat = new Map<number, { id: number; name: string; emoji: string; s: number }>();
-  for (const t of listTxRange(monthStart, new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()).filter(counts)) {
-    if (!t.category_id) continue;
-    const c = byCat.get(t.category_id) ?? { id: t.category_id, name: t.category_name ?? "", emoji: t.category_emoji ?? "•", s: 0 };
-    c.s -= t.amount;
-    byCat.set(t.category_id, c);
-  }
-  const topCats = [...byCat.values()].sort((a, b) => b.s - a.s).slice(0, 8);
-
-  // Норма на день: что осталось на месяц (вместе с сегодняшними тратами), поровну на оставшиеся дни.
-  const dayLimit = safe.known ? Math.max(0, Math.floor((safe.left + todaySpent) / safe.daysLeft / 100) * 100) : 0;
-
-  // «D&N заметил»: необычные траты, перелимиты, найденные подписки, копилки.
-  const notes: { href: string; icon: string; title: string; text: string; tone: "warn" | "info" | "good" }[] = [];
-  for (const b of categoryBudgets(now, simple).filter((b) => b.level !== "ok"))
-    notes.push({
-      href: `/spend?cat=${b.categoryId}`,
-      icon: b.emoji || "🎯",
-      title: b.level === "over" ? `${b.name}: перелимит` : `${b.name}: ${b.pct}% лимита`,
-      text: b.level === "over" ? `на ${formatMoney(-b.left)} больше, чем вы себе разрешили` : `осталось ${formatMoney(b.left)} до конца месяца`,
-      tone: "warn",
-    });
-  for (const u of unusualSpending(now))
-    notes.push({ href: "/analytics", icon: u.emoji || "📈", title: `${u.name}: +${u.pct}%`, text: `${formatMoney(u.now)} с начала месяца — обычно к этому дню ${formatMoney(u.usual)}`, tone: "warn" });
-  for (const a of budgetAlerts(now).slice(0, 2))
-    notes.push({
-      href: simple ? "/spend" : `/centers/${a.id}`,
-      icon: "⚠️",
-      title: a.status === "over" ? `${a.name}: перелимит` : `${a.name}: идёт к перелимиту`,
-      text: a.status === "over" ? `на ${formatMoney(a.spent - a.budget)} больше лимита` : `при таком темпе ≈ ${formatMoney(a.forecast)} при лимите ${formatMoney(a.budget)}`,
-      tone: "warn",
-    });
-  const subs = detectSubscriptions(now);
-  if (subs.length)
-    notes.push({
-      href: "/plans",
-      icon: "🔁",
-      title: `${subs.length} ${plural(subs.length, "подписка", "подписки", "подписок")} · ${formatMoney(subs.reduce((a, s) => a + s.amount, 0))}/мес`,
-      text: `${subs.slice(0, 3).map((s) => s.counterparty).join(", ")} — добавьте в платежи, и D&N напомнит заранее`,
-      tone: "info",
-    });
-  for (const g of listGoals().filter((g) => !g.done).slice(0, 2))
-    notes.push({ href: `/goals?open=${g.id}#g${g.id}`, icon: g.emoji, title: `${g.name}: ${g.pct}%`, text: g.perMonth ? `откладывайте ≈ ${formatMoney(g.perMonth)} в месяц` : `осталось ${formatMoney(g.left)}`, tone: "good" });
 
   return (
-    <div className="today">
-      <div className="greet">
-        <div>
-          <strong className="greet-hi">
-            {greeting(now)}
-            {name ? `, ${name}` : ""}
-          </strong>
-          <span className="muted small">{now.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" })}</span>
-        </div>
-        {streak >= 2 && (
-          <span className="streak" title="Столько дней подряд все траты записаны">
-            🔥 {streak} {plural(streak, "день", "дня", "дней")}
-          </span>
-        )}
+    <div className="home8">
+      <div>
+        <p className="home8-date">{now.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" })}</p>
+        <h1 className="home8-hi">
+          {greeting(now)}
+          {name ? `, ${name}` : ""}
+        </h1>
       </div>
+
       <AddedToast id={added} next="/" />
-      {saved && <div className="toast-row toast-pop">✓ Расход записан</div>}
+      {saved && <div className="toast-row toast-pop">✓ Записано</div>}
       {doneTx && (
         <form action={undoAcceptAction} className="toast-row">
           <input type="hidden" name="id" value={doneTx.id} />
@@ -138,96 +86,67 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
       )}
       {all && <div className="toast-row">✓ Записано сразу: {all}</div>}
 
-      {/* Главное: сколько потрачено сегодня и сколько можно — одним взглядом */}
-      <Link href="/spend" className="hero day-hero">
-        <DayRing spent={todaySpent} limit={safe.known ? dayLimit : 0} />
-        <div className="day-main">
-          <span className="day-label">Сегодня потрачено</span>
-          <b className="day-sum">
-            <CountUp value={todaySpent} format="money" symbol={curSymbol()} />
-          </b>
-          <span className="day-sub">
-            {safe.known
-              ? dayLimit > 0
-                ? todaySpent <= dayLimit
-                  ? `можно ещё ${formatMoney(dayLimit - todaySpent)} сегодня`
-                  : `на ${formatMoney(todaySpent - dayLimit)} больше дневной нормы`
-                : "в этом месяце уже всё потрачено"
-              : `за ${month} — ${formatMoney(safe.spent)}`}
+      <Link href="/wallets" className="money8">
+        <div className="money8-label">Все деньги</div>
+        <div className="money8-sum">{known ? signed(cashTotal + cardTotal) : "—"}</div>
+        <div className="money8-parts">
+          <span>
+            <small>Наличные{boxes.length > 1 ? ` · ${boxes.length} кассы` : ""}</small>
+            <b>{boxes.length ? signed(cashTotal) : "—"}</b>
+          </span>
+          <span>
+            <small>Карты{withBal.length ? ` · ${withBal.length}` : ""}</small>
+            <b>{withBal.length ? signed(cardTotal) : "—"}</b>
           </span>
         </div>
-        <div className="week-bars" aria-label="Траты за 7 дней">
-          {week7.map((d) => (
-            <span key={d.key} className={`wb ${d.key === today ? "is-today" : ""} ${dayLimit > 0 && d.s > dayLimit ? "is-over" : ""}`} title={`${d.wd}: ${formatMoney(d.s)}`}>
-              <i style={{ height: `${Math.max(6, Math.round((d.s / weekMax) * 100))}%` }} />
-              <small>{d.wd}</small>
-            </span>
-          ))}
-        </div>
-        <div className="day-foot">
-          {safe.known ? (
-            <>
-              <span>До конца месяца можно</span>
-              <b>{safe.left >= 0 ? formatMoney(safe.left) : `−${formatMoney(-safe.left)}`}</b>
-              <span className="day-foot-days">
-                {safe.daysLeft} {plural(safe.daysLeft, "день", "дня", "дней")}
-              </span>
-            </>
-          ) : (
-            <span>Добавьте ставку или доход в «Деньги» — D&amp;N посчитает, сколько можно тратить в день ›</span>
-          )}
-        </div>
+        {withBal.length < cards.length && (
+          <p className="money8-hint">
+            Баланс указан у {withBal.length} из {cards.length} карт — в «Деньгах» можно вписать остальные, чтобы сумма была полной.
+          </p>
+        )}
       </Link>
 
-      <nav className="act-row" aria-label="Быстрые действия">
-        <Link href="/new" className="act is-main">
-          <i aria-hidden>＋</i>Записать
+      <div className="today8">
+        <span>
+          <small>Потрачено сегодня</small>
+          <b>{formatMoney(todaySpent)}</b>
+        </span>
+        <span>
+          <small>За {monthName}</small>
+          <b>{formatMoney(monthSpent)}</b>
+        </span>
+      </div>
+
+      <nav className="acts8" aria-label="Записать">
+        <Link href="/new">
+          <Icon name="minus" size={18} />
+          Расход
         </Link>
-        <Link href="/spend" className="act">
-          <i aria-hidden>📊</i>Траты
+        <Link href="/new?type=in">
+          <Icon name="plus" size={18} />
+          Приход
         </Link>
-        <Link href="/report" className="act">
-          <i aria-hidden>📄</i>Отчёт
-        </Link>
-        <Link href="/ask" className="act">
-          <i aria-hidden>✨</i>Спросить
+        <Link href="/new?type=move">
+          <Icon name="swap" size={18} />
+          Перевод
         </Link>
       </nav>
 
-      <QuickLine next="/" symbol={curSymbol()} />
-      <QuickTemplates next="/" />
-
-      {now.getDate() <= 7 && (
-        <Link href="/recap" className="recap-teaser">
-          <span aria-hidden>✨</span>
-          <span>
-            <b>Итоги {prevMonth.toLocaleDateString("ru-RU", { day: "numeric", month: "long" }).replace(/^\d+\s/, "")} готовы</b>
-            <span className="small">Сколько ушло, на что больше всего, любимое место</span>
-          </span>
-          <span aria-hidden>›</span>
-        </Link>
-      )}
-
       <SetupCard />
 
-      {/* Разбор */}
-      {queue.length > 0 ? (
-        <section className="today-sec">
-          <div className="today-head">
+      {queue.length > 0 && (
+        <section className="sec8">
+          <div className="sec8-head">
             <h2>
-              Разобрать <span className="count-pill">{queue.length}</span>
+              Разобрать · {queue.length}
             </h2>
             {ready > 1 ? (
               <form action={acceptAllAction}>
                 <input type="hidden" name="next" value="/" />
-                <button className="btn btn-sm btn-soft">✓ Все подсказки ({ready})</button>
+                <button>Принять подсказки ({ready})</button>
               </form>
             ) : (
-              queue.length > 1 && (
-                <Link href="/inbox" className="link small">
-                  Все ›
-                </Link>
-              )
+              queue.length > 1 && <Link href="/inbox">Все</Link>
             )}
           </div>
           <div className="review-stack">
@@ -236,109 +155,48 @@ export default async function Today({ searchParams }: { searchParams: Promise<{ 
             </Swipe>
             {queue.length > 1 && (
               <Link href="/inbox" className="stack-more">
-                ещё {queue.length - 1} {plural(queue.length - 1, "операция", "операции", "операций")} на {formatMoney(queue.slice(1).reduce((a, t) => a + Math.abs(t.amount), 0))} ›
+                ещё {queue.length - 1} {plural(queue.length - 1, "операция", "операции", "операций")} ›
               </Link>
             )}
           </div>
         </section>
-      ) : (
-        recent.length > 0 && (
-          <>
-            <div className="all-clear">✓ Всё разобрано. Новые траты появятся здесь сами.</div>
-            {(done || all) && <Confetti id={`clear-${today}`} />}
-          </>
-        )
       )}
 
-      {/* На что ушли деньги — цветные кружки */}
-      {topCats.length > 0 && (
-        <section className="today-sec">
-          <div className="today-head">
-            <h2>На что в {month.replace(/ь$/, "е").replace(/й$/, "е").replace(/т$/, "те")}</h2>
-            <Link href="/spend" className="link small">
-              Все ›
-            </Link>
-          </div>
-          <div className="bubbles">
-            {topCats.map((c) => (
-              <Link key={c.id} href={`/spend?cat=${c.id}`} className="bubble" style={{ "--bc": catColor(c.name) } as React.CSSProperties}>
-                <i aria-hidden>{c.emoji}</i>
-                <span>{shortName(c.name)}</span>
-                <b>{formatMoney(c.s).replace(/,\d+/, "")}</b>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* D&N заметил */}
-      {notes.length > 0 && (
-        <section className="today-sec">
-          <div className="today-head">
-            <h2>D&amp;N заметил</h2>
-          </div>
-          <div className="notes-strip">
-            {notes.slice(0, 3).map((n, i) => (
-              <Link key={i} href={n.href} className={`note-card tone-${n.tone}`}>
-                <span className="note-icon" aria-hidden>
-                  {n.icon}
-                </span>
-                <strong>{n.title}</strong>
-                <span className="muted small">{n.text}</span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Скоро оплатить */}
       {soon.length > 0 && (
-        <section className="today-sec">
-          <div className="today-head">
+        <section className="sec8">
+          <div className="sec8-head">
             <h2>Скоро оплатить</h2>
-            <Link href="/plans" className="link small">
-              Все ›
-            </Link>
+            <Link href="/plans">Все</Link>
           </div>
-          <div className="card list-card">
-            {soon.slice(0, 4).map((p) => {
-              const over = p.due_date! < today;
-              const isToday = p.due_date === today;
-              const d = new Date(`${p.due_date}T12:00:00`);
-              return (
-                <Link key={p.id} href={`/plans/${p.id}`} className="wallet-row">
-                  <span className={`date-chip ${over ? "is-over" : isToday ? "is-today" : ""}`}>
-                    <b>{d.getDate()}</b>
-                    <span>{d.toLocaleDateString("ru-RU", { month: "short" }).replace(".", "")}</span>
-                  </span>
-                  <span className="wallet-main">
-                    <strong>{p.title}</strong>
-                    <span className={`small ${over ? "danger" : "muted"}`}>{over ? "просрочен" : isToday ? "сегодня" : p.repeat === "month" ? "каждый месяц" : "на этой неделе"}</span>
-                  </span>
-                  <b className="num wallet-amt">{formatMoney(p.total - p.paid)}</b>
-                </Link>
-              );
-            })}
-          </div>
+          {soon.slice(0, 3).map((p) => {
+            const over = p.due_date! < today;
+            const d = new Date(`${p.due_date}T12:00:00`);
+            return (
+              <Link key={p.id} href={`/plans/${p.id}`} className="pay8">
+                <span className={`pay8-date ${over ? "is-over" : ""}`}>
+                  <b>{d.getDate()}</b>
+                  {d.toLocaleDateString("ru-RU", { month: "short" }).replace(".", "")}
+                </span>
+                <span>
+                  <strong>{p.title}</strong>
+                  <small className={over ? "danger" : undefined}>{over ? "просрочен" : p.due_date === today ? "сегодня" : "на этой неделе"}</small>
+                </span>
+                <b className="num">{formatMoney(p.total - p.paid)}</b>
+              </Link>
+            );
+          })}
         </section>
       )}
 
-      <InstallHint />
-
-      {/* Последние */}
-      <section className="today-sec">
-        <div className="today-head">
-          <h2>Последние траты</h2>
-          <Link href="/spend" className="link small">
-            Все траты ›
-          </Link>
+      <section className="sec8">
+        <div className="sec8-head">
+          <h2>Последние операции</h2>
+          <Link href="/history">Все</Link>
         </div>
         {recent.length === 0 ? (
-          <Link href="/new" className="card empty-row">
-            ＋ <span>Пока пусто. Нажмите «+» внизу и запишите первую трату — это займёт три касания</span>
-          </Link>
+          <p className="clear8">Пока пусто. Нажмите «Расход» выше — это займёт три касания.</p>
         ) : (
-          <div className="card list-card">
+          <div className="list-card">
             {recent.map((t) => (
               <Link key={t.id} href={`/inbox/${t.id}`} className="plain">
                 <TxRow tx={t} />

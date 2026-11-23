@@ -1,7 +1,7 @@
 // Нижнее меню на телефоне: четыре раздела, человек может заменить любой. «＋» есть всегда, остальное — через поиск и профиль.
 
 // В 4.0 меню снова новое (появились «Траты») — старый выбор не переносим, поэтому другое имя cookie.
-export const NAV_COOKIE = "dn_nav3";
+export const NAV_COOKIE = "dn_nav4";
 export const NAV_MAX = 4;
 
 export const NAV_ITEMS = [
@@ -12,7 +12,8 @@ export const NAV_ITEMS = [
   { id: "cash", href: "/cash", label: "Кассы", icon: "wallet" },
   { id: "plans", href: "/plans", label: "Платежи", icon: "calendar" },
   { id: "sales", href: "/sales", label: "Продажи", icon: "bag" },
-  { id: "history", href: "/history", label: "История", icon: "history" },
+  { id: "history", href: "/history", label: "Операции", icon: "list" },
+  { id: "report", href: "/report", label: "Отчёты", icon: "chart" },
   { id: "inbox", href: "/inbox", label: "Записать", icon: "inbox" },
   { id: "income", href: "/income", label: "Доходы", icon: "income" },
   { id: "analytics", href: "/analytics", label: "Отчёты", icon: "chart" },
@@ -23,7 +24,7 @@ export const NAV_ITEMS = [
 ] as const;
 
 export type NavId = (typeof NAV_ITEMS)[number]["id"];
-export const DEFAULT_NAV: NavId[] = ["home", "spend", "plans", "wallets"];
+export const DEFAULT_NAV: NavId[] = ["home", "history", "wallets", "report"];
 
 export function parseNav(raw: string | null | undefined): NavId[] {
   if (!raw) return DEFAULT_NAV;

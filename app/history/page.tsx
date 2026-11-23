@@ -15,8 +15,8 @@ export default function History() {
 
   return (
     <div className="narrow-wide">
-      <h1>История</h1>
-      <Hint>Все ваши операции, новые сверху. Нажмите на любую, чтобы поменять направление или удалить.</Hint>
+      <h1>Операции</h1>
+      <Hint>Новые сверху. Нажмите на операцию, чтобы изменить или удалить.</Hint>
 
       {pending.length > 0 && (
         <section className="pending-block">

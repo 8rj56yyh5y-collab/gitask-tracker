@@ -1,7 +1,10 @@
 // Оформление: хранится в cookie на устройстве, чтобы страница сразу рисовалась нужными цветами.
-export const THEME_COOKIE = "dn_theme";
+// 8.0: новое оформление по умолчанию для всех — старый выбор не переносим, поэтому другое имя cookie.
+export const THEME_COOKIE = "dn_theme2";
 
 export const THEMES = [
+  { id: "calm", name: "Спокойная · светлая", bg: "#f6f6f3", accent: "#2f5bea" },
+  { id: "calmdark", name: "Спокойная · тёмная", bg: "#141518", accent: "#7c9bff" },
   { id: "premium", name: "Премиум · чёрный", bg: "linear-gradient(135deg,#000 55%,#ff3d77 75%,#8f3dff)", accent: "#ffffff" },
   { id: "system", name: "Стекло · как в телефоне", bg: "linear-gradient(135deg,#efeaff 50%,#0b0b10 50%)", accent: "#6d4aff" },
   { id: "light", name: "Стекло · светлое", bg: "linear-gradient(135deg,#e9e3ff,#fde2f0,#d9f7ea)", accent: "#0b0b10" },
@@ -20,5 +23,5 @@ export function lookOf(theme: string): "glass" | "flat" {
 export type ThemeId = (typeof THEMES)[number]["id"];
 
 export function normalizeTheme(v: string | undefined | null): ThemeId {
-  return (THEMES.find((t) => t.id === v)?.id ?? "premium") as ThemeId;
+  return (THEMES.find((t) => t.id === v)?.id ?? "calm") as ThemeId;
 }

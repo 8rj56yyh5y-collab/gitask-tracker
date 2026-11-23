@@ -140,7 +140,7 @@ export function unusualSpending(now = new Date()): Unusual[] {
   };
   const q = getDb().prepare(
     `SELECT t.category_id AS id, cat.name, cat.emoji, SUM(-t.amount) AS s FROM transactions t JOIN categories cat ON cat.id = t.category_id
-     WHERE t.kind = 'expense' AND t.cost_center_id IN (${ids.join(",")}) AND t.occurred_at >= ? AND t.occurred_at < ? GROUP BY t.category_id`,
+     WHERE t.kind = 'expense' AND t.transit_id IS NULL AND t.cost_center_id IN (${ids.join(",")}) AND t.occurred_at >= ? AND t.occurred_at < ? GROUP BY t.category_id`,
   );
   type R = { id: number; name: string; emoji: string; s: number };
   const cur = q.all(...span(0)) as R[];
@@ -177,18 +177,18 @@ export function weekSummary(now = new Date()): WeekSummary {
   const db = getDb();
   const sum = (a: Date, b: Date) =>
     db
-      .prepare(`SELECT COALESCE(SUM(-amount), 0) AS s, COUNT(*) AS n FROM transactions WHERE kind = 'expense' AND cost_center_id IN (${P}) AND occurred_at >= ? AND occurred_at < ?`)
+      .prepare(`SELECT COALESCE(SUM(-amount), 0) AS s, COUNT(*) AS n FROM transactions WHERE kind = 'expense' AND transit_id IS NULL AND cost_center_id IN (${P}) AND occurred_at >= ? AND occurred_at < ?`)
       .get(a.toISOString(), b.toISOString()) as { s: number; n: number };
   const cur = sum(start, end);
   const prev = sum(prevStart, start);
   const top = db
     .prepare(
       `SELECT COALESCE(cat.name, 'Без категории') AS name, COALESCE(cat.emoji, '•') AS emoji, SUM(-t.amount) AS s FROM transactions t LEFT JOIN categories cat ON cat.id = t.category_id
-       WHERE t.kind = 'expense' AND t.cost_center_id IN (${P}) AND t.occurred_at >= ? AND t.occurred_at < ? GROUP BY t.category_id ORDER BY s DESC LIMIT 3`,
+       WHERE t.kind = 'expense' AND t.transit_id IS NULL AND t.cost_center_id IN (${P}) AND t.occurred_at >= ? AND t.occurred_at < ? GROUP BY t.category_id ORDER BY s DESC LIMIT 3`,
     )
     .all(start.toISOString(), end.toISOString()) as { name: string; emoji: string; s: number }[];
   const big = db
-    .prepare(`SELECT counterparty, -amount AS big FROM transactions WHERE kind = 'expense' AND cost_center_id IN (${P}) AND occurred_at >= ? AND occurred_at < ? ORDER BY big DESC LIMIT 1`)
+    .prepare(`SELECT counterparty, -amount AS big FROM transactions WHERE kind = 'expense' AND transit_id IS NULL AND cost_center_id IN (${P}) AND occurred_at >= ? AND occurred_at < ? ORDER BY big DESC LIMIT 1`)
     .get(start.toISOString(), end.toISOString()) as { counterparty: string; big: number } | undefined;
   return {
     spent: Number(cur.s),

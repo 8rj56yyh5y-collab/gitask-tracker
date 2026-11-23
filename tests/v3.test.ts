@@ -133,10 +133,10 @@ test("лимиты по категориям: в норме → почти → �
   setCategoryBudget(cafe, null);
   assert.equal(categoryBudgets(now).length, 0);
   // оформления
-  assert.equal(normalizeTheme(undefined), "premium", "по умолчанию — «Премиум»");
+  assert.equal(normalizeTheme(undefined), "calm", "по умолчанию — «Спокойная»");
   assert.equal(lookOf("premium"), "flat");
   assert.equal(lookOf("system"), "glass");
   assert.equal(lookOf("graphite"), "flat");
   assert.equal(normalizeTheme("classic"), "classic");
-  assert.equal(normalizeTheme("бред"), "premium");
+  assert.equal(normalizeTheme("бред"), "calm");
 });

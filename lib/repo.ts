@@ -322,7 +322,7 @@ export function cardUsage(): Map<number, number> {
   const r = getDb()
     .prepare(
       `SELECT card_id, SUM(-amount) AS used FROM transactions
-       WHERE amount < 0 AND card_id IS NOT NULL AND occurred_at >= ? AND occurred_at < ?
+       WHERE amount < 0 AND kind != 'internal' AND card_id IS NOT NULL AND occurred_at >= ? AND occurred_at < ?
        GROUP BY card_id`,
     )
     .all(from, to) as Row[];
@@ -502,7 +502,7 @@ export function centerStats(today = new Date()): Map<number, CenterStat> {
   const direct = getDb()
     .prepare(
       `SELECT cost_center_id AS id, SUM(-amount) AS s FROM transactions
-       WHERE kind = 'expense' AND cost_center_id IS NOT NULL AND occurred_at >= ? AND occurred_at < ?
+       WHERE kind = 'expense' AND transit_id IS NULL AND cost_center_id IS NOT NULL AND occurred_at >= ? AND occurred_at < ?
        GROUP BY cost_center_id`,
     )
     .all(from, to) as Row[];
@@ -629,7 +629,7 @@ export function monthlyTotals(count = 12, end = new Date()): MonthTotal[] {
       .prepare(
         `SELECT COALESCE(SUM(CASE WHEN kind = 'expense' THEN -amount END), 0) AS e,
                 COALESCE(SUM(CASE WHEN kind = 'income' THEN amount END), 0) AS i
-         FROM transactions WHERE occurred_at >= ? AND occurred_at < ?`,
+         FROM transactions WHERE transit_id IS NULL AND occurred_at >= ? AND occurred_at < ?`,
       )
       .get(from, to) as Row;
     out.push({ key: monthKey(d), expense: Number(r.e), income: Number(r.i) });
@@ -700,7 +700,7 @@ export function dailyTotals(d: Date): { day: number; date: string; expense: numb
   const from = new Date(y, m, 1).toISOString();
   const to = new Date(y, m + 1, 1).toISOString();
   const rows = rows_<{ occurred_at: string; amount: number; kind: string }>(
-    getDb().prepare("SELECT occurred_at, amount, kind FROM transactions WHERE occurred_at >= ? AND occurred_at < ? AND kind != 'internal'").all(from, to),
+    getDb().prepare("SELECT occurred_at, amount, kind FROM transactions WHERE occurred_at >= ? AND occurred_at < ? AND kind != 'internal' AND transit_id IS NULL").all(from, to),
   );
   const out = Array.from({ length: days }, (_, i) => ({ day: i + 1, date: `${y}-${String(m + 1).padStart(2, "0")}-${String(i + 1).padStart(2, "0")}`, expense: 0, income: 0 }));
   for (const r of rows) {
