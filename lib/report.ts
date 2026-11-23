@@ -198,9 +198,7 @@ const C = {
   accent: "FF6E56F8",
   accentSoft: "FFF0EDFF",
   green: "FF0F9D58",
-  greenSoft: "FFE8F7EF",
   red: "FFE5484D",
-  redSoft: "FFFDEEEE",
   amber: "FFF59E0B",
 };
 /** Цвета категорий: и в диаграмме, и точкой перед названием в таблице. */
@@ -359,9 +357,9 @@ export async function reportXlsx(r: Report): Promise<Buffer> {
   const dOut = delta(r.expense, prev.expense, false);
   const dNet = delta(r.net, prev.net, true);
   const cards1: Card[] = [
-    { label: "Приходы", v: r.income / 100, fmt: money, color: C.green, bg: C.greenSoft, edge: C.green, note: dIn.note, noteColor: dIn.color },
-    { label: "Расходы", v: r.expense / 100, fmt: money, color: C.red, bg: C.redSoft, edge: C.red, note: dOut.note, noteColor: dOut.color },
-    { label: "Итог за период", v: r.net / 100, fmt: signed, color: r.net < 0 ? C.red : r.net > 0 ? C.green : C.text, bg: C.accentSoft, edge: C.accent, note: dNet.note, noteColor: dNet.color },
+    { label: "Приходы", v: r.income / 100, fmt: money, color: C.green, bg: C.soft, edge: C.green, note: dIn.note, noteColor: dIn.color },
+    { label: "Расходы", v: r.expense / 100, fmt: money, color: C.red, bg: C.soft, edge: C.red, note: dOut.note, noteColor: dOut.color },
+    { label: "Итог за период", v: r.net / 100, fmt: signed, color: r.net < 0 ? C.red : r.net > 0 ? C.green : C.text, bg: C.soft, edge: C.accent, note: dNet.note, noteColor: dNet.color },
     r.cash
       ? {
           label: "Остаток на конец",
@@ -371,20 +369,16 @@ export async function reportXlsx(r: Report): Promise<Buffer> {
           bg: C.soft,
           edge: C.ink,
           note: r.pending.length ? `после оплат ${r.cash.end - r.pending.reduce((a, p) => a + p.left, 0) < 0 ? "−" : ""}${fmtPlain(Math.abs(r.cash.end - r.pending.reduce((a, p) => a + p.left, 0)), sym)}` : `на начало ${fmtPlain(r.cash.start, sym)}`,
-          noteColor: r.pending.length ? C.amber : C.muted,
+          noteColor: r.pending.length ? C.accent : C.muted,
         }
       : { label: "В среднем в день", v: r.expense / nDays / 100, fmt: money, color: C.ink, bg: C.soft, edge: C.ink, note: "расходов", noteColor: C.muted },
   ];
-  const cards2: Card[] = [
-    { label: "Операций", v: r.ops.length, fmt: "0", color: C.text, bg: C.white, edge: C.line, note: `${spends.length} трат · ${incomes.length} приходов`, noteColor: C.muted },
-    { label: "Средняя трата", v: spends.length ? r.expense / spends.length / 100 : 0, fmt: money, color: C.text, bg: C.white, edge: C.line, note: "на одну операцию", noteColor: C.muted },
-    { label: "Самая крупная", v: biggest ? -biggest.amount / 100 : 0, fmt: money, color: C.text, bg: C.white, edge: C.line, note: biggest ? (biggest.counterparty || biggest.category).slice(0, 26) : "—", noteColor: C.muted },
-    r.adjust
-      ? { label: "Корректировки", v: r.adjust / 100, fmt: signed, color: C.amber, bg: C.white, edge: C.amber, note: "поправки остатка кассы", noteColor: C.muted }
-      : r.cash
-        ? { label: "В среднем в день", v: r.expense / nDays / 100, fmt: money, color: C.text, bg: C.white, edge: C.line, note: "расходов", noteColor: C.muted }
-        : { label: "Дней с тратами", v: new Set(spends.map((o) => ymdLocal(new Date(o.at)))).size, fmt: "0", color: C.text, bg: C.white, edge: C.line, note: `из ${nDays}`, noteColor: C.muted },
-  ];
+  // Остальное — одной спокойной строкой, а не второй сеткой карточек.
+  const facts: string[] = [`${r.ops.length} операций`];
+  if (spends.length) facts.push(`средняя трата ${fmtPlain(Math.round(r.expense / spends.length), sym)}`);
+  if (biggest) facts.push(`самая крупная ${fmtPlain(-biggest.amount, sym)} — ${(biggest.counterparty || biggest.category).slice(0, 24)}`);
+  if (r.cash) facts.push(`в среднем ${fmtPlain(Math.round(r.expense / nDays), sym)} в день`);
+  if (r.adjust) facts.push(`корректировки ${r.adjust > 0 ? "+" : ""}${fmtPlain(r.adjust, sym)}`);
   const drawCards = (cards: Card[], big: boolean) => {
     s.getRow(row).height = 20;
     s.getRow(row + 1).height = big ? 32 : 24;
@@ -404,14 +398,14 @@ export async function reportXlsx(r: Report): Promise<Buffer> {
       v.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
       const n = cell(`${L}${row + 2}`);
       n.value = k.note ?? "";
-      n.font = font(9, k.noteColor ?? C.muted, k.noteColor !== C.muted);
+      n.font = font(9, k.noteColor ?? C.muted, false);
       n.alignment = { vertical: "top", indent: 1 };
       for (let i = 0; i < 3; i++)
         for (const c of [L, R]) {
           const x = cell(`${c}${row + i}`);
           x.fill = fill(k.bg);
           x.border = {
-            top: i === 0 ? { style: "thick", color: { argb: k.edge } } : undefined,
+            top: i === 0 ? { style: "medium", color: { argb: k.edge } } : undefined,
             bottom: i === 2 ? { style: "thin", color: { argb: big ? k.bg : C.line } } : undefined,
             left: c === L ? { style: "thin", color: { argb: C.white } } : undefined,
             right: c === R ? { style: "medium", color: { argb: C.white } } : undefined,
@@ -441,19 +435,24 @@ export async function reportXlsx(r: Report): Promise<Buffer> {
     cell(`G${row}`).font = font(17, f.amount < 0 ? C.red : C.ink, true);
     cell(`G${row}`).alignment = { vertical: "middle", horizontal: "right", indent: 1 };
     for (const c of COLS) {
-      cell(`${c}${row}`).fill = fill(C.accentSoft);
+      cell(`${c}${row}`).fill = fill(C.soft);
       cell(`${c}${row}`).border = { left: c === "B" ? { style: "thick", color: { argb: C.accent } } : undefined };
     }
     row += 2;
   }
-  drawCards(cards2, false);
+  s.mergeCells(`B${row}:I${row}`);
+  s.getRow(row).height = 18;
+  cell(`B${row}`).value = facts.join("   ·   ");
+  cell(`B${row}`).font = font(9.5, C.muted);
+  cell(`B${row}`).alignment = { vertical: "middle", indent: 1 };
+  row += 1;
 
   const section = (title: string, hint?: string) => {
     row += 1;
     s.getRow(row).height = 24;
-    strip(row, row, C.ink);
+    strip(row, row, C.accent);
     cell(`B${row}`).value = title;
-    cell(`B${row}`).font = font(13.5, C.ink, true);
+    cell(`B${row}`).font = font(13, C.ink, true);
     cell(`B${row}`).alignment = { vertical: "middle" };
     if (hint) {
       s.mergeCells(`E${row}:I${row}`);
@@ -518,7 +517,7 @@ export async function reportXlsx(r: Report): Promise<Buffer> {
     }
   }
   if (nDays <= 62) {
-    section("По дням", "зелёный — приходы, красный — расходы");
+    section("По дням");
     const chart = await png(daySvg(days, 780, 170));
     if (chart) {
       const id = wb.addImage({ buffer: chart as unknown as ExcelJS.Buffer, extension: "png" });
@@ -527,7 +526,6 @@ export async function reportXlsx(r: Report): Promise<Buffer> {
       row += 9;
     }
     header([["B:C", "День"], ["D", "Приходы", "right"], ["E", "Расходы", "right"], ["F", "Итог дня", "right"], ["G", "Операций", "right"], ["H:I", "Крупнейшая трата"]]);
-    const firstDayRow = row;
     days.forEach((d, i) =>
       line(i, [
         ["B:C", `${WD[d.d.getDay()]}, ${d.d.toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}`, { color: d.d.getDay() % 6 === 0 ? C.muted : C.text }],
@@ -538,11 +536,7 @@ export async function reportXlsx(r: Report): Promise<Buffer> {
         ["H:I", d.top ? `${(d.top.counterparty || d.top.category).slice(0, 22)} · ${fmtPlain(-d.top.amount, sym)}` : "", { color: C.muted, size: 9.5 }],
       ]),
     );
-    if (days.length > 1)
-      s.addConditionalFormatting({
-        ref: `E${firstDayRow}:E${row - 1}`,
-        rules: [{ type: "dataBar", priority: 1, cfvo: [{ type: "num", value: 0 }, { type: "max" }], color: { argb: "FFFAD4D5" }, gradient: false } as unknown as ExcelJS.ConditionalFormattingRule],
-      });
+
   }
 
   // ---- Куда ушли деньги: кольцо + таблица категорий ----
@@ -594,11 +588,13 @@ export async function reportXlsx(r: Report): Promise<Buffer> {
 
   // ---- Крупнейшие траты ----
   if (spends.length) {
-    section("Крупнейшие траты", spends.length > 8 ? `8 из ${spends.length}` : undefined);
+    // Первая страница — главное (итоги, дни, категории); детали — со второй.
+    s.getRow(row).addPageBreak();
+    section("Крупнейшие траты", spends.length > 5 ? `5 из ${spends.length}` : undefined);
     header([["B", "Дата"], ["C:E", "Где / кому"], ["F:G", "Категория"], ["H", "Карта / касса"], ["I", "Сумма", "right"]]);
     [...spends]
       .sort((a, b) => a.amount - b.amount)
-      .slice(0, 8)
+      .slice(0, 5)
       .forEach((o, i) =>
         line(i, [
           ["B", new Date(o.at).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" }), { color: C.muted }],
@@ -613,14 +609,14 @@ export async function reportXlsx(r: Report): Promise<Buffer> {
   // ---- Ожидают оплаты (заказали, платить при получении) ----
   if (r.pending.length) {
     const tot = r.pending.reduce((a, p) => a + p.left, 0);
-    section("Ожидают оплаты", "заказано, оплата при получении — из кассы ещё не списано");
+    section("Ожидают оплаты", "оплата при получении — из кассы ещё не списано");
     header([["B:E", "Что"], ["F:G", "Где / кому"], ["H", "Когда"], ["I", "Сумма", "right"]]);
     r.pending.forEach((p, i) =>
       line(i, [
         ["B:E", p.title.slice(0, 50)],
         ["F:G", p.payee || "—", { color: C.muted }],
         ["H", p.due ? new Date(`${p.due}T12:00:00`).toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" }) : "—", { color: C.muted }],
-        ["I", p.left / 100, { fmt: money, right: true, bold: true, color: C.amber }],
+        ["I", p.left / 100, { fmt: money, right: true, bold: true, color: C.accent }],
       ]),
     );
     const rest = (r.cash ? r.cash.end : 0) - tot;
@@ -638,7 +634,7 @@ export async function reportXlsx(r: Report): Promise<Buffer> {
   }
 
   // ---- Откуда приходы ----
-  if (incomes.length) {
+  if (incomes.length > 1) {
     const src = new Map<string, { s: number; n: number }>();
     for (const o of incomes) {
       const k = o.kind === "Перевод" ? `Перевод · ${o.account}` : o.counterparty || o.category;
@@ -788,8 +784,8 @@ export async function reportXlsx(r: Report): Promise<Buffer> {
       }
       rr.getCell(1).numFmt = "dd.mm.yyyy";
       rr.getCell(5).numFmt = signed.replace(/#,##0/g, "#,##0.00");
-      rr.getCell(5).font = font(10, x.kind === "Корректировка" ? C.amber : x.amount < 0 ? C.red : C.green, true);
-      rr.getCell(4).font = font(10, x.kind === "Корректировка" ? C.amber : x.kind === "Перевод" ? C.muted : C.text);
+      rr.getCell(5).font = font(10, x.kind === "Корректировка" ? C.accent : x.amount < 0 ? C.red : C.green, true);
+      rr.getCell(4).font = font(10, x.kind === "Корректировка" ? C.accent : x.kind === "Перевод" ? C.muted : C.text);
       if (withRest) rr.getCell(11).numFmt = money2;
     });
     const t = o.getRow(6 + r.ops.length);
@@ -810,6 +806,60 @@ export async function reportXlsx(r: Report): Promise<Buffer> {
 /** «1 250 ₴» для подписей внутри текста. */
 function fmtPlain(kop: number, sym: string): string {
   return `${kop < 0 ? "−" : ""}${Math.round(Math.abs(kop) / 100).toLocaleString("ru-RU").replace(/ /g, " ")} ${sym}`;
+}
+
+const escHtml = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** Тот же отчёт за прошлый такой же период — для сравнения «к прошлой неделе». */
+export function prevReport(r: Report): Report {
+  const p = prevRange(r.from, r.to);
+  return buildReport(r.scope, p.from, p.to);
+}
+
+/**
+ * Сообщение к файлу отчёта в Telegram: главное за 5 секунд. Итоги со сравнением, касса, топ-3 категорий.
+ * Без лишнего: строки появляются, только если в них есть смысл.
+ */
+export function reportMessage(r: Report, prev: Report = prevReport(r)): string {
+  const sym = curSymbol(r.currency);
+  const m = (k: number) => fmtPlain(k, sym);
+  const nDays = Math.max(1, Math.round((startOf(r.to).getTime() - startOf(r.from).getTime()) / 864e5) + 1);
+  const unit = nDays === 7 ? "к прошлой неделе" : nDays >= 28 && nDays <= 31 ? "к прошлому месяцу" : "к прошлому периоду";
+  const cmp = (cur: number, was: number) => {
+    if (!was || !cur) return "";
+    const d = Math.round(((cur - was) / was) * 100);
+    return d === 0 ? "" : `  <i>${d > 0 ? "▲" : "▼"} ${Math.abs(d)}%</i>`;
+  };
+  const L: string[] = [];
+  L.push(`📊 <b>${escHtml(r.scopeName)}</b>`);
+  L.push(`<i>${escHtml(periodTitle(r.from, r.to))}</i>`);
+  L.push("");
+  L.push(`🟢 Приходы  <b>+${m(r.income)}</b>${cmp(r.income, prev.income)}`);
+  L.push(`🔴 Расходы  <b>−${m(r.expense)}</b>${cmp(r.expense, prev.expense)}`);
+  L.push(`${r.net >= 0 ? "✅" : "⚠️"} Итог  <b>${r.net >= 0 ? "+" : "−"}${m(Math.abs(r.net))}</b>`);
+  if (r.cash) {
+    L.push("");
+    L.push(`💵 Касса  ${m(r.cash.start)} → <b>${m(r.cash.end)}</b>`);
+    if (r.cash.fact) L.push(`✋ На руках по факту  <b>${m(r.cash.fact.amount)}</b>`);
+    if (r.pending.length) {
+      const tot = r.pending.reduce((a, p) => a + p.left, 0);
+      L.push(`⏳ Ждут оплаты  ${m(tot)} → останется <b>${m(r.cash.end - tot)}</b>`);
+    }
+    if (r.adjust) L.push(`✎ Корректировки  ${r.adjust > 0 ? "+" : ""}${m(r.adjust)}`);
+  } else if (r.pending.length) {
+    L.push(`⏳ Ждут оплаты  ${m(r.pending.reduce((a, p) => a + p.left, 0))}`);
+  }
+  if (r.byCat.length) {
+    L.push("");
+    L.push("<b>Куда ушло больше всего</b>");
+    for (const c of r.byCat.slice(0, 3)) {
+      const name = c.name.length > 22 ? `${c.name.slice(0, 21)}…` : c.name;
+      L.push(`• ${escHtml(name)} — ${m(c.s)} <i>${r.expense ? Math.round((c.s / r.expense) * 100) : 0}%</i>`);
+    }
+  }
+  L.push("");
+  L.push(`<i>▲▼ — ${unit} · ${r.ops.length} операций, подробно — в файле 📎</i>`);
+  return L.join("\n");
 }
 
 /** Имя файла: «Отчёт Руководитель 2026-11-09 - 2026-11-15.xlsx» — без символов, на которых спотыкаются браузеры. */

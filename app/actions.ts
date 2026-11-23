@@ -4,8 +4,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { revalidatePath } from "next/cache";
 import { analyzeMonth } from "@/lib/ai.ts";
 import { connectMonobank } from "@/lib/monobank.ts";
-import { connectTelegram, disconnectTelegram, reportCaption, sendFileToTelegram } from "@/lib/telegram.ts";
-import { buildReport, parseScope, reportFileName, reportXlsx } from "@/lib/report.ts";
+import { connectTelegram, disconnectTelegram, sendFileToTelegram } from "@/lib/telegram.ts";
+import { buildReport, parseScope, reportFileName, reportMessage, reportXlsx } from "@/lib/report.ts";
 import { publicBase } from "@/lib/url.ts";
 import { cookies } from "next/headers";
 import { THEME_COOKIE, normalizeTheme } from "@/lib/theme.ts";
@@ -981,7 +981,7 @@ export async function sendReportAction(f: FormData) {
   const r = buildReport(parseScope(scope), from, to);
   let err = "";
   try {
-    await sendFileToTelegram(await reportXlsx(r), reportFileName(r), reportCaption(r));
+    await sendFileToTelegram(await reportXlsx(r), reportFileName(r), reportMessage(r));
   } catch (e) {
     err = e instanceof Error ? e.message : "Не получилось отправить";
   }
