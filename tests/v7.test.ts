@@ -70,16 +70,12 @@ test("отчёт по направлению с кассой: траты, при
   const file = await report.reportXlsx(r);
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(file as unknown as ArrayBuffer);
-  assert.deepEqual(wb.worksheets.map((w) => w.name), ["Сводка", "Операции"]);
-  const ops = wb.getWorksheet("Операции")!;
-  assert.equal(ops.getRow(5).getCell(5).value, "Сумма", "шапка таблицы операций");
-  assert.equal(ops.getRow(6).getCell(5).value, 20_000, "первая операция");
-  assert.equal(ops.getRow(6).getCell(11).value, null, "траты с карт направления не меняют наличные — колонки «Остаток» нет");
-  assert.equal(ops.getRow(9).getCell(1).value, "Итого");
-  const sum = wb.getWorksheet("Сводка")!;
-  assert.match(String(sum.getCell("B2").value), /D&N/, "фирменная шапка");
-  assert.equal(sum.getCell("B3").value, r.scopeName);
-  assert.ok(wb.model.media.length >= 1, "в файле есть картинка-логотип");
+  assert.deepEqual(wb.worksheets.map((w) => w.name), ["Отчёт"], "один лист — читается сверху вниз");
+  const ws = wb.getWorksheet("Отчёт")!;
+  const texts: string[] = [];
+  ws.eachRow((row) => row.eachCell((c) => texts.push(String(c.value))));
+  for (const t of ["Руководитель", "Итог за период", "Было на начало", "＝ Осталось на конец", "На что ушли деньги", "Все операции", "Итого", "Топливо"]) assert.ok(texts.includes(t), t);
+  assert.ok(texts.includes("20000") && texts.includes("-3200"), "суммы операций числами");
   assert.equal(report.reportFileName(r, new Date("2026-11-23T20:15:00Z")), "Отчёт Руководитель 2026-11-09 - 2026-11-15 (23.11 22-15).xlsx");
 });
 

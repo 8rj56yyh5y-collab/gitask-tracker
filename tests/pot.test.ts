@@ -69,7 +69,9 @@ test("поправить остаток кассы: корректировка �
   assert.equal(r.cash!.end, 750_00);
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load((await report.reportXlsx(r)) as unknown as ArrayBuffer);
-  assert.equal(wb.getWorksheet("Операции")!.getRow(7).getCell(4).value, "Корректировка");
+  const cells: string[] = [];
+  wb.getWorksheet("Отчёт")!.eachRow((row) => row.eachCell((c) => cells.push(String(c.value))));
+  assert.ok(cells.includes("Корректировки учёта") && cells.includes("Корректировка"), "корректировка видна отдельно");
   getDb().prepare("DELETE FROM transactions WHERE id = ?").run(id);
   assert.equal(cash.cashBalances().get(box), 800_00, "удалили корректировку — остаток вернулся");
 });
