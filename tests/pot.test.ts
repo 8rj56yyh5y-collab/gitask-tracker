@@ -29,10 +29,12 @@ test("касса «D» и направление «D» — одно целое: 
   cash.cashMove(box, { amountKop: -100_00, note: "вода", at: at(13) });
   getDb().prepare("UPDATE transactions SET cost_center_id = ? WHERE cashbox_id = ?").run(d, box);
 
-  assert.equal(cash.cashBalances().get(box), 1_000_00 - 1_200_00 - 300_00 + 5_000_00 - 100_00);
+  // Трата с карты (1 200) наличные не меняет — в остаток кассы не входит, но в отчёте направления есть.
+  assert.equal(cash.cashBalances().get(box), 1_000_00 - 300_00 + 5_000_00 - 100_00);
   const st = cash.cashStats(box, new Date(2026, 10, 20));
   assert.equal(st.monthIn, 5_000_00);
-  assert.equal(st.monthOut, 1_600_00);
+  assert.equal(st.monthOut, 400_00);
+  assert.deepEqual(cash.directionNonCash(b, new Date(2026, 10, 1).toISOString(), new Date(2026, 11, 1).toISOString()), { in: 0, out: 1_200_00, n: 1 });
 
   const rc = report.buildReport({ kind: "cash", id: box }, "2026-11-09", "2026-11-15");
   const rd = report.buildReport({ kind: "center", id: d }, "2026-11-09", "2026-11-15");
@@ -40,7 +42,9 @@ test("касса «D» и направление «D» — одно целое: 
     assert.equal(r.ops.length, 4);
     assert.equal(r.income, 5_000_00);
     assert.equal(r.expense, 1_600_00);
-    assert.deepEqual(r.cash && { s: r.cash.start, e: r.cash.end }, { s: 1_000_00, e: 4_400_00 });
+    assert.deepEqual(r.cash && { s: r.cash.start, e: r.cash.end }, { s: 1_000_00, e: 5_600_00 });
+    assert.deepEqual(r.cashFlow, { in: 5_000_00, out: 400_00, adjust: 0 }, "было + пришло − ушло = осталось");
+    assert.equal(r.ops.filter((o) => !o.cash).length, 1, "трата с карты помечена");
   }
   assert.equal(rc.scopeName, "D");
 
@@ -131,7 +135,7 @@ test("«на руках по факту» — отдельная цифра: у�
   cash.cashMove(box, { amountKop: 400_00, counterparty: "Вернули", at: later });
   repo.createCard({ bank: "Mono", last4: "9911", owner: "", kind: "personal", monthly_limit: 0, mono_account_id: null });
   const card = repo.listCards().find((c) => c.last4 === "9911")!.id;
-  getDb().prepare("UPDATE transactions SET card_id = ? WHERE id = ?").run(card, cash.cashMove(box, { amountKop: -999_00, at: later }));
+  repo.insertTx({ amountKop: -999_00, source: "manual", cardId: card, occurredAt: later });
   cash.adjustCashbox(box, 0);
   const f = cash.cashFactAt(cash.getCashbox(box)!, new Date(Date.now() + 5000).toISOString())!;
   assert.deepEqual({ amount: f.amount, base: f.base, since: f.since }, { amount: 28_900_00, base: 30_000_00, since: -1_100_00 });
@@ -147,8 +151,23 @@ test("сообщение к отчёту в Telegram: итоги, касса, т
   const today = new Date();
   const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   const msg = report.reportMessage(report.buildReport({ kind: "cash", id: box }, ymd, ymd)).replace(/[\u202f\u00a0]/g, " ");
-  assert.match(msg, /Расходы  <b>−300 ₴<\/b>/);
-  assert.match(msg, /Касса  1 000 ₴ → <b>700 ₴<\/b>/);
+  assert.match(msg, /Было на начало: 1 000 ₴/);
+  assert.match(msg, /− Ушло: 300 ₴/);
+  assert.match(msg, /Осталось: 700 ₴/);
   assert.doesNotMatch(msg, /На руках|Ждут оплаты/, "пустые строки не показываем");
   assert.ok(msg.length < 1000, "влезает в подпись к файлу");
+});
+
+test("две кассы одного направления: каждая операция считается только в одной кассе", () => {
+  const dir = repo.createCenter("Склад", null, "#999999", 0, false);
+  const a = cash.createCashbox({ name: "Склад", centerId: dir, opening: 0 });
+  const b2 = cash.createCashbox({ name: "Сейф склада", centerId: dir, opening: 0 });
+  assert.equal(cash.getCashbox(a)!.pot, 1);
+  cash.cashMove(b2, { amountKop: 1_000_00, note: "в сейф" });
+  cash.cashMove(a, { amountKop: 500_00, note: "в кассу" });
+  repo.insertTx({ amountKop: -200_00, source: "manual", costCenterId: dir });
+  repo.insertTx({ amountKop: -50_00, source: "applepay", costCenterId: dir });
+  const bal = cash.cashBalances();
+  assert.equal(bal.get(b2), 1_000_00, "сейф — только свои движения");
+  assert.equal(bal.get(a), 300_00, "касса направления: свои + наличные траты направления без кассы; Apple Pay — не наличные");
 });

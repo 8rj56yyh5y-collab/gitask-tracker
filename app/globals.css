@@ -1958,3 +1958,22 @@ body { padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
 .cash-hero-fact small { grid-column: 1 / -1; font-size: 12px; opacity: 0.85; }
 .cash-hero-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .cash-hero-btns .cash-hero-fix { margin-top: 0; }
+
+/* Касса: спокойный экран — сумма, три действия, месяц, история */
+.cash-hero-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.cash-hero-chips a { padding: 6px 12px; border-radius: 999px; background: rgb(255 255 255 / 0.2); color: inherit; text-decoration: none; font-size: 13px; }
+.cash-hero-chips b { margin-left: 4px; }
+.cash-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+.cash-actions a { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px; border-radius: 16px; background: var(--card, rgb(127 127 127 / 0.1)); border: 1px solid var(--line, rgb(127 127 127 / 0.18)); color: inherit; text-decoration: none; font-weight: 700; font-size: 14px; }
+.cash-actions a span { font-size: 22px; line-height: 1; opacity: 0.8; }
+.cash-actions a.on { border-color: var(--accent, #7c5cff); box-shadow: 0 0 0 1px var(--accent, #7c5cff) inset; }
+.cash-month-row { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: baseline; font-weight: 700; }
+.cash-month-row span:first-child { font-weight: 600; opacity: 0.8; }
+.cash-month p { margin: 8px 0 0; }
+.more-links { display: grid; gap: 4px; margin: 10px 0; }
+.more-links a { padding: 10px 2px; color: inherit; text-decoration: none; font-weight: 600; border-bottom: 1px solid var(--line, rgb(127 127 127 / 0.18)); }
+.more-h { margin: 18px 0 4px; font-size: 15px; }
+.settings-fold .pot-card { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line, rgb(127 127 127 / 0.18)); }
+
+.report-sum .rs-head { margin: 14px 0 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.6; }
+.report-sum .rs-extra { opacity: 0.85; font-size: 14px; }

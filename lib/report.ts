@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 import { getDb } from "./db.ts";
 import { centerTree } from "./repo.ts";
-import { ADJUST, boxScope, cashFactAt, cashPending, getCashbox, listCashboxes, type PendingPay } from "./cash.ts";
+import { ADJUST, boxScope, cashFactAt, cashPending, notAdjust, getCashbox, listCashboxes, type PendingPay } from "./cash.ts";
 import { curSymbol, currentCurrency } from "./money.ts";
 
 // Отчёт за период (например, еженедельный отчёт руководителю): траты, приходы, итог —
@@ -10,6 +10,8 @@ import { curSymbol, currentCurrency } from "./money.ts";
 export type ReportScope = { kind: "all" } | { kind: "center"; id: number } | { kind: "cash"; id: number };
 
 export interface ReportOp {
+  /** Операция прошла через кассу (наличные) — входит в «было → осталось». */
+  cash: boolean;
   at: string;
   kind: "Расход" | "Приход" | "Перевод" | "Корректировка";
   amount: number;
@@ -33,6 +35,8 @@ export interface Report {
   byCat: { name: string; s: number; n: number }[];
   /** Корректировки остатка кассы за период (не приход и не расход). */
   adjust: number;
+  /** Движение наличных в кассах отчёта за период: приходы и расходы (без корректировок). start + in − out + adjust = end. */
+  cashFlow: { in: number; out: number; adjust: number } | null;
   /** Ожидают оплаты из кассы (заказали, платить при получении) — на сегодня. */
   pending: PendingPay[];
   /** Остаток наличных (касса или кассы направления) на начало и конец периода. */
@@ -115,18 +119,21 @@ export function buildReport(scope: ReportScope, from: string, to: string): Repor
     const c = b?.pot && b.center_id ? centerTree().find((x) => x.id === b.center_id) : null;
     scopeName = b ? (c ? c.name : `Касса «${b.name}»`) : "Касса";
     boxIds = b ? [b.id] : [];
-    // «Касса = направление» — все траты и приходы направления плюс движения кассы.
-    where = b ? boxScope(b) : "0";
+    // «Касса и направление» — все траты и приходы направления (и с карт) плюс движения кассы; обычная касса — только её движения.
+    where = b ? (c ? `((t.cost_center_id IN (${subtree(c.id).join(",")}) AND t.kind != 'internal') OR t.cashbox_id = ${b.id})` : boxScope(b)) : "0";
   }
+  const boxList = listCashboxes().filter((x) => boxIds.includes(x.id));
+  const cashCond = boxList.map((x) => boxScope(x)).join(" OR ") || "0";
   const rows = db
     .prepare(
-      `SELECT t.occurred_at, t.amount, t.kind, t.counterparty, t.description, c.name AS cat, cc.name AS center, k.bank || ' •' || k.last4 AS card, cb.name AS box
+      `SELECT (${cashCond}) AS is_cash, t.occurred_at, t.amount, t.kind, t.counterparty, t.description, c.name AS cat, cc.name AS center, k.bank || ' •' || k.last4 AS card, cb.name AS box
        FROM transactions t LEFT JOIN categories c ON c.id = t.category_id LEFT JOIN cost_centers cc ON cc.id = t.cost_center_id
        LEFT JOIN cards k ON k.id = t.card_id LEFT JOIN cashboxes cb ON cb.id = t.cashbox_id
        WHERE ${where} AND t.transit_id IS NULL AND t.occurred_at >= ? AND t.occurred_at < ? ORDER BY t.occurred_at`,
     )
-    .all(fromIso, toIso) as { occurred_at: string; amount: number; kind: string; counterparty: string; description: string; cat: string | null; center: string | null; card: string | null; box: string | null }[];
+    .all(fromIso, toIso) as { is_cash: number; occurred_at: string; amount: number; kind: string; counterparty: string; description: string; cat: string | null; center: string | null; card: string | null; box: string | null }[];
   const ops: ReportOp[] = rows.map((r) => ({
+    cash: Boolean(Number(r.is_cash)),
     at: r.occurred_at,
     kind: r.kind === "internal" ? (r.counterparty === ADJUST ? "Корректировка" : "Перевод") : r.amount < 0 ? "Расход" : "Приход",
     amount: Number(r.amount),
@@ -151,6 +158,7 @@ export function buildReport(scope: ReportScope, from: string, to: string): Repor
   for (const b of listCashboxes().filter((x) => boxIds.includes(x.id))) for (const p of cashPending(b)) pendingMap.set(p.id, p);
   const pending = [...pendingMap.values()];
   let cash: Report["cash"] = null;
+  let cashFlow: Report["cashFlow"] = null;
   if (boxIds.length) {
     // Остаток кассы на начало и конец. У «касса = направление» он включает все операции направления.
     // Каждая операция считается один раз, даже если подходит под несколько касс.
@@ -169,6 +177,14 @@ export function buildReport(scope: ReportScope, from: string, to: string): Repor
       ? { amount: facts.reduce((a, x) => a + x!.amount, 0), base: facts.reduce((a, x) => a + x!.base, 0), since: facts.reduce((a, x) => a + x!.since, 0), at: facts.map((x) => x!.at).sort()[0] }
       : null;
     cash = { names: list.map((b) => b.name).join(", "), start, end: start + Number(during.s), fact };
+    // Движение наличных — тем же условием, что и остаток: было + пришло − ушло ± корректировки = осталось, без расхождений.
+    const fl = db
+      .prepare(
+        `SELECT COALESCE(SUM(CASE WHEN t.amount > 0 AND ${notAdjust()} THEN t.amount END), 0) AS i, COALESCE(SUM(CASE WHEN t.amount < 0 AND ${notAdjust()} THEN -t.amount END), 0) AS o
+         FROM transactions t WHERE (${cond}) AND t.occurred_at >= ? AND t.occurred_at < ?`,
+      )
+      .get(fromIso, toIso) as { i: number; o: number };
+    cashFlow = { in: Number(fl.i), out: Number(fl.o), adjust: Number(during.s) - Number(fl.i) + Number(fl.o) };
   }
   return {
     scope,
@@ -182,6 +198,7 @@ export function buildReport(scope: ReportScope, from: string, to: string): Repor
     net: income - expense,
     byCat: [...cats.values()].sort((a, b) => b.s - a.s),
     adjust,
+    cashFlow,
     pending,
     cash,
     currency: currentCurrency(),
@@ -273,8 +290,7 @@ export async function reportXlsx(r: Report): Promise<Buffer> {
   put("B", period, font(11, C.muted));
   row += 1;
 
-  // ---- Итог: было + пришло − ушло = стало ----
-  title("Итог за период");
+  // ---- Итог. Наличные: было + пришло − ушло = осталось (сходится всегда). Траты с карт — отдельно, в кассу не входят. ----
   const sumLine = (label: string, v: number, opts: { color?: string; bold?: boolean; fmt?: string; note?: string; size?: number } = {}) => {
     s.getRow(row).height = opts.bold ? 24 : 20;
     s.mergeCells(`B${row}:C${row}`);
@@ -283,17 +299,30 @@ export async function reportXlsx(r: Report): Promise<Buffer> {
     put("E", v / 100, font(opts.size ?? 11, opts.color ?? C.ink, true), { horizontal: "right" }, opts.fmt ?? money);
     row += 1;
   };
-  if (r.cash) sumLine("Было на начало", r.cash.start, { color: C.text });
-  const nIn = r.ops.filter((o) => o.amount > 0 && o.kind !== "Корректировка").length;
-  const nOut = r.ops.filter((o) => o.amount < 0 && o.kind !== "Корректировка").length;
-  sumLine("＋ Приходы", r.income, { color: r.income ? C.green : C.muted, note: nIn ? `${nIn} шт.` : "" });
-  sumLine("− Расходы", -r.expense, { color: r.expense ? C.red : C.muted, note: nOut ? `${nOut} шт.` : "" });
-  if (r.adjust) sumLine("Корректировки учёта", r.adjust, { color: C.muted, fmt: signed });
-  rule(C.ink);
-  if (r.cash) {
+  const real = r.ops.filter((o) => o.kind !== "Корректировка");
+  const nonCash = real.filter((o) => !o.cash);
+  const cnt = (list: ReportOp[], sign: 1 | -1) => {
+    const n = list.filter((o) => (sign > 0 ? o.amount > 0 : o.amount < 0)).length;
+    return n ? `${n} шт.` : "";
+  };
+  if (r.cash && r.cashFlow) {
+    const f = r.cashFlow;
+    const cashOps = real.filter((o) => o.cash);
+    title("Наличные в кассе");
+    sumLine("Было на начало", r.cash.start, { color: r.cash.start < 0 ? C.red : C.text });
+    sumLine("＋ Пришло", f.in, { color: f.in ? C.green : C.muted, note: cnt(cashOps, 1) });
+    sumLine("− Ушло", -f.out, { color: f.out ? C.red : C.muted, note: cnt(cashOps, -1) });
+    if (f.adjust) sumLine("Корректировки учёта", f.adjust, { color: C.muted, fmt: signed });
+    rule(C.ink);
     sumLine("＝ Осталось на конец", r.cash.end, { bold: true, size: 13, color: r.cash.end < 0 ? C.red : C.ink });
-  } else {
-    sumLine("＝ Итог за период", r.net, { bold: true, size: 13, color: r.net < 0 ? C.red : C.green, fmt: signed });
+  }
+  if (!r.cash || nonCash.length) {
+    title(r.cash ? "Всего по направлению" : "Итог за период", r.cash ? "наличные и карты" : "");
+    sumLine("＋ Приходы", r.income, { color: r.income ? C.green : C.muted, note: cnt(real, 1) });
+    const cardOut = nonCash.filter((o) => o.amount < 0).reduce((a, o) => a - o.amount, 0);
+    sumLine("− Расходы", -r.expense, { color: r.expense ? C.red : C.muted, note: r.cash && cardOut ? `из них с карт ${fmtPlain(cardOut, sym)}` : cnt(real, -1) });
+    rule(C.ink);
+    sumLine("＝ Итог", r.net, { bold: true, size: 13, color: r.net < 0 ? C.red : r.net > 0 ? C.green : C.ink, fmt: signed });
   }
   // Дополнительно — только если есть.
   const extra: [string, number, string][] = [];
@@ -358,7 +387,7 @@ export async function reportXlsx(r: Report): Promise<Buffer> {
     s.getRow(row).height = 19;
     put("B", day === lastDay ? "" : `${day}, ${WD[d.getDay()]}`, font(10, C.muted));
     put("C", what.length > 60 ? `${what.slice(0, 59)}…` : what, font(10.5, C.text));
-    put("D", o.kind === "Перевод" || o.kind === "Корректировка" ? o.kind : o.category, font(10, C.muted));
+    put("D", `${o.kind === "Перевод" || o.kind === "Корректировка" ? o.kind : o.category}${r.cash && !o.cash ? " · карта" : ""}`, font(10, C.muted));
     put("E", o.amount / 100, font(10.5, o.kind === "Корректировка" ? C.muted : o.amount < 0 ? C.red : C.green, true), { horizontal: "right" }, signed);
     rule();
     lastDay = day;
@@ -403,44 +432,37 @@ export function prevReport(r: Report): Report {
  * Без лишнего: строки появляются, только если в них есть смысл.
  */
 export function reportMessage(r: Report, prev: Report = prevReport(r)): string {
+  void prev;
   const sym = curSymbol(r.currency);
   const m = (k: number) => fmtPlain(k, sym);
-  const nDays = Math.max(1, Math.round((startOf(r.to).getTime() - startOf(r.from).getTime()) / 864e5) + 1);
-  const unit = nDays === 7 ? "к прошлой неделе" : nDays >= 28 && nDays <= 31 ? "к прошлому месяцу" : "к прошлому периоду";
-  const cmp = (cur: number, was: number) => {
-    if (!was || !cur) return "";
-    const d = Math.round(((cur - was) / was) * 100);
-    return d === 0 ? "" : `  <i>${d > 0 ? "▲" : "▼"} ${Math.abs(d)}%</i>`;
-  };
-  const L: string[] = [];
-  L.push(`📊 <b>${escHtml(r.scopeName)}</b>`);
-  L.push(`<i>${escHtml(periodTitle(r.from, r.to))}</i>`);
-  L.push("");
-  L.push(`🟢 Приходы  <b>+${m(r.income)}</b>${cmp(r.income, prev.income)}`);
-  L.push(`🔴 Расходы  <b>−${m(r.expense)}</b>${cmp(r.expense, prev.expense)}`);
-  L.push(`${r.net >= 0 ? "✅" : "⚠️"} Итог  <b>${r.net >= 0 ? "+" : "−"}${m(Math.abs(r.net))}</b>`);
-  if (r.cash) {
-    L.push("");
-    L.push(`💵 Касса  ${m(r.cash.start)} → <b>${m(r.cash.end)}</b>`);
-    if (r.cash.fact) L.push(`✋ На руках по факту  <b>${m(r.cash.fact.amount)}</b>`);
+  const L: string[] = [`<b>${escHtml(r.scopeName)}</b> · ${escHtml(periodTitle(r.from, r.to))}`, ""];
+  const real = r.ops.filter((o) => o.kind !== "Корректировка");
+  const nonCash = real.filter((o) => !o.cash);
+  if (r.cash && r.cashFlow) {
+    L.push("<b>Наличные в кассе</b>");
+    L.push(`Было на начало: ${m(r.cash.start)}`);
+    L.push(`＋ Пришло: ${m(r.cashFlow.in)}`);
+    L.push(`− Ушло: ${m(r.cashFlow.out)}`);
+    if (r.cashFlow.adjust) L.push(`Корректировки учёта: ${r.cashFlow.adjust > 0 ? "+" : ""}${m(r.cashFlow.adjust)}`);
+    L.push(`＝ <b>Осталось: ${m(r.cash.end)}</b>`);
+    if (r.cash.fact) L.push(`На руках по факту: ${m(r.cash.fact.amount)}`);
     if (r.pending.length) {
       const tot = r.pending.reduce((a, p) => a + p.left, 0);
-      L.push(`⏳ Ждут оплаты  ${m(tot)} → останется <b>${m(r.cash.end - tot)}</b>`);
+      L.push(`Ждут оплаты: ${m(tot)} → останется ${m(r.cash.end - tot)}`);
     }
-    if (r.adjust) L.push(`✎ Корректировки  ${r.adjust > 0 ? "+" : ""}${m(r.adjust)}`);
-  } else if (r.pending.length) {
-    L.push(`⏳ Ждут оплаты  ${m(r.pending.reduce((a, p) => a + p.left, 0))}`);
+  }
+  if (!r.cash || nonCash.length) {
+    if (r.cash) L.push("", "<b>Всего по направлению (наличные и карты)</b>");
+    const cardOut = nonCash.filter((o) => o.amount < 0).reduce((a, o) => a - o.amount, 0);
+    L.push(`＋ Приходы: ${m(r.income)}`);
+    L.push(`− Расходы: ${m(r.expense)}${r.cash && cardOut ? ` (с карт ${m(cardOut)})` : ""}`);
+    L.push(`＝ <b>Итог: ${r.net >= 0 ? "+" : "−"}${m(Math.abs(r.net))}</b>`);
   }
   if (r.byCat.length) {
-    L.push("");
-    L.push("<b>Куда ушло больше всего</b>");
-    for (const c of r.byCat.slice(0, 3)) {
-      const name = c.name.length > 22 ? `${c.name.slice(0, 21)}…` : c.name;
-      L.push(`• ${escHtml(name)} — ${m(c.s)} <i>${r.expense ? Math.round((c.s / r.expense) * 100) : 0}%</i>`);
-    }
+    L.push("", "<b>На что ушли деньги</b>");
+    for (const c of r.byCat.slice(0, 3)) L.push(`${escHtml(c.name.length > 24 ? `${c.name.slice(0, 23)}…` : c.name)} — ${m(c.s)}`);
+    if (r.byCat.length > 3) L.push(`и ещё ${r.byCat.length - 3} — в файле`);
   }
-  L.push("");
-  L.push(`<i>▲▼ — ${unit} · ${r.ops.length} операций, подробно — в файле 📎</i>`);
   return L.join("\n");
 }
 
