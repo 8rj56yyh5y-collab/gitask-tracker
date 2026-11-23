@@ -23,8 +23,9 @@ function spend(kop: number, counterparty: string, at: Date, category = "Прод
   return id;
 }
 
-test("меню 4.0: Главная · Траты · Платежи · Деньги", () => {
-  assert.deepEqual(DEFAULT_NAV, ["home", "spend", "plans", "wallets"]);
+test("меню 8.0: Главная · Операции · Деньги · Отчёты", () => {
+  assert.deepEqual(DEFAULT_NAV, ["home", "history", "wallets", "report"]);
+  assert.equal(NAV_ITEMS.find((i) => i.id === "history")!.label, "Операции");
   assert.equal(NAV_MAX, 4);
   assert.equal(NAV_ITEMS.find((i) => i.id === "spend")!.href, "/spend");
   assert.equal(NAV_ITEMS.find((i) => i.id === "wallets")!.label, "Деньги");

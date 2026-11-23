@@ -146,7 +146,7 @@ export function spendByCategory(from: string, to: string, centerIds?: number[]) 
     .prepare(
       `SELECT c.id, c.name, c.emoji, SUM(-t.amount) AS spent, COUNT(*) AS n FROM transactions t
        LEFT JOIN categories c ON c.id = t.category_id
-       WHERE t.kind = 'expense' AND t.occurred_at >= ? AND t.occurred_at < ?${filter}
+       WHERE t.kind = 'expense' AND t.transit_id IS NULL AND t.occurred_at >= ? AND t.occurred_at < ?${filter}
        GROUP BY c.id ORDER BY spent DESC`,
     )
     .all(from, to) as { id: number | null; name: string | null; emoji: string | null; spent: number; n: number }[];

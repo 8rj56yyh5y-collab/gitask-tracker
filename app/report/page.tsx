@@ -68,7 +68,7 @@ export default async function ReportPage({ searchParams }: { searchParams: Promi
   return (
     <div className="narrow-wide report">
       <h1>Отчёт</h1>
-      <p className="page-hint">Например, отчёт руководителю за неделю: выберите период и чьи деньги — ниже итог, а файл Excel можно скачать или отправить себе в Telegram и переслать.</p>
+      <p className="page-hint">Выберите период и чьи деньги — ниже итог, файл Excel и отправка в Telegram.</p>
       {sp.sent && <div className="toast-row toast-pop">✓ Отчёт отправлен вам в Telegram — перешлите его оттуда</div>}
       {sp.err && <div className="card hint-warn">{sp.err}</div>}
 

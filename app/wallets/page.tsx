@@ -23,16 +23,19 @@ export default function Wallets() {
   const spentCards = cards.reduce((a, c) => a + (usage.get(c.id) ?? 0), 0);
   const month = new Date().toLocaleDateString("ru-RU", { month: "long" });
   const cardBal = cardBalances();
+  const mainBal = cards.reduce((a, c) => a + (cardBal.get(c.id) ?? 0), 0);
+  const mainWith = cards.filter((c) => cardBal.has(c.id)).length;
 
   return (
     <div className="narrow-wide">
       <h1>Деньги</h1>
 
-      {cardBal.size > 0 && (
+      {mainWith > 0 && (
         <section className="wallet-total">
           <span className="muted small">Всего на картах{cash ? " и наличными" : ""}</span>
-          <b className="num">{formatMoney([...cardBal.values()].reduce((a, v) => a + v, 0) + cash)}</b>
-          {cardBal.size < cards.length && <span className="muted small">баланс указан у {cardBal.size} из {cards.length} карт — остальные можно добавить в карточке карты</span>}
+          {/* Только основные карты: у дополнительной карты нет своих денег — её траты уже в балансе основной. */}
+          <b className="num">{formatMoney(mainBal + cash)}</b>
+          {mainWith < cards.length && <span className="muted small">баланс указан у {mainWith} из {cards.length} карт — остальные можно добавить в карточке карты</span>}
         </section>
       )}
 
