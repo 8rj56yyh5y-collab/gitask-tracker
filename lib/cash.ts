@@ -139,6 +139,31 @@ export function setCashFact(id: number, kop: number | null) {
     .run(kop, kop === null ? null : new Date().toISOString(), id);
 }
 
+export interface CashFact {
+  /** Сколько на руках на нужный момент: пересчёт ± наличные операции после него. */
+  amount: number;
+  /** Что было при пересчёте и когда. */
+  base: number;
+  at: string;
+  /** Сколько прибавилось/убавилось наличными с момента пересчёта (до нужного момента). */
+  since: number;
+}
+
+/**
+ * «На руках по факту» на момент `atIso` (по умолчанию — сейчас): пересчёт плюс все наличные операции кассы после него —
+ * траты, приходы, переводы. Не считаются: операции с карт (наличные они не меняют) и корректировки учёта.
+ * Если момент раньше пересчёта — наоборот, вычитаем то, что было между ним и пересчётом.
+ */
+export function cashFactAt(b: Pick<Cashbox, "id" | "center_id" | "pot" | "fact" | "fact_at">, atIso = new Date().toISOString()): CashFact | null {
+  if (b.fact === null || b.fact === undefined || !b.fact_at) return null;
+  const base = Number(b.fact);
+  const where = `${boxScope(b)} AND t.card_id IS NULL AND ${notAdjust()}`;
+  const q = (from: string, to: string) =>
+    Number((getDb().prepare(`SELECT COALESCE(SUM(t.amount), 0) AS s FROM transactions t WHERE ${where} AND t.occurred_at > ? AND t.occurred_at <= ?`).get(from, to) as { s: number }).s);
+  const since = atIso >= b.fact_at ? q(b.fact_at, atIso) : -q(atIso, b.fact_at);
+  return { amount: base + since, base, at: b.fact_at, since };
+}
+
 /** Включить или выключить «касса = направление». */
 export function setCashboxPot(id: number, on: boolean) {
   getDb().prepare("UPDATE cashboxes SET pot = ? WHERE id = ?").run(on ? 1 : 0, id);

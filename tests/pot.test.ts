@@ -123,6 +123,18 @@ test("«на руках по факту» — отдельная цифра: у�
   assert.equal(r.cash!.fact!.amount, 30_000_00);
   assert.equal(r.expense, 11_390_00);
   await report.reportXlsx(r);
+  // После пересчёта: траты наличными уменьшают «на руках», траты с карты и корректировки учёта — нет.
+  const later = new Date(Date.now() + 2000).toISOString();
+  cash.cashMove(box, { amountKop: -1_500_00, counterparty: "Бензин", at: later });
+  cash.cashMove(box, { amountKop: 400_00, counterparty: "Вернули", at: later });
+  repo.createCard({ bank: "Mono", last4: "9911", owner: "", kind: "personal", monthly_limit: 0, mono_account_id: null });
+  const card = repo.listCards().find((c) => c.last4 === "9911")!.id;
+  getDb().prepare("UPDATE transactions SET card_id = ? WHERE id = ?").run(card, cash.cashMove(box, { amountKop: -999_00, at: later }));
+  cash.adjustCashbox(box, 0);
+  const f = cash.cashFactAt(cash.getCashbox(box)!, new Date(Date.now() + 5000).toISOString())!;
+  assert.deepEqual({ amount: f.amount, base: f.base, since: f.since }, { amount: 28_900_00, base: 30_000_00, since: -1_100_00 });
+  // На момент раньше пересчёта — наоборот: трата 11 390 до пересчёта ещё не случилась.
+  assert.equal(cash.cashFactAt(cash.getCashbox(box)!, new Date(Date.now() - 864e5).toISOString())!.amount, 41_390_00);
   cash.setCashFact(box, null);
   assert.equal(report.buildReport({ kind: "cash", id: box }, ymd, ymd).cash!.fact, null);
 });
