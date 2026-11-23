@@ -88,7 +88,24 @@ export function boxScope(b: Pick<Cashbox, "id" | "center_id" | "pot">, alias = "
   const id = Number(b.id);
   if (!b.pot || !b.center_id) return `${alias}.cashbox_id = ${id}`;
   const ids = centerSubtree(Number(b.center_id)).join(",");
-  return `(${alias}.cashbox_id = ${id} OR (${alias}.cost_center_id IN (${ids}) AND ${alias}.kind != 'internal' AND ${alias}.transit_id IS NULL))`;
+  // Только наличные: записи направления без карты и без другой кассы, введённые вручную.
+  // Траты с карт (и оплаты Apple Pay/банка без карты) наличные в кассе не меняют — в остаток не входят.
+  // Записи другой кассы этого направления принадлежат той кассе — не считаем их дважды.
+  return `(${alias}.cashbox_id = ${id} OR (${alias}.cashbox_id IS NULL AND ${alias}.card_id IS NULL AND ${alias}.source = 'manual' AND ${alias}.cost_center_id IN (${ids}) AND ${alias}.kind != 'internal' AND ${alias}.transit_id IS NULL))`;
+}
+
+/** Траты и приходы направления кассы, сделанные не наличными (с карт, Apple Pay, банк), за период. Для подсказки «в кассу не входят». */
+export function directionNonCash(b: Pick<Cashbox, "id" | "center_id" | "pot">, fromIso: string, toIso: string): { in: number; out: number; n: number } {
+  if (!b.center_id) return { in: 0, out: 0, n: 0 };
+  const ids = centerSubtree(Number(b.center_id)).join(",");
+  const r = getDb()
+    .prepare(
+      `SELECT COALESCE(SUM(CASE WHEN t.amount > 0 THEN t.amount END), 0) AS i, COALESCE(SUM(CASE WHEN t.amount < 0 THEN -t.amount END), 0) AS o, COUNT(*) AS n
+       FROM transactions t WHERE t.cost_center_id IN (${ids}) AND t.kind != 'internal' AND t.transit_id IS NULL
+       AND COALESCE((${boxScope(b)}), 0) = 0 AND t.cashbox_id IS NULL AND t.occurred_at >= ? AND t.occurred_at < ?`,
+    )
+    .get(fromIso, toIso) as { i: number; o: number; n: number };
+  return { in: Number(r.i), out: Number(r.o), n: Number(r.n) };
 }
 
 /** Остатки всех касс: начальный остаток + все приходы и расходы (у «касса = направление» — всего направления). */
@@ -157,7 +174,7 @@ export interface CashFact {
 export function cashFactAt(b: Pick<Cashbox, "id" | "center_id" | "pot" | "fact" | "fact_at">, atIso = new Date().toISOString()): CashFact | null {
   if (b.fact === null || b.fact === undefined || !b.fact_at) return null;
   const base = Number(b.fact);
-  const where = `${boxScope(b)} AND t.card_id IS NULL AND ${notAdjust()}`;
+  const where = `${boxScope(b)} AND ${notAdjust()}`;
   const q = (from: string, to: string) =>
     Number((getDb().prepare(`SELECT COALESCE(SUM(t.amount), 0) AS s FROM transactions t WHERE ${where} AND t.occurred_at > ? AND t.occurred_at <= ?`).get(from, to) as { s: number }).s);
   const since = atIso >= b.fact_at ? q(b.fact_at, atIso) : -q(atIso, b.fact_at);

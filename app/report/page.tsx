@@ -50,15 +50,17 @@ export default async function ReportPage({ searchParams }: { searchParams: Promi
   const tg = telegramState();
   const auto = getSetting("report_auto") === "1";
   const centerNoBox = scope.kind === "center" && !boxes.some((b) => b.center_id === scope.id);
+  const pendingSum = r.pending.reduce((a, p) => a + p.left, 0);
+  const nonCashOps = r.ops.filter((o) => !o.cash && o.kind !== "Корректировка").length;
+  const cardOut = r.ops.filter((o) => !o.cash && o.amount < 0 && o.kind !== "Корректировка").reduce((a, o) => a - o.amount, 0);
   const text = [
     r.title,
-    r.cash ? `Наличные на начало: ${formatMoney(r.cash.start)}` : null,
-    `Приходы: ${formatMoney(r.income)}`,
-    `Расходы: ${formatMoney(r.expense)}`,
-    `Итог: ${formatMoney(r.net)}`,
-    r.cash ? `Наличные на конец: ${formatMoney(r.cash.end)}` : null,
+    r.cash && r.cashFlow
+      ? `Наличные: было ${formatMoney(r.cash.start)} + пришло ${formatMoney(r.cashFlow.in)} − ушло ${formatMoney(r.cashFlow.out)}${r.cashFlow.adjust ? ` ± корректировки ${formatMoney(r.cashFlow.adjust)}` : ""} = осталось ${formatMoney(r.cash.end)}`
+      : null,
     r.cash?.fact ? `На руках по факту: ${formatMoney(r.cash.fact.amount)}` : null,
-    r.pending.length ? `Ожидают оплаты: ${formatMoney(r.pending.reduce((a, p) => a + p.left, 0))}` : null,
+    pendingSum ? `Ждут оплаты: ${formatMoney(pendingSum)}` : null,
+    !r.cash || nonCashOps ? `${r.cash ? "Всего по направлению: " : ""}приходы ${formatMoney(r.income)}, расходы ${formatMoney(r.expense)}, итог ${formatMoney(r.net)}` : null,
   ]
     .filter(Boolean)
     .join("\n");
@@ -122,57 +124,69 @@ export default async function ReportPage({ searchParams }: { searchParams: Promi
           <strong>{r.scopeName}</strong>
           <span className="muted">{periodTitle(from, to)}</span>
         </div>
-        {r.cash && (
-          <div className="rs-row">
-            <span>Наличные на начало</span>
-            <b className="num">{formatMoney(r.cash.start)}</b>
-          </div>
-        )}
-        <div className="rs-row">
-          <span>Приходы</span>
-          <b className="num pos-text">+{formatMoney(r.income)}</b>
-        </div>
-        <div className="rs-row">
-          <span>Расходы</span>
-          <b className="num">−{formatMoney(r.expense)}</b>
-        </div>
-        <div className="rs-row is-total">
-          <span>Итог</span>
-          <b className="num">{formatMoney(r.net)}</b>
-        </div>
-        {r.adjust !== 0 && (
-          <div className="rs-row">
-            <span>Корректировки остатка</span>
-            <b className="num">{r.adjust > 0 ? "+" : "−"}{formatMoney(Math.abs(r.adjust))}</b>
-          </div>
-        )}
-        {r.cash && (
-          <div className="rs-row is-total">
-            <span>Наличные на конец</span>
-            <b className="num">{formatMoney(r.cash.end)}</b>
-          </div>
-        )}
-        {r.cash?.fact && (
-          <div className="rs-row is-total">
-            <span>
-              ✋ На руках по факту
-              <small className="muted"> · пересчёт {new Date(r.cash.fact.at).toLocaleDateString("ru-RU", { day: "numeric", month: "long" })}</small>
-            </span>
-            <b className="num">{formatMoney(r.cash.fact.amount)}</b>
-          </div>
-        )}
-        {r.pending.length > 0 && (
+        {r.cash && r.cashFlow && (
           <>
+            <div className="rs-head">Наличные в кассе</div>
             <div className="rs-row">
-              <span>Ожидают оплаты ({r.pending.length})</span>
-              <b className="num">−{formatMoney(r.pending.reduce((a, p) => a + p.left, 0))}</b>
+              <span>Было на начало</span>
+              <b className="num">{formatMoney(r.cash.start)}</b>
             </div>
-            {r.cash && (
+            <div className="rs-row">
+              <span>＋ Пришло</span>
+              <b className="num pos-text">{r.cashFlow.in ? "+" : ""}{formatMoney(r.cashFlow.in)}</b>
+            </div>
+            <div className="rs-row">
+              <span>− Ушло</span>
+              <b className="num">{r.cashFlow.out ? "−" : ""}{formatMoney(r.cashFlow.out)}</b>
+            </div>
+            {r.cashFlow.adjust !== 0 && (
               <div className="rs-row">
-                <span>После всех оплат</span>
-                <b className="num">{formatMoney(r.cash.end - r.pending.reduce((a, p) => a + p.left, 0))}</b>
+                <span>Корректировки учёта</span>
+                <b className="num">
+                  {r.cashFlow.adjust > 0 ? "+" : "−"}
+                  {formatMoney(Math.abs(r.cashFlow.adjust))}
+                </b>
               </div>
             )}
+            <div className="rs-row is-total">
+              <span>＝ Осталось на конец</span>
+              <b className="num">{formatMoney(r.cash.end)}</b>
+            </div>
+            {r.cash.fact && (
+              <div className="rs-row rs-extra">
+                <span>На руках по факту</span>
+                <b className="num">{formatMoney(r.cash.fact.amount)}</b>
+              </div>
+            )}
+            {pendingSum > 0 && (
+              <>
+                <div className="rs-row rs-extra">
+                  <span>Ждут оплаты ({r.pending.length})</span>
+                  <b className="num">−{formatMoney(pendingSum)}</b>
+                </div>
+                <div className="rs-row rs-extra">
+                  <span>Останется после оплат</span>
+                  <b className="num">{formatMoney(r.cash.end - pendingSum)}</b>
+                </div>
+              </>
+            )}
+          </>
+        )}
+        {(!r.cash || nonCashOps > 0) && (
+          <>
+            {r.cash && <div className="rs-head">Всего по направлению · наличные и карты</div>}
+            <div className="rs-row">
+              <span>＋ Приходы</span>
+              <b className="num pos-text">{r.income ? "+" : ""}{formatMoney(r.income)}</b>
+            </div>
+            <div className="rs-row">
+              <span>− Расходы{r.cash && cardOut ? <small className="muted"> · из них с карт {formatMoney(cardOut)}</small> : null}</span>
+              <b className="num">{r.expense ? "−" : ""}{formatMoney(r.expense)}</b>
+            </div>
+            <div className="rs-row is-total">
+              <span>＝ Итог</span>
+              <b className="num">{formatMoney(r.net)}</b>
+            </div>
           </>
         )}
       </section>

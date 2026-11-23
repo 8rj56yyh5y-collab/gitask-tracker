@@ -74,7 +74,7 @@ test("отчёт по направлению с кассой: траты, при
   const ws = wb.getWorksheet("Отчёт")!;
   const texts: string[] = [];
   ws.eachRow((row) => row.eachCell((c) => texts.push(String(c.value))));
-  for (const t of ["Руководитель", "Итог за период", "Было на начало", "＝ Осталось на конец", "На что ушли деньги", "Все операции", "Итого", "Топливо"]) assert.ok(texts.includes(t), t);
+  for (const t of ["Руководитель", "Наличные в кассе", "Было на начало", "＝ Осталось на конец", "Всего по направлению", "На что ушли деньги", "Все операции", "Итого", "Топливо"]) assert.ok(texts.includes(t), t);
   assert.ok(texts.includes("20000") && texts.includes("-3200"), "суммы операций числами");
   assert.equal(report.reportFileName(r, new Date("2026-11-23T20:15:00Z")), "Отчёт Руководитель 2026-11-09 - 2026-11-15 (23.11 22-15).xlsx");
 });
