@@ -126,3 +126,15 @@ test("«на руках по факту» — отдельная цифра: у�
   cash.setCashFact(box, null);
   assert.equal(report.buildReport({ kind: "cash", id: box }, ymd, ymd).cash!.fact, null);
 });
+
+test("сообщение к отчёту в Telegram: итоги, касса, топ категорий, без лишнего", () => {
+  const box = cash.createCashbox({ name: "Касса сообщения", opening: 1_000_00 });
+  cash.cashMove(box, { amountKop: -300_00, counterparty: "АЗС", at: new Date().toISOString() });
+  const today = new Date();
+  const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const msg = report.reportMessage(report.buildReport({ kind: "cash", id: box }, ymd, ymd)).replace(/[\u202f\u00a0]/g, " ");
+  assert.match(msg, /Расходы  <b>−300 ₴<\/b>/);
+  assert.match(msg, /Касса  1 000 ₴ → <b>700 ₴<\/b>/);
+  assert.doesNotMatch(msg, /На руках|Ждут оплаты/, "пустые строки не показываем");
+  assert.ok(msg.length < 1000, "влезает в подпись к файлу");
+});

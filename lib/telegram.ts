@@ -356,10 +356,10 @@ export async function sendWeekSummary(now = new Date()): Promise<boolean> {
   // Файл отчёта за прошлую неделю (если включено на странице «Отчёт») — чтобы сразу переслать руководителю.
   if (getSetting("report_auto") === "1") {
     try {
-      const { buildReport, parseScope, presetRange, reportFileName, reportXlsx } = await import("./report.ts");
+      const { buildReport, parseScope, presetRange, reportFileName, reportMessage, reportXlsx } = await import("./report.ts");
       const range = presetRange("lastweek", now);
       const r = buildReport(parseScope(getSetting("report_scope")), range.from, range.to);
-      await sendFileToTelegram(await reportXlsx(r), reportFileName(r), `📎 Отчёт за прошлую неделю\n${reportCaption(r)}`);
+      await sendFileToTelegram(await reportXlsx(r), reportFileName(r), reportMessage(r));
     } catch (e) {
       console.error("Weekly report file:", e);
     }
@@ -612,13 +612,3 @@ export async function sendFileToTelegram(file: Buffer, filename: string, caption
   if (!data.ok) throw new Error(`Telegram: ${data.description ?? res.status}`);
 }
 
-/** Короткий текст отчёта для сообщения: приходы, расходы, итог. */
-export function reportCaption(r: { title: string; income: number; expense: number; net: number; cash: { start: number; end: number; fact?: { amount: number } | null } | null; pending?: { left: number }[] }): string {
-  const lines = [`<b>${esc(r.title)}</b>`];
-  if (r.cash) lines.push(`Наличные на начало: ${esc(formatMoney(r.cash.start))}`);
-  lines.push(`Приходы: ${esc(formatMoney(r.income))}`, `Расходы: ${esc(formatMoney(r.expense))}`, `Итог: <b>${esc(formatMoney(r.net))}</b>`);
-  if (r.cash) lines.push(`Наличные на конец: <b>${esc(formatMoney(r.cash.end))}</b>`);
-  if (r.cash?.fact) lines.push(`На руках по факту: <b>${esc(formatMoney(r.cash.fact.amount))}</b>`);
-  if (r.pending?.length) lines.push(`Ожидают оплаты: ${esc(formatMoney(r.pending.reduce((a, p) => a + p.left, 0)))}`);
-  return lines.join("\n");
-}
