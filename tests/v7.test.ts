@@ -80,7 +80,7 @@ test("отчёт по направлению с кассой: траты, при
   assert.match(String(sum.getCell("B2").value), /D&N/, "фирменная шапка");
   assert.equal(sum.getCell("B3").value, r.scopeName);
   assert.ok(wb.model.media.length >= 1, "в файле есть картинка-логотип");
-  assert.equal(report.reportFileName(r), "Отчёт Руководитель 2026-11-09 - 2026-11-15.xlsx");
+  assert.equal(report.reportFileName(r, new Date("2026-11-23T20:15:00Z")), "Отчёт Руководитель 2026-11-09 - 2026-11-15 (23.11 22-15).xlsx");
 });
 
 test("периоды: прошлая неделя — пн–вс, этот месяц, прошлый месяц", () => {
