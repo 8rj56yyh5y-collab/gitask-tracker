@@ -1,4 +1,4 @@
-import { buildReport, parseScope, presetRange, reportFileName, reportXlsx } from "@/lib/report.ts";
+import { buildReport, madeStamp, parseScope, presetRange, reportFileName, reportXlsx } from "@/lib/report.ts";
 
 // Скачать отчёт за период файлом Excel. Доступ — как ко всему D&N: только после входа (middleware).
 export async function GET(req: Request) {
@@ -9,12 +9,16 @@ export async function GET(req: Request) {
   const to = ok(u.searchParams.get("to")) ?? def.to;
   const r = buildReport(parseScope(u.searchParams.get("scope")), from <= to ? from : to, from <= to ? to : from);
   const file = await reportXlsx(r);
-  const name = reportFileName(r);
+  const made = new Date();
+  const name = reportFileName(r, made);
+  const ascii = `DN-report-${r.from}_${r.to}-${madeStamp(made).replace(/[^0-9]/g, "")}.xlsx`;
   return new Response(new Uint8Array(file), {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="DN-report-${r.from}_${r.to}.xlsx"; filename*=UTF-8''${encodeURIComponent(name)}`,
-      "Cache-Control": "no-store",
+      "Content-Disposition": `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`,
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+      Pragma: "no-cache",
+      Expires: "0",
     },
   });
 }

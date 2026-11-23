@@ -294,7 +294,7 @@ export async function reportXlsx(r: Report): Promise<Buffer> {
   const signed = `+#,##0 "${sym}";−#,##0 "${sym}";0 "${sym}"`;
   const pct = `+0%;−0%;0%`;
   const now = new Date();
-  const made = `${now.toLocaleDateString("ru-RU")} в ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const made = `${now.toLocaleDateString("ru-RU", { timeZone: "Europe/Kyiv" })} в ${now.toLocaleTimeString("ru-RU", { timeZone: "Europe/Kyiv", hour: "2-digit", minute: "2-digit", hour12: false })}`;
   const period = periodTitle(r.from, r.to);
   const nDays = Math.max(1, Math.round((startOf(r.to).getTime() - startOf(r.from).getTime()) / 864e5) + 1);
   const pr = prevRange(r.from, r.to);
@@ -868,7 +868,15 @@ export function reportMessage(r: Report, prev: Report = prevReport(r)): string {
 }
 
 /** Имя файла: «Отчёт Руководитель 2026-11-09 - 2026-11-15.xlsx» — без символов, на которых спотыкаются браузеры. */
-export function reportFileName(r: Report): string {
+export function reportFileName(r: Report, made: Date = new Date()): string {
   const scope = r.scopeName.replace(/[^\p{L}\p{N} ._-]/gu, "").replace(/\s+/g, " ").trim();
-  return `Отчёт ${scope} ${r.from} - ${r.to}.xlsx`;
+  // Время формирования в имени: телефон не перепутает новый файл со старым за тот же период.
+  return `Отчёт ${scope} ${r.from} - ${r.to} (${madeStamp(made)}).xlsx`;
+}
+
+/** «23.11 22-15» по Киеву — когда сформирован файл. */
+export function madeStamp(d: Date = new Date()): string {
+  const p = new Intl.DateTimeFormat("ru-RU", { timeZone: "Europe/Kyiv", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(d);
+  const g = (t: string) => p.find((x) => x.type === t)?.value ?? "";
+  return `${g("day")}.${g("month")} ${g("hour")}-${g("minute")}`;
 }

@@ -178,7 +178,7 @@ export default async function ReportPage({ searchParams }: { searchParams: Promi
       </section>
 
       <div className="report-actions">
-        <a href={`/report/file?${q({})}`} className="btn btn-primary btn-big">
+        <a href={`/report/file?${q({ t: String(Date.now()) })}`} className="btn btn-primary btn-big">
           ⬇ Скачать Excel
         </a>
         {tg.linked ? (
