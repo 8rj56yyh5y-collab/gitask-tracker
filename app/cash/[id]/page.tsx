@@ -6,7 +6,7 @@ import { CenterSelect } from "../../components/CenterSelect.tsx";
 import { CategoryChips, CenterChips, SegTabs } from "../../components/Pickers.tsx";
 import { popularCategories } from "@/lib/categories.ts";
 import { TxRow } from "../../components/TxRow.tsx";
-import { boxScope, cashPending, cashStats, getCashbox } from "@/lib/cash.ts";
+import { boxScope, cashFactAt, cashPending, cashStats, getCashbox } from "@/lib/cash.ts";
 import { getDb } from "@/lib/db.ts";
 import { formatMoney, curSymbol } from "@/lib/money.ts";
 import { listPlans } from "@/lib/plans.ts";
@@ -36,8 +36,9 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
   const fixRaw = String(fixTo ?? "").replace(/\s/g, "").replace(",", ".");
   const fixAbs = fixRaw && Number.isFinite(Number(fixRaw)) ? Math.round(Math.abs(Number(fixRaw)) * 100) : null;
   const fixActual = fixAbs === null ? null : fixSign === "minus" || fixRaw.startsWith("-") ? -fixAbs : fixAbs;
-  const hasFact = b.fact !== null && b.fact !== undefined;
-  const fact = hasFact ? Number(b.fact) : 0;
+  const factNow = cashFactAt(b);
+  const hasFact = factNow !== null;
+  const fact = factNow?.amount ?? 0;
   const factDate = b.fact_at ? new Date(b.fact_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long" }) : "";
   const pending = cashPending(b);
   const pendingSum = pending.reduce((a, p) => a + p.left, 0);
@@ -109,7 +110,8 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
             <span>✋ На руках по факту</span>
             <b className={fact < 0 ? "neg" : undefined}>{fmtSigned(fact)}</b>
             <small>
-              пересчёт {factDate}
+              пересчёт {factDate}: {fmtSigned(factNow?.base ?? 0)}
+              {factNow?.since ? `, с тех пор ${factNow.since > 0 ? "+" : "−"}${formatMoney(Math.abs(factNow.since))}` : ", с тех пор без движений"}
               {fact !== balance ? ` · разница с учётом ${fact - balance > 0 ? "+" : "−"}${formatMoney(Math.abs(fact - balance))}` : " · совпадает с учётом"}
             </small>
           </a>
@@ -138,8 +140,9 @@ export default async function CashboxPage({ params, searchParams }: { params: Pr
           <h2>Сколько на руках по факту</h2>
           <p className="muted small">
             Записали трату заранее (например, заказали фару и заплатите при получении на почте), и по учёту в кассе меньше, чем лежит на самом деле? Впишите,
-            сколько наличных у вас <b>на руках сейчас</b>. Это отдельная цифра: учёт, траты и история <b>не меняются</b>. В отчёте будет видно и «по учёту», и
-            «на руках».
+            сколько наличных у вас <b>на руках сейчас</b>. Это отдельная цифра: учёт, траты и история <b>не меняются</b>. Дальше она сама меняется: траты
+            наличными её уменьшают, приходы — увеличивают (операции с карт — нет). Новый заказ с оплатой при получении лучше записать в «Ожидают оплаты» —
+            тогда он не уменьшит «на руках» раньше времени.
           </p>
           <div className="sign-seg" role="radiogroup" aria-label="Плюс или минус">
             <label>

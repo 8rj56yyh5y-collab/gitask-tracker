@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 import { getDb } from "./db.ts";
 import { centerTree } from "./repo.ts";
-import { ADJUST, boxScope, cashPending, getCashbox, listCashboxes, type PendingPay } from "./cash.ts";
+import { ADJUST, boxScope, cashFactAt, cashPending, getCashbox, listCashboxes, type PendingPay } from "./cash.ts";
 import { curSymbol, currentCurrency } from "./money.ts";
 
 // Отчёт за период (например, еженедельный отчёт руководителю): траты, приходы, итог —
@@ -36,7 +36,7 @@ export interface Report {
   /** Ожидают оплаты из кассы (заказали, платить при получении) — на сегодня. */
   pending: PendingPay[];
   /** Остаток наличных (касса или кассы направления) на начало и конец периода. */
-  cash: { names: string; start: number; end: number; fact?: { amount: number; at: string } | null } | null;
+  cash: { names: string; start: number; end: number; fact?: { amount: number; at: string; base: number; since: number } | null } | null;
   currency: string;
 }
 
@@ -161,8 +161,13 @@ export function buildReport(scope: ReportScope, from: string, to: string): Repor
     const during = db.prepare(`SELECT COALESCE(SUM(t.amount), 0) AS s FROM transactions t WHERE (${cond}) AND t.occurred_at >= ? AND t.occurred_at < ?`).get(fromIso, toIso) as { s: number };
     const start = opening + Number(before.s);
     // «На руках по факту» — только если записан у всех касс отчёта.
-    const facts = list.map((b) => (b.fact === null || b.fact === undefined ? null : { amount: Number(b.fact), at: String(b.fact_at ?? "") }));
-    const fact = facts.length && facts.every(Boolean) ? { amount: facts.reduce((a, x) => a + x!.amount, 0), at: facts.map((x) => x!.at).sort()[0] } : null;
+    // На конец периода: пересчёт ± наличные операции после него.
+    const endIso = toIso < new Date().toISOString() ? toIso : new Date().toISOString();
+    // Период закончился раньше пересчёта — «на руках» тогда неизвестно (траты могли быть записаны заранее), не показываем.
+    const facts = list.map((b) => (b.fact_at && endIso >= b.fact_at ? cashFactAt(b, endIso) : null));
+    const fact = facts.length && facts.every(Boolean)
+      ? { amount: facts.reduce((a, x) => a + x!.amount, 0), base: facts.reduce((a, x) => a + x!.base, 0), since: facts.reduce((a, x) => a + x!.since, 0), at: facts.map((x) => x!.at).sort()[0] }
+      : null;
     cash = { names: list.map((b) => b.name).join(", "), start, end: start + Number(during.s), fact };
   }
   return {
@@ -426,7 +431,7 @@ export async function reportXlsx(r: Report): Promise<Buffer> {
     cell(`B${row}`).value = {
       richText: [
         { text: "НА РУКАХ ПО ФАКТУ", font: font(8.5, C.muted, true) },
-        { text: `   пересчёт ${when}${diff ? ` · разница с учётом ${diff > 0 ? "+" : ""}${fmtPlain(diff, sym)} (траты, записанные заранее)` : " · совпадает с учётом"}`, font: font(9, C.muted) },
+        { text: `   пересчёт ${when}: ${fmtPlain(f.base, sym)}${f.since ? `, с тех пор ${f.since > 0 ? "+" : ""}${fmtPlain(f.since, sym)}` : ""}${diff ? ` · разница с учётом ${diff > 0 ? "+" : ""}${fmtPlain(diff, sym)}` : ""}`, font: font(9, C.muted) },
       ],
     };
     cell(`B${row}`).alignment = { vertical: "middle", indent: 1 };
